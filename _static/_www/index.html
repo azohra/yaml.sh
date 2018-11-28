@@ -6,91 +6,37 @@
     <meta name="keywords" content="YAML, yml, Azohra, azohra">
     <meta name="author" content="Azohra">
     <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Text+Me+One" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <title>YAML.sh</title>
 </head>
 
 <body>
-    <!-- Site header, include logo and possibly some text -->
+    <a href="https://github.com/azohra/yaml.sh" class="github-corner" aria-label="View source on GitHub"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#151513; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style>
+
     <header>
         <div class="banner">
-            <img class="block lead center" src="logos/logo-black.png">
+            <h1>yaml.sh</h1>
         </div>
     </header>
 
-    <!-- Terminal window -->
-    <div class="container scale-up-center">
-        <div class="bar">
-            <div class="butt bg-red"></div>
-            <div class="butt bg-yellow"></div>
-            <div class="butt bg-green"></div>
-        </div>
-        <!-- Tab bar -->
-        <div class="tab">
-            <button id="initial" class="window-links" onclick="openTab(event, 'tab1')">~ - strapped</button>
-            <button class="window-links" onclick="openTab(event, 'tab2')">~ - vim strap_config.yml</button>
-        </div>
-
-        <!-- Window that contains the script execution -->
-        <div id="tab1" class="window">
-            <div class="block center">
-                <div class="console">
-                    <span class="prompt">> </span>
-                    <span class="command"> curl https://get.yaml.sh | sh</span><br>
-                    <span class="prompt">🔫 #YAML</span><br><br>
-                    <span class="prompt pulse">></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Window that contains the contents of strapped_config -->
-        <div id="tab2" class="window">
-            <div class="block center">
-                <div class="body console">
-                    <span class="highlight pulse">~</span><br>
-                    <span class="command">strapped:</span>
-                    <span class="comment"> # Where you wish to source your straps from</span><br>
-                    <span class="command indent-1">repo:</span>
-                    <span class="prompt"> https://raw.githubusercontent.com/azohra/strapped/master/straps</span><br><br>
-                    <span class="command">brew:</span><span class="comment"># Brew taps, casks and packages</span><br>
-                    <span class="command indent-1">taps:</span><br>
-                    <span class="prompt indent-2"> - { name: homebrew/core }</span><br>
-                    <span class="command indent-1">packages:</span><br>
-                    <span class="prompt indent-2">- { name: terraform, upgrade: true }</span><br>
-                    <span class="command indent-1">casks:</span><br>
-                    <span class="prompt indent-2">- { name: visual-studio-code, upgrade: true }</span><br><br>
-                    <span class="command">git:</span><span class="comment"># Clone any git repos you contribute to</span><br>
-                    <span class="command indent-1">clone:</span><br>
-                    <span class="prompt indent-1">- { repo: git@github.com:kelseyhightower/nocode.git, folder: ~/repos }</span><br><br>
-                    <span class="command">visual_studio_code:</span><span class="comment"># Install any vscode plugins you use</span><br>
-                    <span class="command indent-1">extensions:</span><br>
-                    <span class="prompt indent-2">- { name: PKief.material-icon-theme }</span><br>
-                    <span class="accent">~</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Middle content and links -->
     <div class="container">
-        <h3>A pure bash bootstrap for your system</h3>
-        <div class="row">
-            <a href="https://github.com/azohra/yaml.sh">
-                <img class="row-img-small" src="logos/github.svg">
-            </a>
-            <a href="https://docs.yaml.sh">
-                <img class="row-img-small" src="logos/docs.svg">
-            </a>
-        </div>
+            <h4>YAML ready for your shell</h4>
+    </div>
+    <div class="container">
+        <span>
+            Made with ❤️ by the developers at <a href="https://azohra.com">azohra.com</a>
+        </span>
     </div>
 
-    <!-- Footer content and links -->
-    <footer>
-        <h3>Made with ❤️ by the developers at</h3>
-        <a href="https://azohra.com">
-            <img class="item center" src="logos/black.png">
-        </a>
-    </footer>
+    <div class="container">
+        <div class="snippit">
+            <p>$ curl -s https://get.yaml.sh | sh</p>
+        </div>
+        <a href="https://docs.yaml.sh">View the docs</a></p>
+    </div>
+
+
 </body>
 
 </html>

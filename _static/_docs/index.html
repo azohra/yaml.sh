@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>strapped.sh</title>
+  <title>YAML.sh</title>
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
   <meta name="description" content="Description">
   <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
@@ -14,15 +14,20 @@
     window.$docsify = {
       loadSidebar: true,
       subMaxLevel: 2,
-      coverpage: true,
-      repo: 'https://github.com/azohra/strapped',
-      homepage: 'https://raw.githubusercontent.com/azohra/strapped/master/README.md',
-      auto2top: true
+      coverpage: false,
+      repo: 'https://github.com/azohra/yaml.sh',
+      homepage: 'https://raw.githubusercontent.com/azohra/yaml.sh/master/README.md',
+      auto2top: true,
+
+      search: 'auto',
+
     }
     if (typeof navigator.serviceWorker !== 'undefined') {
       navigator.serviceWorker.register('sw.js')
     }
   </script>
   <script src="//unpkg.com/docsify/lib/docsify.min.js"></script>
+  <script src="//unpkg.com/docsify/lib/plugins/search.min.js"></script>
+  <script src="https://unpkg.com/docsify-copy-code@2"></script>
 </body>
 </html>

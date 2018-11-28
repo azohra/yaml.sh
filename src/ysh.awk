@@ -114,7 +114,7 @@ function remove_sur_quotes(target) {
     next
 }
 
-/^[[:space:]]*-[[:space:]][^[:space:]]+/ {
+/^[[:space:]]*-[[:space:]]+[^[:space:]]+/ {
     depth=level()
     val=$0
     sub(/^[[:space:]]*-[[:space:]]+/, "", val)
