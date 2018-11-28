@@ -1,0 +1,494 @@
+body, html {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body {
+  width: 100%;
+  background: #fff;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+footer {
+  text-align: center;
+}
+
+footer .item{
+  margin: 0;
+  padding: 20px;
+  width: 20vw;
+  height: auto;
+  display: inline-block;
+}
+
+.strapbox {
+  padding-bottom: 100px;
+}
+
+h1 {
+  color: #25313e;
+  font-size: 80px;
+  font-weight: 80;
+  text-align: center;
+  letter-spacing: 0.3rem;
+  margin-bottom: 1rem;
+  line-height: 1;
+}
+
+h2 {
+  color: #25313e;
+  font-size: 60px;
+  font-weight: 60;
+  text-align: center;
+  line-height: 1;
+}
+
+h3 {
+  color: #12181e;
+  font-size: 40px;
+  font-weight: 50;
+  text-align: center;
+  line-height: 1;
+}
+
+.spacer {
+  padding-top: 100px;
+  padding-bottom: 100px;
+}
+
+.window {
+  width: 60vw;
+  box-shadow: 0 0.25rem 0.5rem #12181e;
+  border-radius: 0 0 0.1rem 0.1rem;
+}
+
+.bar {
+  display: flex;
+  justify-content: left;
+  background: #191919;
+  height: 3vh;
+  width: auto;
+  min-height: 25px;
+  padding: 5px;
+  border-radius: 0.5rem 0.5rem 0 0;
+  overflow-wrap: break-word;
+}
+
+.butt {
+  align-self: center;
+  float: left;
+  margin-left: 10px;
+  height: 15px;
+  width: 15px;
+  border-radius: 100%;
+}
+
+.bg-red {
+  background: #f55551;
+}
+
+.bg-yellow {
+  background: #f6b73e;
+}
+
+.bg-green {
+  background: #32c146;
+}
+
+.btn, .btn::before, .btn::after {
+  width: 12px;
+  height: 12px;
+  border-radius: 100%;
+  display: block;
+}
+
+.btn {
+  background: #f6b73e;
+  position: relative;
+  margin-left: 38px;
+  top: 12px;
+}
+
+.btn::before, .btn::after {
+  content: " ";
+  position: absolute;
+}
+
+.btn::before {
+  background: #f55551;
+  margin-left: -20px;
+}
+
+.btn::after {
+  background: #32c146;
+  margin-left: 20px;
+}
+
+header {
+  margin-top: 0;
+  text-align: center;
+}
+
+nav {
+  width: 100vw;
+  height: auto;
+  text-align: right;
+}
+
+.icon {
+  width: 5vw;
+  height: auto;
+}
+
+.nav-item{
+  padding: 20px;
+  display: inline-block;
+  text-align: right;
+}
+
+.container {
+  margin: auto;
+  width: 60vw;
+  text-align: center;
+}
+
+.banner {
+  display: inline-block;
+  width: 50vw;
+  text-align: center;
+}
+
+.block {
+  text-align:left;
+  display: block;
+}
+
+.center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.left {
+  margin:auto auto auto 0;
+}
+
+.right {
+  margin:auto 0 auto auto;
+}
+
+.window {
+  display: none;
+  width: 100%;
+  box-shadow: 0 0.25rem 0.5rem #12181e;
+  border-radius: 0 0 0.1rem 0.1rem;
+}
+
+.lead {
+  width: 100%;
+}
+
+h2.nav {
+  margin: 0;
+  padding: 0;
+}
+
+.bg-white {
+  background-color: #fff;
+}
+
+/* Animations */
+.scale-up-center {
+	-webkit-animation: scale-up-center 0.4s cubic-bezier(0.390, 0.575, 0.565, 1.000) both;
+	        animation: scale-up-center 0.4s cubic-bezier(0.390, 0.575, 0.565, 1.000) both;
+}
+
+@-webkit-keyframes scale-up-center {
+  0% {
+    -webkit-transform: scale(0.5);
+            transform: scale(0.5);
+  }
+  100% {
+    -webkit-transform: scale(1);
+            transform: scale(1);
+  }
+}
+
+@keyframes scale-up-center {
+  0% {
+    -webkit-transform: scale(0.5);
+            transform: scale(0.5);
+  }
+  100% {
+    -webkit-transform: scale(1);
+            transform: scale(1);
+  }
+}
+
+/* Styling for the console tabs */
+
+.tab {
+    overflow: hidden;
+    background: #191919;
+}
+
+.tab button {
+  box-shadow: 0 0.25rem 0.5rem #12181e;
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  color: #fff;
+}
+
+.tab button:hover {
+  background-color: #302f2f;
+}
+
+.tab button.active {
+  
+  background-color: #414040;
+}
+
+/* Text styling */
+
+.indent-1{
+  padding-left: 10px;
+}
+
+.indent-2{
+  padding-left: 20px;
+}
+
+.indent-3{
+  padding-left: 30px;
+}
+
+/* Style for the the console text */
+
+.console {
+  background: #232323;
+  font-family: Courier, monospace;
+}
+
+span {
+  overflow-wrap: break-word;
+  margin-left: 8px;
+}
+
+.console .accent {
+  color: #969cff
+}
+
+.console .highlight {
+  background-color: #bbbbbb;
+  color: #3b3b3b;
+}
+
+.console .command {
+  color: #32c146;
+}
+
+.console .prompt {
+  color: #eeeeee;
+}
+
+.console .comment {
+  color: #fff;
+  opacity: 0.5;
+}
+
+.console .pulse {
+  -webkit-animation: pulse 1s ease-in-out infinite;
+  -moz-animation: pulse 1s ease-in-out infinite;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.m0 {
+  margin: 0;
+}
+
+/* Style for flexbox divs */
+
+.row { 
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+}
+
+.row-img-small {
+  width: 16vw;
+  height: auto;
+  margin: auto;
+}
+
+a {
+  margin: auto;
+}
+
+/* Pulse animation */
+
+@-webkit-keyframes pulse {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@-moz-keyframes pulse {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pulse {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Media query for mobile screens */
+
+@media (max-width: 1000px) {
+  .container {
+    width: 100vw;
+  }
+
+  .banner {
+    width: 80vw;
+  }
+
+  .nav {
+    height: 0;
+    visibility: hidden;
+  }
+
+  .icon {
+    width: 32px;
+    height: auto;
+  }
+
+  .bar {
+    display: flex;
+    justify-content: left;
+    background: #191919;
+    height: 2vh;
+    width: auto;
+    min-height: 25px;
+    padding: 5px;
+    border-radius: 0.5rem 0.5rem 0 0;
+    overflow-wrap: break-word;
+  }
+
+  h1 {
+    color: #25313e;
+    font-size: 40px;
+    font-weight: 80;
+    text-align: center;
+    letter-spacing: 0.3rem;
+    margin-bottom: 1rem;
+    line-height: 1;
+  }
+
+  h2 {
+    font-family: 'Montserrat', sans-serif;
+    color: #12181e;
+    font-size: 30px;
+    font-weight: 60;
+    text-align: center;
+    line-height: 1;
+  }
+
+  h3 {
+    font-family: 'Montserrat', sans-serif;
+    color: #12181e;
+    font-size: 20px;
+    font-weight: 50;
+    text-align: center;
+    line-height: 1;
+  }
+
+  footer .item{
+    margin: 0;
+    padding: 20px;
+    width: 40vw;
+    height: auto;
+    display: inline-block;
+  }
+
+}
+
+@keyframes fade-in {
+  from {opacity: 0; transform: scale(.7,.7)}
+  to {opacity: 1;}
+}
+.fade-in-element {
+animation: fade-in 2.0s;
+}
+
+.hidden {
+  opacity: 0;
+}
+
+.roll-in-left {
+	-webkit-animation: roll-in-left 0.6s ease-out both;
+	        animation: roll-in-left 0.6s ease-out both;
+}
+
+/* ----------------------------------------------
+ * Generated by Animista on 2018-11-23 16:46:41
+ * w: http://animista.net, t: @cssanimista
+ * ---------------------------------------------- */
+
+/**
+ * ----------------------------------------
+ * animation roll-in-left
+ * ----------------------------------------
+ */
+ @-webkit-keyframes roll-in-left {
+  0% {
+    -webkit-transform: translateX(-800px) rotate(-540deg);
+            transform: translateX(-800px) rotate(-540deg);
+    opacity: 0;
+  }
+  100% {
+    -webkit-transform: translateX(0) rotate(0deg);
+            transform: translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+@keyframes roll-in-left {
+  0% {
+    -webkit-transform: translateX(-800px) rotate(-540deg);
+            transform: translateX(-800px) rotate(-540deg);
+    opacity: 0;
+  }
+  100% {
+    -webkit-transform: translateX(0) rotate(0deg);
+            transform: translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+
+

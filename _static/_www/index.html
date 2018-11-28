@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="keywords" content="YAML, yml, Azohra, azohra">
+    <meta name="author" content="Azohra">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <title>YAML.sh</title>
+</head>
+
+<body>
+    <!-- Site header, include logo and possibly some text -->
+    <header>
+        <div class="banner">
+            <img class="block lead center" src="logos/logo-black.png">
+        </div>
+    </header>
+
+    <!-- Terminal window -->
+    <div class="container scale-up-center">
+        <div class="bar">
+            <div class="butt bg-red"></div>
+            <div class="butt bg-yellow"></div>
+            <div class="butt bg-green"></div>
+        </div>
+        <!-- Tab bar -->
+        <div class="tab">
+            <button id="initial" class="window-links" onclick="openTab(event, 'tab1')">~ - strapped</button>
+            <button class="window-links" onclick="openTab(event, 'tab2')">~ - vim strap_config.yml</button>
+        </div>
+
+        <!-- Window that contains the script execution -->
+        <div id="tab1" class="window">
+            <div class="block center">
+                <div class="console">
+                    <span class="prompt">> </span>
+                    <span class="command"> curl https://get.yaml.sh | sh</span><br>
+                    <span class="prompt">🔫 #YAML</span><br><br>
+                    <span class="prompt pulse">></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Window that contains the contents of strapped_config -->
+        <div id="tab2" class="window">
+            <div class="block center">
+                <div class="body console">
+                    <span class="highlight pulse">~</span><br>
+                    <span class="command">strapped:</span>
+                    <span class="comment"> # Where you wish to source your straps from</span><br>
+                    <span class="command indent-1">repo:</span>
+                    <span class="prompt"> https://raw.githubusercontent.com/azohra/strapped/master/straps</span><br><br>
+                    <span class="command">brew:</span><span class="comment"># Brew taps, casks and packages</span><br>
+                    <span class="command indent-1">taps:</span><br>
+                    <span class="prompt indent-2"> - { name: homebrew/core }</span><br>
+                    <span class="command indent-1">packages:</span><br>
+                    <span class="prompt indent-2">- { name: terraform, upgrade: true }</span><br>
+                    <span class="command indent-1">casks:</span><br>
+                    <span class="prompt indent-2">- { name: visual-studio-code, upgrade: true }</span><br><br>
+                    <span class="command">git:</span><span class="comment"># Clone any git repos you contribute to</span><br>
+                    <span class="command indent-1">clone:</span><br>
+                    <span class="prompt indent-1">- { repo: git@github.com:kelseyhightower/nocode.git, folder: ~/repos }</span><br><br>
+                    <span class="command">visual_studio_code:</span><span class="comment"># Install any vscode plugins you use</span><br>
+                    <span class="command indent-1">extensions:</span><br>
+                    <span class="prompt indent-2">- { name: PKief.material-icon-theme }</span><br>
+                    <span class="accent">~</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Middle content and links -->
+    <div class="container">
+        <h3>A pure bash bootstrap for your system</h3>
+        <div class="row">
+            <a href="https://github.com/azohra/yaml.sh">
+                <img class="row-img-small" src="logos/github.svg">
+            </a>
+            <a href="https://docs.yaml.sh">
+                <img class="row-img-small" src="logos/docs.svg">
+            </a>
+        </div>
+    </div>
+
+    <!-- Footer content and links -->
+    <footer>
+        <h3>Made with ❤️ by the developers at</h3>
+        <a href="https://azohra.com">
+            <img class="item center" src="logos/black.png">
+        </a>
+    </footer>
+</body>
+
+</html>
+
+<script>
+    function openTab(evt, tabName) {
+        // Declare all variables
+        var i, tabcontent, tablinks;
+
+        // Get all elements with class="tabcontent" and hide them
+        tabcontent = document.getElementsByClassName("window");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+
+        // Get all elements with class="tablinks" and remove the class "active"
+        tablinks = document.getElementsByClassName("window-links");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+
+        // Show the current tab, and add an "active" class to the button that opened the tab
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    document.getElementById("initial").click();
+</script>

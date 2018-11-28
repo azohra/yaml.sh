@@ -1,0 +1,1 @@
+[Guide](https://raw.githubusercontent.com/azohra/strapped/master/README.md ":include")
