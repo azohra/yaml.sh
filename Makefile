@@ -1,22 +1,24 @@
-.PHONY: all perms test build strap docs integrity
+.PHONY: lint test all install
+all: ysh lint test
 
-all: exec test build docs integrity
+ysh: src/ysh.sh src/ysh.awk
+	@echo "👷 Building"
+	@awk -f build/builder.awk src/ysh.sh > ysh
+	@chmod u+x ysh
 
-exec:
-	@chmod u+x *.sh
-	@chmod u+x build/*.sh
-	@chmod u+x straps/**/*.sh
+lint: ysh
+	@echo "👖 Linting"
+	@shellcheck -e SC2016 ysh
 
-test:
-	@shellcheck ./strapped.sh
-	@shellcheck ./straps/**/*.sh
-	@shellcheck ./build/*.sh
+test: ysh
+	@echo "🔬 Testing"
+	@./test/test.sh
 
-docs:
-	@./build/docs.sh
+install: ysh
+	@echo "📦 Installing ysh"
+	@cp ysh /usr/local/bin/ysh
+	@chmod u+x /usr/local/bin/ysh
 
-integrity:
-	@./build/integrity.sh
-
-strap:
-	@./build/compiler.sh $(yml)
+uninstall:
+	@echo "🗑️  Uninstalling ysh"
+	@rm /usr/local/bin/ysh

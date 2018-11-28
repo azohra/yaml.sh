@@ -1,0 +1,7 @@
+language: shell
+sudo: false
+script:
+  - shellcheck -e SC2016 ysh
+  - bash -c './test/test.sh'
+matrix:
+  fast_finish: true

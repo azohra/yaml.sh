@@ -13,8 +13,22 @@ body {
 }
 
 footer {
+  position: absolute;
+  bottom: 0px;
   text-align: center;
 }
+
+.snippit {
+  border-radius: 6px;
+  background: #25313e;
+  color: white;
+  width: 40%;
+  align-content: center;
+  margin: auto;
+  margin-top: 12%;
+  padding: 1px;
+}
+
 
 footer .item{
   margin: 0;
@@ -22,10 +36,6 @@ footer .item{
   width: 20vw;
   height: auto;
   display: inline-block;
-}
-
-.strapbox {
-  padding-bottom: 100px;
 }
 
 h1 {
@@ -52,6 +62,26 @@ h3 {
   font-weight: 50;
   text-align: center;
   line-height: 1;
+}
+
+/* unvisited link */
+a:link {
+  color: #25313e;
+}
+
+/* visited link */
+a:visited {
+  color: #25313e;
+}
+
+/* mouse over link */
+a:hover {
+  color: hotpink;
+}
+
+/* selected link */
+a:active {
+  color: #253130;
 }
 
 .spacer {
@@ -86,56 +116,9 @@ h3 {
   border-radius: 100%;
 }
 
-.bg-red {
-  background: #f55551;
-}
-
-.bg-yellow {
-  background: #f6b73e;
-}
-
-.bg-green {
-  background: #32c146;
-}
-
-.btn, .btn::before, .btn::after {
-  width: 12px;
-  height: 12px;
-  border-radius: 100%;
-  display: block;
-}
-
-.btn {
-  background: #f6b73e;
-  position: relative;
-  margin-left: 38px;
-  top: 12px;
-}
-
-.btn::before, .btn::after {
-  content: " ";
-  position: absolute;
-}
-
-.btn::before {
-  background: #f55551;
-  margin-left: -20px;
-}
-
-.btn::after {
-  background: #32c146;
-  margin-left: 20px;
-}
-
 header {
   margin-top: 0;
   text-align: center;
-}
-
-nav {
-  width: 100vw;
-  height: auto;
-  text-align: right;
 }
 
 .icon {
@@ -159,6 +142,8 @@ nav {
   display: inline-block;
   width: 50vw;
   text-align: center;
+  font-family: 'Text Me One', sans-serif;
+  padding-top: 10%;
 }
 
 .block {

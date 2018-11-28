@@ -1,0 +1,48 @@
+key_value:
+  key: value
+
+loose_query:
+  key: value
+  level1:
+    top_key: another_value
+
+subtree:
+  lower1: value
+  lower2: another_value
+  lower3:
+    upper1: upper_value
+    upper2:
+      - one
+      - two
+
+simple_list:
+  list:
+    - one
+    - two
+    - three
+    - four
+
+object_list:
+  list:
+    - { name: one, value: 1 }
+    - { name: two, value: 2 }
+    - { name: three, value: 3 }
+
+expanded_list:
+  list:
+    - name: one
+      value: 1
+    - name: two
+      value: 2
+    - name: three
+      value: 3
+  
+top_values:
+  lower1: value
+  lower2:
+    upper1:
+      upper_upper1: value
+    upper2: another_value
+  lower3:
+    - one
+    - two
