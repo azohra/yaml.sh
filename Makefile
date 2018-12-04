@@ -1,9 +1,10 @@
+BUILDERS=$(shell find build/*)
 .PHONY: lint test all install
 all: ysh lint test
 
-ysh: src/ysh.sh src/ysh.awk
+ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 	@echo "👷 Building"
-	@awk -f build/builder.awk src/ysh.sh > ysh
+	@awk -f build/shbuilder.awk src/ysh.sh > ysh
 	@chmod u+x ysh
 
 lint: ysh

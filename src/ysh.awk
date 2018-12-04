@@ -62,7 +62,7 @@ function remove_sur_quotes(target) {
     val=$0
     sub(/^[[:space:]]*[^[:space:]]+:[[:space:]]+/, "", val)
     val = remove_sur_quotes(val)
-    print join_stack(depth) "=" val
+    print join_stack(depth) "=\"" val "\""
     next
 }
 
@@ -87,11 +87,11 @@ function remove_sur_quotes(target) {
         sub(/^[[:space:]]*/, "", key)
         sub(/:.*$/, "", key)
 
-        sub(/^[[:space:]]*[^[:space:]]+:[[:space:]]+\"?/, "", val) # "
+        sub(/^[[:space:]]*[^[:space:]]+:[[:space:]]+\"?/, "", val) #"
         sub(/\"?[[:space:]]*$/, "", val) #"
         val = remove_sur_quotes(val)
 
-        print join_stack(depth) "." key "=" val
+        print join_stack(depth) "." key "=\"" val "\""
     }
     delete entries
     next
@@ -110,7 +110,7 @@ function remove_sur_quotes(target) {
     val=$0
     sub(/^[[:space:]]*-[[:space:]][^[:space:]]+:[[:space:]]+/, "", val)
     val = remove_sur_quotes(val)
-    print join_stack(depth) "=" val
+    print join_stack(depth) "=\"" val "\""
     next
 }
 
@@ -120,7 +120,7 @@ function remove_sur_quotes(target) {
     sub(/^[[:space:]]*-[[:space:]]+/, "", val)
     sub(/[[:space:]]*$/, "", val)
     val = remove_sur_quotes(val)
-    print join_stack(depth) "=" val
+    print join_stack(depth) "=\"" val "\""
     next
 }
 

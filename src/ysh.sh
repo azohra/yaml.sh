@@ -1,6 +1,8 @@
 #! /bin/bash
 # shellcheck source=/dev/null
-YSH_version='0.1.0'
+YSH_version='0.1.1'
+
+# Will be replaced by builder with minified awk parser program
 YAML_AWK_PARSER=$(cat src/ysh.awk)
 
 YSH_parse() {
@@ -12,7 +14,7 @@ YSH_query() {
 }
 
 YSH_safe_query() {
-    grep -E "^${2}=" <<< "${1}" | sed -E "s/^${2}=//"
+    grep -E "^${2}=\".*\"$" <<< "${1}" | sed -E "s/^${2}=\"//" | sed -E "s/\"$//"
 }
 
 YSH_sub() {
@@ -35,6 +37,10 @@ YSH_safe_index() {
     YSH_safe_query "${1}" "\\[${2}\\]"
 }
 
+YSH_safe_index() {
+    YSH_safe_query "${1}" "\\[${2}\\]"
+}
+
 YSH_tops() {
     sed -E "s/[\\[\\.=].*$//" <<< "${1}" | uniq
 }
@@ -48,11 +54,12 @@ YSH_usage() {
     echo "  -f, --file        <file_name>    parse file"
     echo "  -T, --transpiled  <file_name>    use pre-transpiled file"
     echo "  -q, --query       <query>        generic query"
-    echo "  -Q, --query-val   <query>        safe query. Guarentees value results."
+    echo "  -Q, --query-val   <query>        safe query. Guarentees a value."
     echo "  -s, --sub         <query>        sub structure. No values."
     echo "  -l, --list        <query>        query for a list"
     echo "  -c, --count       <query>        count length of list element"
     echo "  -i, --index       <i>            array access by index"
+    echo "  -I, --index       <i>            array access by index. Guarentees a value."
     echo "  -I, --index-val   <i>            safe array access by index. Guarentees a value."
     echo "  -t, --tops                       top level children keys of structure"
     echo "  -h, --help                       prints this message"
