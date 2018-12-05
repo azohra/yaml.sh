@@ -5,6 +5,8 @@
 
 Yup. A YAML parser completely in bash. I can't believe it either.
 
+> At the moment, we support [a subset of the yaml spec](https://docs.yaml.sh/#/supported_yml).
+
 ## Getting Started
 
 Install it:
