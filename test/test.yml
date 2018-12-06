@@ -1,3 +1,4 @@
+---
 key_value:
   key: value
 
@@ -46,3 +47,8 @@ top_values:
   lower3:
     - one
     - two
+key: value
+---
+key: block_2_value
+---
+key: block_3_value

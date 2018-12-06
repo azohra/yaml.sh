@@ -16,7 +16,8 @@ function level() {
 }
 
 function join_stack(depth) {
-    r = ""
+    r = sprintf("%"block_level"s","")
+    gsub(/ /,"-",r)
     for (i = 0; i <= depth; i++) {
         r = r "." stack[i]
     }
@@ -50,7 +51,24 @@ function remove_sur_quotes(target) {
     return target
 }
 
+function check_started() {
+    if (started == 0) {
+        raise("Keys must be added before line "NR)
+    }
+}
+
+/^---/ {
+    if (started==0) {
+        started=1
+    } else {
+        block_level++
+    }
+    next
+}
+
+
 /^[[:space:]]*[^[:space:]]+:/ {
+    started=1
     depth=level()
     key=$1
     sub(/:.*$/, "", key)
@@ -58,6 +76,7 @@ function remove_sur_quotes(target) {
 }
 
 /^[[:space:]]*[^[:space:]]+:[[:space:]]+[^[:space:]]+/ {
+    started=1
     depth=level()
     val=$0
     sub(/^[[:space:]]*[^[:space:]]+:[[:space:]]+/, "", val)
@@ -67,6 +86,7 @@ function remove_sur_quotes(target) {
 }
 
 /^[[:space:]]*\-/ {
+    check_started()
     depth=level()
     stack_key=join_stack(depth-1)
     indx=list_counter[stack_key]++
@@ -74,6 +94,7 @@ function remove_sur_quotes(target) {
 }
 
 /^[[:space:]]*-[[:space:]]+\{.*\}[[:space:]]*$/ {
+    check_started()
     depth=level()
     line=$0
     sub(/^[[:space:]]*-[[:space:]]+\{/, "", line)
@@ -98,6 +119,7 @@ function remove_sur_quotes(target) {
 }
 
 /^[[:space:]]*-[[:space:]][^[:space:]]+:/ {
+    check_started()
     depth=level() + 1
     key=$0
     sub(/^[[:space:]]*-[[:space:]]/, "", key)
@@ -106,6 +128,7 @@ function remove_sur_quotes(target) {
 }
 
 /^[[:space:]]*-[[:space:]][^[:space:]]+:[[:space:]]+[^[:space:]]+/ {
+    check_started()
     depth=level() + 1
     val=$0
     sub(/^[[:space:]]*-[[:space:]][^[:space:]]+:[[:space:]]+/, "", val)
@@ -115,6 +138,7 @@ function remove_sur_quotes(target) {
 }
 
 /^[[:space:]]*-[[:space:]]+[^[:space:]]+/ {
+    check_started()
     depth=level()
     val=$0
     sub(/^[[:space:]]*-[[:space:]]+/, "", val)

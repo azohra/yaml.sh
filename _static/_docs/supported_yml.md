@@ -1,6 +1,8 @@
 Right now YAML.sh only supports a subset of the yaml spec. Below is a reference on what is currently supported:
 
 ```yaml
+---
+block_no: 0
 level_one:
   level_two:
     key: value
@@ -19,4 +21,6 @@ level_one:
         value: 2
       - name: "quoted thing"
         value: 9000
+---
+block_no: 1
 ```

@@ -1,6 +1,6 @@
 #! /bin/bash
 # shellcheck source=/dev/null
-YSH_version='0.1.1'
+YSH_version='0.1.2'
 
 # Will be replaced by builder with minified awk parser program
 YAML_AWK_PARSER=$(cat src/ysh.awk)
@@ -45,6 +45,10 @@ YSH_tops() {
     sed -E "s/[\\[\\.=].*$//" <<< "${1}" | uniq
 }
 
+YSH_next_block() {
+    grep -E "^-.*" <<< "${1}" | sed -E "s/^-\\.?//g"
+}
+
 
 YSH_usage() {
     echo ""
@@ -62,6 +66,7 @@ YSH_usage() {
     echo "  -I, --index       <i>            array access by index. Guarentees a value."
     echo "  -I, --index-val   <i>            safe array access by index. Guarentees a value."
     echo "  -t, --tops                       top level children keys of structure"
+    echo "  -n, --next                       move to next block"
     echo "  -h, --help                       prints this message"
     echo ""
     echo "And even more at https://docs.yaml.sh"
@@ -113,6 +118,9 @@ ysh() {
         -s|--sub)
             YSH_RAW_STRING="$(YSH_sub "${YSH_RAW_STRING}" "${2}")"
             shift
+        ;;
+        -n|--next)
+            YSH_RAW_STRING="$(YSH_next_block "${YSH_RAW_STRING}")"
         ;;
         -t|--tops)
             YSH_RAW_STRING="$(YSH_tops "${YSH_RAW_STRING}")"

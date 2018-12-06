@@ -63,6 +63,9 @@ $ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/a
 `-t, --tops           `
 > Return top level keys of structure.
 
+`-n, --next           `
+> Moves to next block
+
 `-h, --help           `
 > Show this help dialog.
 

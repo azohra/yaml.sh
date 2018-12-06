@@ -122,4 +122,13 @@ testTopKeys() {
     assertEquals 2 $(wc -l <<< "${result}")
 }
 
+testNextBlock() {
+    result=$(ysh -T "$file" -Q key)
+    assertEquals "value" "${result}"
+
+    file=$(ysh -T "$file" -n)
+    result=$(ysh -T "$file" -Q key)
+    assertEquals "block_2_value" "${result}"
+}
+
 . ./test/shunit2
