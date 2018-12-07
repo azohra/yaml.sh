@@ -129,6 +129,10 @@ testNextBlock() {
     file=$(ysh -T "$file" -n)
     result=$(ysh -T "$file" -Q key)
     assertEquals "block_2_value" "${result}"
+
+    file=$(ysh -T "$file" -n)
+    result=$(ysh -T "$file" -Q key)
+    assertEquals "block_3_value" "${result}"
 }
 
 . ./test/shunit2

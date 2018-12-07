@@ -66,7 +66,6 @@ function check_started() {
     next
 }
 
-
 /^[[:space:]]*[^[:space:]]+:/ {
     started=1
     depth=level()
@@ -95,7 +94,6 @@ function check_started() {
 
 /^[[:space:]]*-[[:space:]]+\{.*\}[[:space:]]*$/ {
     check_started()
-    depth=level()
     line=$0
     sub(/^[[:space:]]*-[[:space:]]+\{/, "", line)
     sub(/\}[[:space:]]*$/, "", line)
@@ -120,7 +118,7 @@ function check_started() {
 
 /^[[:space:]]*-[[:space:]][^[:space:]]+:/ {
     check_started()
-    depth=level() + 1
+    depth++
     key=$0
     sub(/^[[:space:]]*-[[:space:]]/, "", key)
     sub(/:.*$/, "", key)
@@ -129,7 +127,6 @@ function check_started() {
 
 /^[[:space:]]*-[[:space:]][^[:space:]]+:[[:space:]]+[^[:space:]]+/ {
     check_started()
-    depth=level() + 1
     val=$0
     sub(/^[[:space:]]*-[[:space:]][^[:space:]]+:[[:space:]]+/, "", val)
     val = remove_sur_quotes(val)
@@ -139,7 +136,6 @@ function check_started() {
 
 /^[[:space:]]*-[[:space:]]+[^[:space:]]+/ {
     check_started()
-    depth=level()
     val=$0
     sub(/^[[:space:]]*-[[:space:]]+/, "", val)
     sub(/[[:space:]]*$/, "", val)

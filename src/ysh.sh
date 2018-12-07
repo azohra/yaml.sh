@@ -63,7 +63,6 @@ YSH_usage() {
     echo "  -l, --list        <query>        query for a list"
     echo "  -c, --count       <query>        count length of list element"
     echo "  -i, --index       <i>            array access by index"
-    echo "  -I, --index       <i>            array access by index. Guarentees a value."
     echo "  -I, --index-val   <i>            safe array access by index. Guarentees a value."
     echo "  -t, --tops                       top level children keys of structure"
     echo "  -n, --next                       move to next block"
