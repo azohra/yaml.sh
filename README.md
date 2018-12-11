@@ -28,7 +28,7 @@ YSH_LIB=1;source /usr/local/bin/ysh
 
 If you want the internet as your only dependency:
 ```bash
-$ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/azohra/yaml.sh/v0.1.2/ysh)"
+$ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/azohra/yaml.sh/v0.1.3/ysh)"
 ```
 
 ## Flags
@@ -50,6 +50,9 @@ $ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/a
 
 `-l, --list        <query>`
 > Query for a list.
+
+`-L, --list        <query>`
+> Query for a list of values. Guarentees results are all values.
 
 `-c, --count       <query>`
 > Query for a list and count the elements.

@@ -1,6 +1,6 @@
 #! /bin/bash
 # shellcheck source=/dev/null
-YSH_version='0.1.2'
+YSH_version='0.1.3'
 
 # Will be replaced by builder with minified awk parser program
 YAML_AWK_PARSER=$(cat src/ysh.awk)
@@ -23,6 +23,10 @@ YSH_sub() {
 
 YSH_list() {
     YSH_sub "${1}" "${2}" | grep -E "^\\[[0-9]+\\]"
+}
+
+YSH_list_values() {
+    YSH_sub "${1}" "${2}" | grep -E "^\\[[0-9]+\\]=" | sed "s/^\\[[0-9]\\]=//" | sed "s/[(^\")(\"$)]//g"
 }
 
 YSH_count() {
@@ -104,6 +108,10 @@ ysh() {
         ;;
         -l|--list)
             YSH_RAW_STRING="$(YSH_list "${YSH_RAW_STRING}" "${2}")"
+            shift
+        ;;
+        -L|--list-val)
+            YSH_RAW_STRING="$(YSH_list_values "${YSH_RAW_STRING}" "${2}")"
             shift
         ;;
         -i|--index)

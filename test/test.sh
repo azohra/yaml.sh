@@ -55,6 +55,16 @@ testSimpleList() {
     assertEquals 4 $(wc -l <<< "${result}")
 }
 
+testSimpleListValues() {
+    result=$(ysh -T "${file}" -L simple_list.list)
+    assertContains "${result}" "one"
+    assertContains "${result}" "two"
+    assertContains "${result}" "three"
+    assertContains "${result}" "four"
+    assertNotContains "${result}" "\""
+    assertEquals 4 $(wc -l <<< "${result}")
+}
+
 testSimpleCount() {
     result=$(ysh -T "$file" -c simple_list.list)
     assertEquals 4 $result

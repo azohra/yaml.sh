@@ -1,5 +1,5 @@
 #! /bin/bash
-YSH_version='0.1.2'
+YSH_version='0.1.3'
 YAML_AWK_PARSER='
 function raise(msg) { print msg > "/dev/stderr"; if (force_complete) { exit_status = 1; } else { exit 1; };};
 function level() { match($0, /^[[:space:]]*/); if (RLENGTH % 2 != 0) { raise("Bad indentation on line "NR". Number of spaces uneven."); }; return RLENGTH / 2;};
@@ -34,6 +34,9 @@ YSH_sub() {
 }
 YSH_list() {
     YSH_sub "${1}" "${2}" | grep -E "^\\[[0-9]+\\]"
+}
+YSH_list_values() {
+    YSH_sub "${1}" "${2}" | grep -E "^\\[[0-9]+\\]=" | sed "s/^\\[[0-9]\\]=//" | sed "s/[(^\")(\"$)]//g"
 }
 YSH_count() {
     YSH_sub "${1}" "${2}" | grep -oE "^\\[[0-9]+\\]" | uniq | wc -l
@@ -105,6 +108,10 @@ ysh() {
         ;;
         -l|--list)
             YSH_RAW_STRING="$(YSH_list "${YSH_RAW_STRING}" "${2}")"
+            shift
+        ;;
+        -L|--list-val)
+            YSH_RAW_STRING="$(YSH_list_values "${YSH_RAW_STRING}" "${2}")"
             shift
         ;;
         -i|--index)
