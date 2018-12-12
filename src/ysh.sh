@@ -1,12 +1,16 @@
 #! /bin/bash
 # shellcheck source=/dev/null
-YSH_version='0.1.3'
+YSH_version='0.1.4'
 
 # Will be replaced by builder with minified awk parser program
 YAML_AWK_PARSER=$(cat src/ysh.awk)
 
 YSH_parse() {
     awk "${YAML_AWK_PARSER}" "${1}"
+}
+
+YSH_parse_sdin() {
+    awk "${YAML_AWK_PARSER}"
 }
 
 YSH_query() {
@@ -56,11 +60,13 @@ YSH_next_block() {
 
 YSH_usage() {
     echo ""
-    echo "Usage: ysh [flags]"
+    echo "Usage: ysh [-fT input] [queries]"
     echo ""
-    echo "flags:"
+    echo "input:"
     echo "  -f, --file        <file_name>    parse file"
     echo "  -T, --transpiled  <file_name>    use pre-transpiled file"
+    echo ""
+    echo "queries:"
     echo "  -q, --query       <query>        generic query"
     echo "  -Q, --query-val   <query>        safe query. Guarentees a value."
     echo "  -s, --sub         <query>        sub structure. No values."
@@ -77,23 +83,27 @@ YSH_usage() {
 
 ysh() {
     local YSH_RAW_STRING=""
+    case "$1" in
+    -v|--version)
+        echo "v${YSH_version}" && exit 0
+    ;;
+    -h|--help)
+        YSH_usage
+    ;;
+    -f|--file)
+        YSH_RAW_STRING="$(YSH_parse "${2}")"
+        shift; shift
+    ;;
+    -T|--transpiled)
+        YSH_RAW_STRING="${2}"
+        shift; shift
+    ;;
+    *)
+        YSH_RAW_STRING="$(YSH_parse_sdin)"
+    ;;
+    esac
     while [ $# -gt 0 ] ; do
-
         case "$1" in
-        -v|--version)
-            echo "v${YSH_version}" && exit 0
-        ;;
-        -h|--help)
-            YSH_usage
-        ;;
-        -f|--file)
-            YSH_RAW_STRING="$(YSH_parse "${2}")"
-            shift
-        ;;
-        -T|--transpiled)
-            YSH_RAW_STRING="${2}"
-            shift
-        ;;
         -q|--query)
             YSH_RAW_STRING="$(YSH_query "${YSH_RAW_STRING}" "${2}")"
             shift
@@ -142,8 +152,8 @@ ysh() {
         ;;
         esac
         shift
-        if [[ $# -eq 0 ]]; then echo "${YSH_RAW_STRING}"; fi
     done
+    if [[ $# -eq 0 ]]; then echo "${YSH_RAW_STRING}"; fi
 }
 if [[ YSH_LIB -ne 1 ]]; then 
     if [[ $# -eq 0 ]] ; then YSH_usage; exit 1; fi
