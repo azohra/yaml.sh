@@ -28,7 +28,7 @@ YSH_LIB=1;source /usr/local/bin/ysh
 
 If you want the internet as your only dependency:
 ```bash
-$ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/azohra/yaml.sh/v0.1.4/ysh)"
+$ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/azohra/yaml.sh/v0.1.5/ysh)"
 ```
 
 ## Flags

@@ -1,6 +1,6 @@
 #! /bin/bash
 # shellcheck source=/dev/null
-YSH_version='0.1.4'
+YSH_version='0.1.5'
 
 # Will be replaced by builder with minified awk parser program
 YAML_AWK_PARSER=$(cat src/ysh.awk)
@@ -155,7 +155,7 @@ ysh() {
     done
     if [[ $# -eq 0 ]]; then echo "${YSH_RAW_STRING}"; fi
 }
-if [[ YSH_LIB -ne 1 ]]; then 
+if [[ YSH_LIB -ne 1 ]]; then
     if [[ $# -eq 0 ]] ; then YSH_usage; exit 1; fi
-    ysh "$@"; 
+    ysh "$@";
 fi

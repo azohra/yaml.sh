@@ -1,4 +1,5 @@
 BUILDERS = $(shell find build/*)
+INSTALL_DIR=/usr/local/bin
 
 .PHONY: lint test all install uninstall docs
 
@@ -19,12 +20,13 @@ test: ysh
 
 install: ysh
 	@echo "📦 Installing ysh"
-	@cp ysh /usr/local/bin/ysh
-	@chmod u+x /usr/local/bin/ysh
+	@mkdir -p $(INSTALL_DIR)
+	@cp ysh $(INSTALL_DIR)/ysh
+	@chmod u+x $(INSTALL_DIR)/ysh
 
 uninstall:
 	@echo "🗑️  Uninstalling ysh"
-	@rm /usr/local/bin/ysh
+	@rm $(INSTALL_DIR)/ysh
 
 docs: ysh
 	@echo "📚 Updating docs"

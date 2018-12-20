@@ -1,5 +1,5 @@
 #! /bin/bash
-YSH_version='0.1.4'
+YSH_version='0.1.5'
 YAML_AWK_PARSER='
 function raise(msg) { print msg > "/dev/stderr"; if (force_complete) { exit_status = 1; } else { exit 1; };};
 function level() { match($0, /^[[:space:]]*/); if (RLENGTH % 2 != 0) { raise("Bad indentation on line "NR". Number of spaces uneven."); }; return RLENGTH / 2;};
@@ -155,7 +155,7 @@ ysh() {
     done
     if [[ $# -eq 0 ]]; then echo "${YSH_RAW_STRING}"; fi
 }
-if [[ YSH_LIB -ne 1 ]]; then 
+if [[ YSH_LIB -ne 1 ]]; then
     if [[ $# -eq 0 ]] ; then YSH_usage; exit 1; fi
-    ysh "$@"; 
+    ysh "$@";
 fi
