@@ -1,9 +1,13 @@
 #! /bin/bash
 # shellcheck source=/dev/null
-YSH_version='0.1.5'
+YSH_version='0.2.0'
 
 # Will be replaced by builder with minified awk parser program
 YAML_AWK_PARSER=$(cat src/ysh.awk)
+
+YSH_escape_query() {
+    sed -e "s/\\[/.\\\\[/" -e "s/\\]/\\\\]/" -e "s/^\\.//" <<< "$1"
+}
 
 YSH_parse() {
     awk "${YAML_AWK_PARSER}" "${1}"
@@ -14,15 +18,18 @@ YSH_parse_sdin() {
 }
 
 YSH_query() {
-    grep -E "^${2}" <<< "${1}" | sed -E "s/^${2}[\\.=]?//"
+    q=$(YSH_escape_query "${2}")
+    grep -E "^${q}" <<< "${1}" | sed -E "s/^${q}[\\.=]?//"
 }
 
 YSH_safe_query() {
-    grep -E "^${2}=\".*\"$" <<< "${1}" | sed -E "s/^${2}=\"//" | sed -E "s/\"$//"
+    q=$(YSH_escape_query "${2}")
+    grep -E "^${q}=\".*\"$" <<< "${1}" | sed -E "s/^${q}=\"//" | sed -E "s/\"$//"
 }
 
 YSH_sub() {
-    grep -E "^${2}[^=]" <<< "${1}" | sed "s/^$2\\.//"
+    q=$(YSH_escape_query "${2}")
+    grep -E "^${q}[^=]" <<< "${1}" | sed "s/^$2\\.//"
 }
 
 YSH_list() {
@@ -38,15 +45,15 @@ YSH_count() {
 }
 
 YSH_index() {
-    YSH_query "${1}" "\\[${2}\\]"
+    YSH_query "${1}" "[${2}]"
 }
 
 YSH_safe_index() {
-    YSH_safe_query "${1}" "\\[${2}\\]"
+    YSH_safe_query "${1}" "[${2}]"
 }
 
 YSH_safe_index() {
-    YSH_safe_query "${1}" "\\[${2}\\]"
+    YSH_safe_query "${1}" "[${2}]"
 }
 
 YSH_tops() {
@@ -56,7 +63,6 @@ YSH_tops() {
 YSH_next_block() {
     grep -E "^-.*" <<< "${1}" | sed -E "s/^-\\.?//g"
 }
-
 
 YSH_usage() {
     echo ""
@@ -147,7 +153,7 @@ ysh() {
             exit 1
         ;;
         *)
-            echo "Unknown Ussage!" > /dev/stdout
+            echo "Error: invalid use" > /dev/stdout
             exit 1
         ;;
         esac

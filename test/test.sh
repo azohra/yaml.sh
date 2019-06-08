@@ -55,6 +55,7 @@ testSimpleList() {
     assertEquals 4 $(wc -l <<< "${result}")
 }
 
+
 testSimpleListValues() {
     result=$(ysh -T "${file}" -L simple_list.list)
     assertContains "${result}" "one"
@@ -92,8 +93,20 @@ testExpandedList() {
     assertEquals 6 $(wc -l <<< "${result}")
 }
 
+testGetValueFromSimpleExpandedList() {
+    result=$(ysh -T "$file" -l "simple_list.list" -I 2)
+    assertEquals "three" "$result"
+}
+
+testGetValueFromComplexExpandedList() {
+    result=$(ysh -T "$file" -l "object_list.list" -i 2)
+    assertContains "${result}" 'name="three"'
+    assertContains "${result}" 'value="3"'
+    assertEquals 2 $(wc -l <<< "${result}")
+}
+
 testArrayIndexAccess() {
-    result=$(ysh -T "$file" -l simple_list.list -i 1)
+    result=$(ysh -T "$file" -q "simple_list.list[1]")
     assertEquals "\"two\"" "${result}"
 
     result=$(ysh -T "$file" -l object_list.list -i 1)
@@ -102,20 +115,20 @@ testArrayIndexAccess() {
 }
 
 testSafeArrayIndexAccess() {
-    result=$(ysh -T "$file" -l simple_list.list -I 1)
+    result=$(ysh -T "$file" -Q "simple_list.list[1]")
     assertEquals "two" "${result}"
 
-    result=$(ysh -T "$file" -l object_list.list -I 1)
+    result=$(ysh -T "$file" -l "object_list.list[1]")
     assertContains "name=two" "${result}"
     assertContains "value=2" "${result}"
 
 }
 
 testArraySafeIndexAccess() {
-    result=$(ysh -T "$file" -l simple_list.list -I 1)
+    result=$(ysh -T "$file" -Q "simple_list.list[1]")
     assertEquals "two" "${result}"
 
-    result=$(ysh -T "$file" -l object_list.list -I 1)
+    result=$(ysh -T "$file" -Q "object_list.list[1]")
     assertNull "${result}"
 }
 
@@ -136,13 +149,37 @@ testNextBlock() {
     result=$(ysh -T "$file" -Q key)
     assertEquals "value" "${result}"
 
-    file=$(ysh -T "$file" -n)
-    result=$(ysh -T "$file" -Q key)
+    file2=$(ysh -T "$file" -n)
+    result=$(ysh -T "$file2" -Q key)
     assertEquals "block_2_value" "${result}"
 
-    file=$(ysh -T "$file" -n)
-    result=$(ysh -T "$file" -Q key)
+    file2=$(ysh -T "$file2" -n)
+    result=$(ysh -T "$file2" -Q key)
     assertEquals "block_3_value" "${result}"
+}
+
+testEscapeLiteralListQuery() {
+    assertEquals "simple_list.list.\[2\]" $(YSH_escape_query "simple_list.list[2]")
+}
+
+testEscapeComplexListItemQuery() {
+    assertEquals "simple_list.list.\[2\].key" $(YSH_escape_query "simple_list.list[2].key")
+}
+
+testEscapeExpandedListItemQuery() {
+    assertEquals "\[2\]" $(YSH_escape_query "[2]")
+}
+
+testSafeQueryWithListQuery() {
+    result=$(ysh -T "$file" -Q "simple_list.list[2]")
+    assertEquals "three" "$result"
+}
+
+testSubSupportsEscapedQueries() {
+    result=$(ysh -T "$file" -s "object_list.list[2]")
+    assertContains "$result" 'object_list.list.[2].name="three"'
+    assertContains "$result" 'object_list.list.[2].value="3"'
+    assertEquals 2 $(wc -l <<< "$result")
 }
 
 . ./test/shunit2

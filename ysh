@@ -1,5 +1,5 @@
 #! /bin/bash
-YSH_version='0.1.5'
+YSH_version='0.2.0'
 YAML_AWK_PARSER='
 function raise(msg) { print msg > "/dev/stderr"; if (force_complete) { exit_status = 1; } else { exit 1; };};
 function level() { match($0, /^[[:space:]]*/); if (RLENGTH % 2 != 0) { raise("Bad indentation on line "NR". Number of spaces uneven."); }; return RLENGTH / 2;};
@@ -20,6 +20,9 @@ function check_started() { if (started == 0) { raise("Keys must be added before 
 /^[[:space:]]*$/ { next };
 0
 '
+YSH_escape_query() {
+    sed -e "s/\\[/.\\\\[/" -e "s/\\]/\\\\]/" -e "s/^\\.//" <<< "$1"
+}
 YSH_parse() {
     awk "${YAML_AWK_PARSER}" "${1}"
 }
@@ -27,13 +30,16 @@ YSH_parse_sdin() {
     awk "${YAML_AWK_PARSER}"
 }
 YSH_query() {
-    grep -E "^${2}" <<< "${1}" | sed -E "s/^${2}[\\.=]?//"
+    q=$(YSH_escape_query "${2}")
+    grep -E "^${q}" <<< "${1}" | sed -E "s/^${q}[\\.=]?//"
 }
 YSH_safe_query() {
-    grep -E "^${2}=\".*\"$" <<< "${1}" | sed -E "s/^${2}=\"//" | sed -E "s/\"$//"
+    q=$(YSH_escape_query "${2}")
+    grep -E "^${q}=\".*\"$" <<< "${1}" | sed -E "s/^${q}=\"//" | sed -E "s/\"$//"
 }
 YSH_sub() {
-    grep -E "^${2}[^=]" <<< "${1}" | sed "s/^$2\\.//"
+    q=$(YSH_escape_query "${2}")
+    grep -E "^${q}[^=]" <<< "${1}" | sed "s/^$2\\.//"
 }
 YSH_list() {
     YSH_sub "${1}" "${2}" | grep -E "^\\[[0-9]+\\]"
@@ -45,13 +51,13 @@ YSH_count() {
     YSH_sub "${1}" "${2}" | grep -oE "^\\[[0-9]+\\]" | uniq | wc -l
 }
 YSH_index() {
-    YSH_query "${1}" "\\[${2}\\]"
+    YSH_query "${1}" "[${2}]"
 }
 YSH_safe_index() {
-    YSH_safe_query "${1}" "\\[${2}\\]"
+    YSH_safe_query "${1}" "[${2}]"
 }
 YSH_safe_index() {
-    YSH_safe_query "${1}" "\\[${2}\\]"
+    YSH_safe_query "${1}" "[${2}]"
 }
 YSH_tops() {
     sed -E "s/[\\[\\.=].*$//" <<< "${1}" | uniq
