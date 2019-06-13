@@ -28,7 +28,7 @@ YSH_LIB=1;source /usr/local/bin/ysh
 
 If you want the internet as your only dependency:
 ```bash
-$ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/azohra/yaml.sh/v0.1.5/ysh)"
+$ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/azohra/yaml.sh/v0.2.0/ysh)"
 ```
 
 ## Cook Book
@@ -60,39 +60,39 @@ block_no: 1
 
 ### Read from a file:
 ```bash
-ysh -f input.yaml -Q block_no
+ysh -f input.yaml -Q "block_no"
 ```
 
 ### Re-use an already transpiled file
 ```bash
 file=$(ysh -f input.yaml)
-ysh -T $file -Q block_no
+ysh -T $file -Q "block_no"
 ```
 
 ### Query piped yaml
 ```bash
-cat input.yaml | ysh -Q block_no
+cat input.yaml | ysh -Q "block_no"
 ```
 
 ### Query for a value
 ```bash
-ysh -f file.yaml -Q block_no
+ysh -f file.yaml -Q "block_no"
 ```
 
 ### Query from a stored sub structure
 ```bash
-sub=$(ysh -f file.yaml -s level_one)
-ysh -T $sub -Q level_two.key
+sub=$(ysh -f file.yaml -s "level_one")
+ysh -T $sub -Q "level_two.key"
 ```
 
 ### Query i'th item from a simple list
 ```bash
-ysh -f input.yaml -l level_one.level_two.simple_lists -I 1
+ysh -f input.yaml -Q "level_one.level_two.simple_lists[1]"
 ```
 
 ### Query i'th item from a complex list
 ```bash
-ysh -f input.yaml -l level_one.level_two.expanded_lists -i 1 -Q name
+ysh -f input.yaml -Q "level_one.level_two.expanded_lists[1].name"
 ```
 
 ### Print value from each block
@@ -102,7 +102,7 @@ YSH_LIB=1; source /usr/local/bin/ysh
 
 file=$(ysh -f input.yaml)
 while [ -n "${file}" ]; do
-  echo "Block Number:" $(ysh -T "${file}" -Q block_no)
+  echo "Block Number:" $(ysh -T "${file}" -Q "block_no")
   file=$(ysh -T "${file}" -n)
 done
 ```
