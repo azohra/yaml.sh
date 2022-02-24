@@ -1,5 +1,5 @@
 #! /bin/bash
-YSH_version='0.2.0'
+YSH_version='0.2.1'
 YAML_AWK_PARSER='
 function raise(msg) { print msg > "/dev/stderr"; if (force_complete) { exit_status = 1; } else { exit 1; };};
 function level() { match($0, /^[[:space:]]*/); if (RLENGTH % 2 != 0) { raise("Bad indentation on line "NR". Number of spaces uneven."); }; return RLENGTH / 2;};

@@ -1,6 +1,6 @@
 #! /bin/bash
 # shellcheck source=/dev/null
-YSH_version='0.2.0'
+YSH_version='0.2.1'
 
 # Will be replaced by builder with minified awk parser program
 YAML_AWK_PARSER=$(cat src/ysh.awk)
