@@ -98,6 +98,10 @@ ysh() {
         exit 0
     ;;
     -f|--file)
+        if [ ! -f "${2}" ]; then
+            echo "Error: file ${2} does not exist" > /dev/stderr
+            exit 1
+        fi
         YSH_RAW_STRING="$(YSH_parse "${2}")"
         shift; shift
     ;;
@@ -154,7 +158,7 @@ ysh() {
             exit 1
         ;;
         *)
-            echo "Error: invalid use" > /dev/stdout
+            echo "Error: invalid use" > /dev/stderr
             exit 1
         ;;
         esac
