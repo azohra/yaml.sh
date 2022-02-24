@@ -95,6 +95,7 @@ ysh() {
     ;;
     -h|--help)
         YSH_usage
+        exit 0
     ;;
     -f|--file)
         YSH_RAW_STRING="$(YSH_parse "${2}")"
