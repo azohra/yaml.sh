@@ -188,4 +188,9 @@ testHelpFlagShouldNotBeAnError() {
     assertEquals 0 $?
 }
 
+testFileDoesNotExist() {
+    result=$(ysh -f "does_not_exist.yaml" -s "doesnotmatter")
+    assertEquals 1 $?
+}
+
 . ./test/shunit2
