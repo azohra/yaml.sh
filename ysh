@@ -95,6 +95,7 @@ ysh() {
     ;;
     -h|--help)
         YSH_usage
+        exit 0
     ;;
     -f|--file)
         YSH_RAW_STRING="$(YSH_parse "${2}")"
@@ -153,7 +154,7 @@ ysh() {
             exit 1
         ;;
         *)
-            echo "Unknown Usage!" > /dev/stdout
+            echo "Error: invalid use" > /dev/stdout
             exit 1
         ;;
         esac

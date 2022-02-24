@@ -182,4 +182,10 @@ testSubSupportsEscapedQueries() {
     assertEquals 2 $(wc -l <<< "$result")
 }
 
+# From Issue https://github.com/azohra/yaml.sh/issues/13
+testHelpFlagShouldNotBeAnError() {
+    result=$(ysh -h)
+    assertEquals 0 $?
+}
+
 . ./test/shunit2
