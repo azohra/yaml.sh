@@ -157,7 +157,7 @@ done
 `-h, --help           `
 > Show this help dialog.
 
-For more complete usage and examples look at the [docs](https://docs.yaml.sh).
+For more complete usage and examples look at the [docs](https://docs.yaml.azohra.com).
 
 ---
 Made with ❤️ by the developers at [azohra.com](https://azohra.com)

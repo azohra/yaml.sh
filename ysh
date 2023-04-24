@@ -85,7 +85,7 @@ YSH_usage() {
     echo "  -n, --next                       move to next block"
     echo "  -h, --help                       prints this message"
     echo ""
-    echo "And even more at https://docs.yaml.sh"
+    echo "And even more at https://docs.yaml.azohra.com"
 }
 ysh() {
     local YSH_RAW_STRING=""
