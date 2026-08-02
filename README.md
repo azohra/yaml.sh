@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.1.0" src="https://img.shields.io/badge/release-v1.1.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
+  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.2.0" src="https://img.shields.io/badge/release-v1.2.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
   <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
   <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
 </p>
@@ -35,6 +35,8 @@ $ ysh -o=json '.services[0]' config.yml
 $ ysh '.services[] | select(.enabled) | .name' config.yml
 api
 web
+
+$ ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 ```
 
 ## The tiny idea
@@ -44,7 +46,7 @@ Sometimes `yq` is exactly the right answer. Sometimes you are writing the script
 YAML.sh lives in that second moment. Version 1 stopped pretending YAML was flattened text and built a real node graph instead:
 
 ```text
-YAML stream → node graph → aliases + merges → expression stream → values
+YAML stream → node graph → aliases + merges → expression stream → values / YAML
 ```
 
 Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys containing dots no longer turn into existential crises.
@@ -52,7 +54,7 @@ Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys c
 ## Install one file
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.1.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.2.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -95,7 +97,7 @@ ysh '.services[0]' config.yml
 # {"name":"api","enabled":true}
 ```
 
-Then let v1.1 stream and filter real nodes:
+Then let the expression engine stream and filter real nodes:
 
 ```sh
 ysh '.services[] | select(.enabled) | .name' config.yml
@@ -106,6 +108,37 @@ ysh '.services | length' config.yml
 
 ysh '.missing // "fallback"' config.yml
 # fallback
+```
+
+## Make it change things
+
+Version 1.2 gives those node references teeth. Assign values, build missing paths, update relative to the current value, or delete a node:
+
+```sh
+ysh -o=yaml '.release.channel = "stable"' config.yml
+ysh -o=yaml '.replicas += 1' config.yml
+ysh -o=yaml 'del(.metadata.internal)' config.yml
+```
+
+Ready to commit to the bit?
+
+```sh
+ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
+```
+
+`-i` requires a real single-document file, writes valid YAML only after the full parse and transformation succeeds, and preserves the existing file permissions. It intentionally normalizes presentation: comments, blank lines, scalar style, and key quoting are not retained. Multi-document streams remain queryable but are rejected by `-i` in v1.2 so unselected documents can never be silently dropped.
+
+Construct a fresh document without reading input:
+
+```sh
+ysh -n -o=yaml '{name: "api", enabled: true, ports: [8080, 8443]}'
+```
+
+And yes, AWK is now doing arithmetic too:
+
+```sh
+ysh -n --json '2 + 3 * 4'
+# 14
 ```
 
 Pipe YAML in naturally:
@@ -133,7 +166,7 @@ ysh '.metadata["build[number]"]' config.yml
 | Partial merge handling | Alias lists, flow mappings, and block merge sequences |
 | Parser internals hidden | `--ast` and `--events` on tap |
 
-Version 1.1 adds `[]`, pipes, `select`, comparisons, booleans, defaults, and collection helpers without changing the node graph. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+Version 1.1 added streaming reads. Version 1.2 adds recursive and optional traversal, construction, arithmetic, assignments, deletion, YAML output, null input, and in-place editing without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
 
 ## Open the hood
 
@@ -159,15 +192,18 @@ ysh --document 1 '.project.name' stream.yml
 | Flag | Purpose |
 | --- | --- |
 | `QUERY [FILE]` | Query a file or standard input. |
-| `-o, --output FORMAT` | Select `value`, `raw`, or `json`. |
+| `-o, --output FORMAT` | Select `value`, `raw`, `json`, or `yaml`. |
 | `-r, --raw-output` | Print scalar text without JSON quoting. |
 | `--json` | Emit JSON. |
+| `-y, --yaml-output` | Emit YAML. |
 | `--type` | Print the selected node type. |
 | `--tag` | Print its expanded tag. |
 | `--line` | Print its source line. |
 | `--ast` | Print the node graph. |
 | `--events` | Print parser-style events. |
 | `-d, --document N` | Select a zero-based document. |
+| `-n, --null-input` | Build output without reading input. |
+| `-i, --inplace` | Transform and replace one YAML file. |
 | `-V, --version` | Print the installed version. |
 | `-h, --help` | Print help. |
 
@@ -187,7 +223,7 @@ That contract is the promise: supported syntax gets a test; neighboring unsuppor
 make all
 ```
 
-That rebuilds the standalone `ysh`, runs ShellCheck, and executes 47 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
+That rebuilds the standalone `ysh`, runs ShellCheck, and executes 57 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
 
 The constraint is the fun part. Come make AWK do something unreasonable.
 

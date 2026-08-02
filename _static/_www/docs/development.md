@@ -15,7 +15,7 @@ src/ysh.sh              POSIX shell CLI
 src/ysh.awk             YAML engine
 test/test.sh            behavioral suite
 test/advanced.yml       v1 conformance fixture
-test/expressions.yml    v1.1 expression fixture
+test/expressions.yml    v1 expression and transformation fixture
 _static/_www            unified Cloudflare Pages site
 _static/_www/docs       documentation
 _static/_www/install    installer

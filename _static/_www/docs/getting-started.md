@@ -5,7 +5,7 @@ YAML.sh ships as one executable text file. The released file contains both the p
 ## Install the pinned release
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.1.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.2.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -77,6 +77,20 @@ ysh '.release.channel // "stable"' config.yml
 # stable
 ```
 
+Transform and emit YAML:
+
+```sh
+ysh -o=yaml '.release.channel = "stable"' config.yml
+```
+
+Once the result looks right, update the file in place:
+
+```sh
+ysh -i '.release.channel = "stable"' config.yml
+```
+
+In-place output preserves the file permissions but normalizes YAML presentation. Comments and original formatting are not retained, so review the diff like the tiny chaos engineer you are.
+
 ## Standard input
 
 Omit the file to read YAML from standard input:
@@ -93,6 +107,6 @@ generate-config | ysh '.release.version' -
 
 ## Next steps
 
-- [Learn paths, streams, filters, and defaults](queries.md)
-- [Choose JSON, type, tag, or line output](output.md)
+- [Learn paths, streams, construction, and updates](queries.md)
+- [Choose value, JSON, YAML, type, tag, or line output](output.md)
 - [Read the YAML support contract](supported_yml.md)

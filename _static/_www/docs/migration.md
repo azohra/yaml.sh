@@ -66,7 +66,8 @@ The following v0.x flags are not accepted in v1:
 - `-f`, because the input file is positional.
 - `-T`, because the transpiled representation is gone.
 - `-q` and `-Q`, because the positional query replaces them.
-- `-s`, `-l`, `-L`, `-c`, `-i`, and `-I`, because node selection uses one query grammar.
+- `-s`, `-l`, `-L`, `-c`, and `-I`, because node selection uses one query grammar.
+- The v0.x meaning of `-i`. Version 1.2 reuses `-i` for yq-style in-place file updates.
 - `--next`, because `--document N` addresses a document directly.
 
 If a script depends on v0.x behavior, pin `v0.4.0` while migrating.

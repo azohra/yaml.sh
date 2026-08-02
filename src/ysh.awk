@@ -973,6 +973,24 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         expression_position += 2
         return
     }
+    if (char next_char == "..") {
+        expression_token_type = "recursive"
+        expression_token_value = ".."
+        expression_position += 2
+        return
+    }
+    if (char next_char == "|=") {
+        expression_token_type = "update"
+        expression_token_value = "|="
+        expression_position += 2
+        return
+    }
+    if ((char == "+" || char == "-" || char == "*" || char == "/" || char == "%") && next_char == "=") {
+        expression_token_type = "compound"
+        expression_token_value = char next_char
+        expression_position += 2
+        return
+    }
     if (char next_char == "==" || char next_char == "!=" || char next_char == ">=" || char next_char == "<=") {
         expression_token_type = "compare"
         expression_token_value = char next_char
@@ -981,6 +999,12 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
     }
     if (char == ">" || char == "<") {
         expression_token_type = "compare"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "=") {
+        expression_token_type = "assign"
         expression_token_value = char
         expression_position++
         return
@@ -1027,6 +1051,36 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         expression_position++
         return
     }
+    if (char == "{") {
+        expression_token_type = "left_brace"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "}") {
+        expression_token_type = "right_brace"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == ":") {
+        expression_token_type = "colon"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "?") {
+        expression_token_type = "question"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "+" || char == "-" || char == "*" || char == "/" || char == "%") {
+        expression_token_type = "arithmetic"
+        expression_token_value = char
+        expression_position++
+        return
+    }
 
     quote = sprintf("%c", 39)
     if (char == "\"" || char == quote) {
@@ -1051,11 +1105,25 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         fail("unterminated string in expression")
     }
 
-    if (char ~ /^[0-9]$/ || (char == "-" && next_char ~ /^[0-9]$/)) {
+    if (char ~ /^[0-9]$/) {
         start = expression_position
-        expression_position++
-        while (expression_position <= length(expression_source) && substr(expression_source, expression_position, 1) ~ /^[0-9.eE_+-]$/) {
+        while (expression_position <= length(expression_source) && substr(expression_source, expression_position, 1) ~ /^[0-9_]$/) {
             expression_position++
+        }
+        if (substr(expression_source, expression_position, 1) == "." && substr(expression_source, expression_position + 1, 1) ~ /^[0-9]$/) {
+            expression_position++
+            while (expression_position <= length(expression_source) && substr(expression_source, expression_position, 1) ~ /^[0-9_]$/) {
+                expression_position++
+            }
+        }
+        if (tolower(substr(expression_source, expression_position, 1)) == "e") {
+            expression_position++
+            if (substr(expression_source, expression_position, 1) == "+" || substr(expression_source, expression_position, 1) == "-") {
+                expression_position++
+            }
+            while (expression_position <= length(expression_source) && substr(expression_source, expression_position, 1) ~ /^[0-9_]$/) {
+                expression_position++
+            }
         }
         expression_token_type = "number"
         expression_token_value = substr(expression_source, start, expression_position - start)
@@ -1099,7 +1167,7 @@ function expression_expect(type,    actual) {
     expression_lex_next()
 }
 
-function expression_parse_primary(    expression, name, step, argument, value, value_type) {
+function expression_parse_primary(    expression, name, step, argument, value, value_type, child, key) {
     if (expression_token_type == "dot") {
         expression = expression_new("identity", 0, 0, "")
         expression_lex_next()
@@ -1107,6 +1175,9 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             expression = expression_new("key", expression, 0, expression_token_value)
             expression_lex_next()
         }
+    } else if (expression_token_type == "recursive") {
+        expression = expression_new("recursive", 0, 0, "")
+        expression_lex_next()
     } else if (expression_token_type == "string") {
         expression = expression_new("literal", 0, 0, expression_token_value)
         expression_literal_type[expression] = "string"
@@ -1132,10 +1203,45 @@ function expression_parse_primary(    expression, name, step, argument, value, v
         expression_lex_next()
         expression = expression_parse_pipe()
         expression_expect("right_parenthesis")
+    } else if (expression_token_type == "left_bracket") {
+        expression = expression_new("array", 0, 0, "")
+        expression_lex_next()
+        if (expression_token_type != "right_bracket") {
+            while (1) {
+                child = expression_parse_pipe()
+                expression_child[expression, ++expression_child_count[expression]] = child
+                if (expression_token_type != "comma") {
+                    break
+                }
+                expression_lex_next()
+            }
+        }
+        expression_expect("right_bracket")
+    } else if (expression_token_type == "left_brace") {
+        expression = expression_new("object", 0, 0, "")
+        expression_lex_next()
+        if (expression_token_type != "right_brace") {
+            while (1) {
+                if (expression_token_type != "identifier" && expression_token_type != "string") {
+                    fail("object keys must be identifiers or strings")
+                }
+                key = expression_token_value
+                expression_lex_next()
+                expression_expect("colon")
+                child = expression_parse_pipe()
+                expression_object_key[expression, ++expression_child_count[expression]] = key
+                expression_child[expression, expression_child_count[expression]] = child
+                if (expression_token_type != "comma") {
+                    break
+                }
+                expression_lex_next()
+            }
+        }
+        expression_expect("right_brace")
     } else if (expression_token_type == "identifier") {
         name = tolower(expression_token_value)
         expression_lex_next()
-        if (name == "select" || name == "has") {
+        if (name == "select" || name == "has" || name == "del") {
             expression_expect("left_parenthesis")
             argument = expression_parse_pipe()
             expression_expect("right_parenthesis")
@@ -1153,6 +1259,10 @@ function expression_parse_primary(    expression, name, step, argument, value, v
         fail("expected expression but found " expression_token_name(expression_token_type))
     }
 
+    if (expression_token_type == "question") {
+        expression_optional[expression] = 1
+        expression_lex_next()
+    }
     while (1) {
         if (expression_token_type == "dot") {
             expression_lex_next()
@@ -1185,6 +1295,10 @@ function expression_parse_primary(    expression, name, step, argument, value, v
         } else {
             break
         }
+        if (expression_token_type == "question") {
+            expression_optional[expression] = 1
+            expression_lex_next()
+        }
     }
     return expression
 }
@@ -1195,15 +1309,42 @@ function expression_parse_unary(    operand) {
         operand = expression_new("identity", 0, 0, "")
         return expression_new("not", operand, 0, "")
     }
+    if (expression_token_type == "arithmetic" && expression_token_value == "-") {
+        expression_lex_next()
+        operand = expression_parse_unary()
+        return expression_new("negate", operand, 0, "")
+    }
     return expression_parse_primary()
 }
 
-function expression_parse_compare(    left, operator, right) {
+function expression_parse_product(    left, operator, right) {
     left = expression_parse_unary()
-    while (expression_token_type == "compare") {
+    while (expression_token_type == "arithmetic" && (expression_token_value == "*" || expression_token_value == "/" || expression_token_value == "%")) {
         operator = expression_token_value
         expression_lex_next()
         right = expression_parse_unary()
+        left = expression_new("arithmetic", left, right, operator)
+    }
+    return left
+}
+
+function expression_parse_sum(    left, operator, right) {
+    left = expression_parse_product()
+    while (expression_token_type == "arithmetic" && (expression_token_value == "+" || expression_token_value == "-")) {
+        operator = expression_token_value
+        expression_lex_next()
+        right = expression_parse_product()
+        left = expression_new("arithmetic", left, right, operator)
+    }
+    return left
+}
+
+function expression_parse_compare(    left, operator, right) {
+    left = expression_parse_sum()
+    while (expression_token_type == "compare") {
+        operator = expression_token_value
+        expression_lex_next()
+        right = expression_parse_sum()
         left = expression_new("compare", left, right, operator)
     }
     return left
@@ -1239,11 +1380,28 @@ function expression_parse_alternative(    left, right) {
     return left
 }
 
-function expression_parse_pipe(    left, right) {
+function expression_parse_assignment(    left, right, kind, operator, identity, arithmetic) {
     left = expression_parse_alternative()
+    if (expression_token_type == "assign" || expression_token_type == "update" || expression_token_type == "compound") {
+        kind = expression_token_type
+        operator = expression_token_value
+        expression_lex_next()
+        right = expression_parse_assignment()
+        if (kind == "compound") {
+            identity = expression_new("identity", 0, 0, "")
+            arithmetic = expression_new("arithmetic", identity, right, substr(operator, 1, 1))
+            return expression_new("update", left, arithmetic, "")
+        }
+        return expression_new(kind, left, right, "")
+    }
+    return left
+}
+
+function expression_parse_pipe(    left, right) {
+    left = expression_parse_assignment()
     while (expression_token_type == "pipe") {
         expression_lex_next()
-        right = expression_parse_alternative()
+        right = expression_parse_assignment()
         left = expression_new("pipe", left, right, "")
     }
     return left
@@ -1455,6 +1613,244 @@ function expression_type_name(node,    resolved) {
     return "!!" node_type[resolved]
 }
 
+function expression_clone_node(source,    resolved, clone, i, collection, key, child) {
+    resolved = resolve_alias(source)
+    clone = new_node(node_kind[resolved], 0, node_value[resolved], node_type[resolved], node_tag[resolved])
+    if (node_kind[resolved] == "sequence") {
+        for (i = 1; i <= sequence_count[resolved]; i++) {
+            add_sequence(clone, expression_clone_node(sequence_child[resolved, i]), 0)
+        }
+    } else if (node_kind[resolved] == "mapping") {
+        collection = ++collection_serial
+        collect_mapping_keys(resolved, collection)
+        for (i = 1; i <= collection_count[collection]; i++) {
+            key = collection_key[collection, i]
+            child = mapping_lookup(resolved, key)
+            add_mapping(clone, key, expression_clone_node(child), 0, 0)
+        }
+    }
+    return clone
+}
+
+function expression_clear_node(node,    i, key) {
+    if (node_kind[node] == "mapping") {
+        for (i = 1; i <= mapping_count[node]; i++) {
+            key = mapping_key[node, i]
+            delete mapping_seen[node SUBSEP key]
+            delete mapping_key[node, i]
+            delete mapping_child[node, i]
+            delete mapping_merge[node, i]
+        }
+        mapping_count[node] = 0
+    } else if (node_kind[node] == "sequence") {
+        for (i = 1; i <= sequence_count[node]; i++) {
+            delete sequence_child[node, i]
+        }
+        sequence_count[node] = 0
+    }
+    delete alias_target[node]
+    delete node_anchor[node]
+}
+
+function expression_attach_missing(node,    parent, key) {
+    if (!(node in expression_missing_parent) || expression_placeholder_attached[node]) {
+        return
+    }
+    parent = expression_missing_parent[node]
+    key = expression_missing_key[node]
+    if (parent in expression_missing_parent) {
+        if (node_kind[parent] == "scalar" && node_type[parent] == "null") {
+            node_kind[parent] = "mapping"
+            node_type[parent] = ""
+            node_value[parent] = ""
+        }
+        expression_attach_missing(parent)
+    }
+    if (node_kind[parent] != "mapping") {
+        fail("cannot create key " key " below " expression_type_name(parent))
+    }
+    add_mapping(parent, key, node, 0, 0)
+    expression_placeholder_attached[node] = 1
+}
+
+function expression_replace_node(target, source,    clone, saved_parent, saved_edge, saved_line, saved_document, i, key, child) {
+    if (resolve_alias(target) == resolve_alias(source) && !(target in expression_missing_parent)) {
+        return target
+    }
+    clone = expression_clone_node(source)
+    saved_parent = node_parent[target]
+    saved_edge = node_parent_edge[target]
+    saved_line = node_line[target]
+    saved_document = node_document[target]
+    expression_clear_node(target)
+    node_kind[target] = node_kind[clone]
+    node_value[target] = node_value[clone]
+    node_type[target] = node_type[clone]
+    node_tag[target] = node_tag[clone]
+    node_line[target] = saved_line
+    node_document[target] = saved_document
+    node_parent[target] = saved_parent
+    node_parent_edge[target] = saved_edge
+    if (node_kind[clone] == "sequence") {
+        for (i = 1; i <= sequence_count[clone]; i++) {
+            child = sequence_child[clone, i]
+            add_sequence(target, child, 0)
+        }
+    } else if (node_kind[clone] == "mapping") {
+        for (i = 1; i <= mapping_count[clone]; i++) {
+            key = mapping_key[clone, i]
+            child = mapping_child[clone, i]
+            add_mapping(target, key, child, 0, mapping_merge[clone, i])
+        }
+    }
+    expression_attach_missing(target)
+    return target
+}
+
+function expression_delete_node(target,    parent, i, j, key, child) {
+    if (target in expression_missing_parent && !expression_placeholder_attached[target]) {
+        return
+    }
+    parent = node_parent[target]
+    if (!parent) {
+        expression_clear_node(target)
+        node_kind[target] = "scalar"
+        node_value[target] = ""
+        node_type[target] = "null"
+        node_tag[target] = ""
+        return
+    }
+    if (node_kind[parent] == "mapping") {
+        for (i = 1; i <= mapping_count[parent]; i++) {
+            if (mapping_child[parent, i] != target) {
+                continue
+            }
+            key = mapping_key[parent, i]
+            delete mapping_seen[parent SUBSEP key]
+            for (j = i; j < mapping_count[parent]; j++) {
+                mapping_key[parent, j] = mapping_key[parent, j + 1]
+                mapping_child[parent, j] = mapping_child[parent, j + 1]
+                mapping_merge[parent, j] = mapping_merge[parent, j + 1]
+                child = mapping_child[parent, j]
+                node_parent_edge[child] = "key " mapping_key[parent, j]
+            }
+            delete mapping_key[parent, mapping_count[parent]]
+            delete mapping_child[parent, mapping_count[parent]]
+            delete mapping_merge[parent, mapping_count[parent]]
+            mapping_count[parent]--
+            return
+        }
+    } else if (node_kind[parent] == "sequence") {
+        for (i = 1; i <= sequence_count[parent]; i++) {
+            if (sequence_child[parent, i] != target) {
+                continue
+            }
+            for (j = i; j < sequence_count[parent]; j++) {
+                sequence_child[parent, j] = sequence_child[parent, j + 1]
+                child = sequence_child[parent, j]
+                node_parent_edge[child] = "index " (j - 1)
+            }
+            delete sequence_child[parent, sequence_count[parent]]
+            sequence_count[parent]--
+            return
+        }
+    }
+}
+
+function expression_collect_recursive(node, stream, serial,    resolved, seen_key, i, collection, key) {
+    resolved = resolve_alias(node)
+    seen_key = serial SUBSEP resolved
+    if (seen_key in expression_recursive_seen) {
+        return
+    }
+    expression_recursive_seen[seen_key] = 1
+    expression_stream_push(stream, resolved)
+    if (node_kind[resolved] == "sequence") {
+        for (i = 1; i <= sequence_count[resolved]; i++) {
+            expression_collect_recursive(sequence_child[resolved, i], stream, serial)
+        }
+    } else if (node_kind[resolved] == "mapping") {
+        collection = ++collection_serial
+        collect_mapping_keys(resolved, collection)
+        for (i = 1; i <= collection_count[collection]; i++) {
+            key = collection_key[collection, i]
+            expression_collect_recursive(mapping_lookup(resolved, key), stream, serial)
+        }
+    }
+}
+
+function expression_arithmetic_number(value, value_type, operator,    rendered) {
+    rendered = sprintf("%.15g", value)
+    if (value_type == "float" && rendered !~ /[.eE]/) {
+        rendered = rendered ".0"
+    }
+    return expression_scalar(rendered, value_type)
+}
+
+function expression_arithmetic(left, right, operator,    left_node, right_node, left_type, right_type, result_type, value, result, i, collection, key, child) {
+    left_node = resolve_alias(left)
+    right_node = resolve_alias(right)
+    left_type = node_type[left_node]
+    right_type = node_type[right_node]
+
+    if (operator == "+" && left_type == "null") {
+        return expression_clone_node(right_node)
+    }
+    if (operator == "+" && right_type == "null") {
+        return expression_clone_node(left_node)
+    }
+    if ((left_type == "int" || left_type == "float") && (right_type == "int" || right_type == "float")) {
+        if (operator == "/" && expression_numeric(right_node) == 0) {
+            fail("division by zero")
+        }
+        if (operator == "%" && expression_numeric(right_node) == 0) {
+            fail("modulo by zero")
+        }
+        if (operator == "+") {
+            value = expression_numeric(left_node) + expression_numeric(right_node)
+        } else if (operator == "-") {
+            value = expression_numeric(left_node) - expression_numeric(right_node)
+        } else if (operator == "*") {
+            value = expression_numeric(left_node) * expression_numeric(right_node)
+        } else if (operator == "/") {
+            value = expression_numeric(left_node) / expression_numeric(right_node)
+        } else {
+            value = expression_numeric(left_node) % expression_numeric(right_node)
+        }
+        result_type = (operator == "/" || left_type == "float" || right_type == "float") ? "float" : "int"
+        return expression_arithmetic_number(value, result_type, operator)
+    }
+    if (operator == "+" && left_type == "string" && right_type == "string") {
+        return expression_scalar(node_value[left_node] node_value[right_node], "string")
+    }
+    if (operator == "+" && node_kind[left_node] == "sequence" && node_kind[right_node] == "sequence") {
+        result = new_node("sequence", 0, "", "", "")
+        for (i = 1; i <= sequence_count[left_node]; i++) {
+            add_sequence(result, expression_clone_node(sequence_child[left_node, i]), 0)
+        }
+        for (i = 1; i <= sequence_count[right_node]; i++) {
+            add_sequence(result, expression_clone_node(sequence_child[right_node, i]), 0)
+        }
+        return result
+    }
+    if (operator == "+" && node_kind[left_node] == "mapping" && node_kind[right_node] == "mapping") {
+        result = expression_clone_node(left_node)
+        collection = ++collection_serial
+        collect_mapping_keys(right_node, collection)
+        for (i = 1; i <= collection_count[collection]; i++) {
+            key = collection_key[collection, i]
+            child = mapping_lookup(right_node, key)
+            if (mapping_lookup(result, key)) {
+                expression_replace_node(mapping_lookup(result, key), child)
+            } else {
+                add_mapping(result, key, expression_clone_node(child), 0, 0)
+            }
+        }
+        return result
+    }
+    fail("operator " operator " does not support " expression_type_name(left_node) " and " expression_type_name(right_node))
+}
+
 function expression_evaluate(expression, input,    output, middle, left_stream, right_stream, single, kind, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node) {
     output = expression_stream_new()
     kind = expression_kind[expression]
@@ -1466,6 +1862,59 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
     if (kind == "literal") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             expression_stream_push(output, expression_scalar(expression_value[expression], expression_literal_type[expression]))
+        }
+        return output
+    }
+    if (kind == "array" || kind == "object") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            single = expression_stream_single(expression_stream_node[input, i])
+            if (kind == "array") {
+                result_node = new_node("sequence", 0, "", "", "")
+                for (j = 1; j <= expression_child_count[expression]; j++) {
+                    middle = expression_evaluate(expression_child[expression, j], single)
+                    for (collection = 1; collection <= expression_stream_count[middle]; collection++) {
+                        add_sequence(result_node, expression_clone_node(expression_stream_node[middle, collection]), 0)
+                    }
+                }
+            } else {
+                result_node = new_node("mapping", 0, "", "", "")
+                for (j = 1; j <= expression_child_count[expression]; j++) {
+                    middle = expression_evaluate(expression_child[expression, j], single)
+                    child = expression_stream_count[middle] ? expression_stream_node[middle, 1] : expression_null()
+                    add_mapping(result_node, expression_object_key[expression, j], expression_clone_node(child), 0, 0)
+                }
+            }
+            expression_stream_push(output, result_node)
+        }
+        return output
+    }
+    if (kind == "recursive") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            expression_collect_recursive(expression_stream_node[input, i], output, ++expression_recursive_serial)
+        }
+        return output
+    }
+    if (kind == "negate") {
+        middle = expression_evaluate(expression_left[expression], input)
+        for (i = 1; i <= expression_stream_count[middle]; i++) {
+            node = resolve_alias(expression_stream_node[middle, i])
+            if (node_type[node] != "int" && node_type[node] != "float") {
+                fail("unary - requires a number")
+            }
+            expression_stream_push(output, expression_arithmetic_number(-expression_numeric(node), node_type[node], "-"))
+        }
+        return output
+    }
+    if (kind == "arithmetic") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            single = expression_stream_single(expression_stream_node[input, i])
+            left_stream = expression_evaluate(expression_left[expression], single)
+            right_stream = expression_evaluate(expression_right[expression], single)
+            for (j = 1; j <= expression_stream_count[left_stream]; j++) {
+                for (collection = 1; collection <= expression_stream_count[right_stream]; collection++) {
+                    expression_stream_push(output, expression_arithmetic(expression_stream_node[left_stream, j], expression_stream_node[right_stream, collection], expression_value[expression]))
+                }
+            }
         }
         return output
     }
@@ -1484,14 +1933,25 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 } else {
                     child = 0
                 }
-                expression_stream_push(output, child ? child : expression_null())
+                if (child) {
+                    expression_stream_push(output, child)
+                } else if (!expression_optional[expression]) {
+                    child = expression_null()
+                    expression_missing_parent[child] = resolved
+                    expression_missing_key[child] = expression_value[expression]
+                    expression_stream_push(output, child)
+                }
             } else if (kind == "index") {
                 if (node_kind[resolved] == "sequence" && expression_value[expression] < sequence_count[resolved]) {
                     child = sequence_child[resolved, expression_value[expression] + 1]
                 } else {
                     child = 0
                 }
-                expression_stream_push(output, child ? child : expression_null())
+                if (child) {
+                    expression_stream_push(output, child)
+                } else if (!expression_optional[expression]) {
+                    expression_stream_push(output, expression_null())
+                }
             } else if (node_kind[resolved] == "sequence") {
                 for (j = 1; j <= sequence_count[resolved]; j++) {
                     expression_stream_push(output, sequence_child[resolved, j])
@@ -1504,12 +1964,46 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     expression_stream_push(output, mapping_lookup(resolved, key))
                 }
             } else {
+                if (expression_optional[expression]) {
+                    continue
+                }
                 if (node_kind[resolved] == "scalar") {
                     fail("cannot iterate over " node_type[resolved])
                 }
                 fail("cannot iterate over " node_kind[resolved])
             }
         }
+        return output
+    }
+    if (kind == "assign" || kind == "update") {
+        left_stream = expression_evaluate(expression_left[expression], input)
+        if (kind == "assign") {
+            right_stream = expression_evaluate(expression_right[expression], input)
+            if (!expression_stream_count[right_stream]) {
+                expression_stream_push(right_stream, expression_null())
+            }
+            for (i = 1; i <= expression_stream_count[left_stream]; i++) {
+                j = expression_stream_count[right_stream] == expression_stream_count[left_stream] ? i : 1
+                expression_replace_node(expression_stream_node[left_stream, i], expression_stream_node[right_stream, j])
+            }
+        } else {
+            for (i = 1; i <= expression_stream_count[left_stream]; i++) {
+                node = expression_stream_node[left_stream, i]
+                single = expression_stream_single(node)
+                right_stream = expression_evaluate(expression_right[expression], single)
+                child = expression_stream_count[right_stream] ? expression_stream_node[right_stream, 1] : expression_null()
+                expression_replace_node(node, child)
+            }
+        }
+        expression_stream_append(output, input)
+        return output
+    }
+    if (kind == "del") {
+        middle = expression_evaluate(expression_left[expression], input)
+        for (i = expression_stream_count[middle]; i >= 1; i--) {
+            expression_delete_node(expression_stream_node[middle, i])
+        }
+        expression_stream_append(output, input)
         return output
     }
     if (kind == "select") {
@@ -1752,6 +2246,129 @@ function emit_json(node,    resolved, stack_key, i, collection, key, child, lowe
     delete json_stack[stack_key]
 }
 
+function yaml_spaces(indent,    result, i) {
+    result = ""
+    for (i = 0; i < indent; i++) {
+        result = result " "
+    }
+    return result
+}
+
+function yaml_properties(node,    result, tag) {
+    result = ""
+    tag = node_tag[node]
+    if (tag != "") {
+        if (tag ~ /^tag:yaml.org,2002:/) {
+            tag = "!!" substr(tag, length("tag:yaml.org,2002:") + 1)
+        } else {
+            tag = "!<" tag ">"
+        }
+        result = tag
+    }
+    if (node_anchor[node] != "") {
+        if (result != "") {
+            result = result " "
+        }
+        result = result "&" node_anchor[node]
+    }
+    return result
+}
+
+function yaml_scalar_text(node,    value, properties, lowered) {
+    if (node_kind[node] == "alias") {
+        return "*" node_value[node]
+    }
+    properties = yaml_properties(node)
+    if (properties != "") {
+        properties = properties " "
+    }
+    value = node_value[node]
+    if (node_type[node] == "null") {
+        return properties "null"
+    }
+    if (node_type[node] == "bool") {
+        lowered = tolower(value)
+        if (lowered == "true" || lowered == "false") {
+            return properties lowered
+        }
+    }
+    if (node_type[node] == "int" || node_type[node] == "float" || node_type[node] == "timestamp") {
+        return properties value
+    }
+    return properties json_quote(value)
+}
+
+function yaml_inline_node(node,    properties) {
+    if (node_kind[node] == "scalar" || node_kind[node] == "alias") {
+        return yaml_scalar_text(node)
+    }
+    properties = yaml_properties(node)
+    if (properties != "") {
+        properties = properties " "
+    }
+    if (node_kind[node] == "mapping" && mapping_count[node] == 0) {
+        return properties "{}"
+    }
+    if (node_kind[node] == "sequence" && sequence_count[node] == 0) {
+        return properties "[]"
+    }
+    return ""
+}
+
+function emit_yaml_collection(node, indent,    i, child, inline, properties, key) {
+    if (node_kind[node] == "mapping") {
+        for (i = 1; i <= mapping_count[node]; i++) {
+            key = mapping_key[node, i]
+            if (mapping_merge[node, i]) {
+                printf "%s<<:", yaml_spaces(indent)
+            } else {
+                printf "%s%s:", yaml_spaces(indent), json_quote(key)
+            }
+            child = mapping_child[node, i]
+            inline = yaml_inline_node(child)
+            if (inline != "") {
+                printf " %s\n", inline
+            } else {
+                properties = yaml_properties(child)
+                if (properties != "") {
+                    printf " %s", properties
+                }
+                printf "\n"
+                emit_yaml_collection(child, indent + 2)
+            }
+        }
+        return
+    }
+    for (i = 1; i <= sequence_count[node]; i++) {
+        child = sequence_child[node, i]
+        printf "%s-", yaml_spaces(indent)
+        inline = yaml_inline_node(child)
+        if (inline != "") {
+            printf " %s\n", inline
+        } else {
+            properties = yaml_properties(child)
+            if (properties != "") {
+                printf " %s", properties
+            }
+            printf "\n"
+            emit_yaml_collection(child, indent + 2)
+        }
+    }
+}
+
+function emit_yaml(node,    inline, properties) {
+    inline = yaml_inline_node(node)
+    if (inline != "") {
+        print inline
+        return
+    }
+    properties = yaml_properties(node)
+    if (properties != "") {
+        print properties
+    }
+    emit_yaml_collection(node, 0)
+}
+
 function output_ast(document,    node, i) {
     for (node = 1; node <= node_count; node++) {
         if (node_document[node] != document) {
@@ -1842,6 +2459,8 @@ function output_expression_node(target, output_mode,    resolved) {
     } else if (output_mode == "json") {
         emit_json(target)
         printf "\n"
+    } else if (output_mode == "yaml") {
+        emit_yaml(target)
     } else if (node_kind[resolved] == "scalar") {
         print node_value[resolved]
     } else {
@@ -1868,6 +2487,9 @@ function output_result(document, query, output_mode,    root, expression, input,
     input = expression_stream_single(root)
     results = expression_evaluate(expression, input)
     for (i = 1; i <= expression_stream_count[results]; i++) {
+        if (output_mode == "yaml" && i > 1) {
+            print "---"
+        }
         output_expression_node(expression_stream_node[results, i], output_mode)
     }
 }
@@ -1909,7 +2531,19 @@ END {
         finalize_nodes()
         validate_aliases()
         validate_merges()
-        output_result(selected_document + 0, query, output_mode)
+        if (inplace_mode) {
+            document_total = 0
+            for (document_number in document_root) {
+                document_total++
+            }
+            if (document_total > 1) {
+                print "Error: --inplace does not yet support multi-document streams" > "/dev/stderr"
+                exit_status = 1
+            }
+        }
+        if (!exit_status) {
+            output_result(selected_document + 0, query, output_mode)
+        }
     }
     exit exit_status
 }

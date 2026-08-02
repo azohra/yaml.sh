@@ -5,6 +5,6 @@ install_dir=${YSH_INSTALL_DIR:-/usr/local/bin}
 temporary_file=$(mktemp "${TMPDIR:-/tmp}/ysh.XXXXXX")
 trap 'rm -f "${temporary_file}"' 0 HUP INT TERM
 
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.1.0/ysh -o "${temporary_file}"
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.2.0/ysh -o "${temporary_file}"
 mkdir -p "${install_dir}"
 install -m 755 "${temporary_file}" "${install_dir}/ysh"

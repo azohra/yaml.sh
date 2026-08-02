@@ -14,13 +14,15 @@ ysh -o=json '.services[0]' config.yml
 ysh '.services[] | select(.enabled) | .name' config.yml
 # api
 # web
+
+ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 ```
 
 ## Why it exists
 
 Sometimes `yq` is exactly the right answer. Sometimes you are writing the script that would install `yq`.
 
-YAML.sh aims for the useful middle: familiar yq-style paths, streams and filters; serious handling of common YAML structures; one auditable file; and no additional packages. It does not pretend that YAML is simple or claim complete specification compliance.
+YAML.sh aims for the useful middle: familiar yq-style paths, streams, filters, construction, and updates; serious handling of common YAML structures; one auditable file; and no additional packages. It does not pretend that YAML is simple or claim complete specification compliance.
 
 ## What changed in v1
 
@@ -33,7 +35,7 @@ YAML.sh aims for the useful middle: familiar yq-style paths, streams and filters
 | Tag syntax mostly discarded | Expanded tags attached to nodes |
 | Inline merge subset | Alias lists, flow mappings, and block merge sequences |
 
-Version 1.1 adds iteration, pipes, selection, comparisons, booleans, defaults, and collection helpers above that graph.
+Version 1.1 added iteration, pipes, selection, comparisons, booleans, defaults, and collection helpers above that graph. Version 1.2 makes references writable and adds recursive and optional traversal, arithmetic, construction, assignment, deletion, YAML output, and in-place updates.
 
 ## Pick a path
 
