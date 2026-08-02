@@ -14,9 +14,9 @@
 
 <p align="center">
   <a href="https://yaml.azohra.com">Website</a> ·
-  <a href="https://docs.yaml.azohra.com">Documentation</a> ·
-  <a href="https://get.yaml.azohra.com">Install</a> ·
-  <a href="_static/_docs/supported_yml.md">YAML support</a>
+  <a href="https://yaml.azohra.com/docs/">Documentation</a> ·
+  <a href="https://yaml.azohra.com/install">Install</a> ·
+  <a href="_static/_www/docs/supported_yml.md">YAML support</a>
 </p>
 
 ---
@@ -56,13 +56,13 @@ sudo mv ysh /usr/local/bin/ysh
 Or let the tiny installer do those three lines:
 
 ```sh
-curl -fsSL https://get.yaml.azohra.com | sh
+curl -fsSL https://yaml.azohra.com/install | sh
 ```
 
 No `sudo` mood today?
 
 ```sh
-curl -fsSL https://get.yaml.azohra.com | YSH_INSTALL_DIR="$HOME/.local/bin" sh
+curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR="$HOME/.local/bin" sh
 ```
 
 ## Query something
@@ -116,7 +116,7 @@ ysh '.metadata["build[number]"]' config.yml
 | Partial merge handling | Alias lists, flow mappings, and block merge sequences |
 | Parser internals hidden | `--ast` and `--events` on tap |
 
-The CLI break is intentional. See the [migration guide](_static/_docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+The CLI break is intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
 
 ## Open the hood
 
@@ -160,7 +160,7 @@ ysh --document 1 '.project.name' stream.yml
 
 YAML is enormous. YAML.sh is not a complete YAML 1.2 processor, and it does not cosplay as one.
 
-The tested subset includes common block and flow collections, quoted and block scalars, anchors, aliases, merge keys, tags, directives, explicit scalar keys, source lines, and multiple documents. The boundaries—including multiline flow collections, recursive aliases, collection-valued keys, and full schema resolution—are written down in the [support contract](_static/_docs/supported_yml.md).
+The tested subset includes common block and flow collections, quoted and block scalars, anchors, aliases, merge keys, tags, directives, explicit scalar keys, source lines, and multiple documents. The boundaries—including multiline flow collections, recursive aliases, collection-valued keys, and full schema resolution—are written down in the [support contract](_static/_www/docs/supported_yml.md).
 
 That contract is the promise: supported syntax gets a test; neighboring unsupported syntax gets an explicit error instead of a confident misparse.
 

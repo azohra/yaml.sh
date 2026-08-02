@@ -1,0 +1,12 @@
+- **Start**
+  - [Welcome](README.md)
+  - [Install & quick start](getting-started.md)
+  - [Migrate from v0.x](migration.md)
+- **Use**
+  - [Queries](queries.md)
+  - [Output & metadata](output.md)
+  - [Multiple documents](documents.md)
+- **Understand**
+  - [YAML support](supported_yml.md)
+  - [Parser internals](internals.md)
+  - [Development](development.md)
