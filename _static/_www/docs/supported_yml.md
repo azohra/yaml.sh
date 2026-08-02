@@ -7,6 +7,7 @@ YAML.sh is a query-oriented YAML implementation with a tested support contract. 
 - Nested block mappings using space indentation.
 - Block sequences in indented and indentationless styles.
 - Single-line flow sequences and mappings.
+- Multiline flow sequences and mappings.
 - Expanded and flow mappings inside sequences.
 - Empty flow mappings (`{}`) and sequences (`[]`).
 - Duplicate mapping-key rejection.
@@ -16,8 +17,10 @@ YAML.sh is a query-oriented YAML implementation with a tested support contract. 
 
 - Plain, single-quoted, and double-quoted scalars.
 - Common double-quoted escapes for newlines, tabs, returns, quotes, slashes, and backslashes.
+- Four- and eight-digit Unicode escapes using `\u` and `\U`.
 - Literal (`|`) and folded (`>`) block scalars.
 - Strip (`-`), clip, and keep (`+`) chomping behavior for common block scalars.
+- Explicit block-scalar indentation indicators from 1 through 9.
 - Lexical recognition of strings, nulls, booleans, binary/octal/decimal/hexadecimal integers, floats, and timestamps.
 
 Values remain text in default output. Type recognition is used by `--type` and JSON output.
@@ -64,17 +67,17 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Anchor names are limited to letters, digits, `_`, and `-`.
 - Collection-valued mapping keys are rejected. Explicit scalar keys are supported.
 - Anchors and tags on mapping keys are not implemented.
-- Flow collections must fit on one line.
 - The complete YAML Unicode escape repertoire and every block-folding edge case are not implemented.
 - Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.
-- YAML emission preserves data, node kinds, tags, anchors, aliases, and merge edges where representable, but not comments or original presentation style.
+- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, and merge edges where representable, but not comments or original presentation style.
+- In-place scalar replacements preserve comments and surrounding presentation. Structural changes deliberately fall back to semantic YAML.
 - Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
-- The expression language does not implement variables, interpolation, regular expressions, reducers, dynamic keys, slices, deep-merge operators, comment/style operators, file operators, or yq's non-YAML codecs.
+- The expression language does not implement interpolation, regular expressions, slices, grouping, ireduce, comment/style mutation operators, file-loading operators, or yq's non-YAML codecs.
 
 YAML.sh does not evaluate YAML as shell code, but it is not a complete specification validator. Use a maintained full YAML library when exact conformance for arbitrary or hostile input is a hard requirement.
 
 ## Conformance fixture
 
-The advanced fixture covers anchors, collection aliases, merge precedence, block merge lists, directives, expanded tags, scalar types, explicit keys, empty collections, punctuated keys, and document scoping. The expression fixture covers node streams, iteration, pipes, filters, comparisons, booleans, defaults, construction, arithmetic, recursive and optional traversal, assignment, deletion, YAML round-tripping, null input, and in-place updates. Rejection tests cover boundaries that could otherwise be misread as supported syntax.
+The advanced fixture covers anchors, collection aliases, merge precedence, block merge lists, directives, expanded tags, scalar types, explicit keys, empty collections, punctuated keys, and document scoping. The expression fixture covers streams, filters, construction, arithmetic, recursion, assignments, maps, entries, variables, dynamic indexes, reducers, deep merge, YAML round-tripping, multi-document updates, and presentation preservation. Rejection tests cover boundaries that could otherwise be misread as supported syntax.
 
 See [`test/advanced.yml`](https://github.com/azohra/yaml.sh/blob/main/test/advanced.yml) and [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh).

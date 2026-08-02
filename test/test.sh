@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.2.0" "$(./ysh --version)"
+    assertEquals "v2.0.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -197,6 +197,43 @@ testExpressionDeletion() {
     assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json 'del(.missing) | .metadata' test/expressions.yml)"
 }
 
+testExpressionMapAndCommaStreams() {
+    assertEquals '["api","worker","web"]' "$(./ysh --json '.services | map(.name)' test/expressions.yml)"
+    assertEquals '{"owner":"PLATFORM","region":"WEST"}' "$(./ysh --json '.metadata | map_values(upcase)' test/expressions.yml)"
+    assertEquals "$(printf '%s\n' platform west)" "$(./ysh '.metadata.owner, .metadata.region' test/expressions.yml)"
+}
+
+testExpressionEntries() {
+    assertEquals '[{"key":"owner","value":"platform"},{"key":"region","value":"west"}]' "$(./ysh --json '.metadata | to_entries' test/expressions.yml)"
+    assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json '.metadata | to_entries | from_entries' test/expressions.yml)"
+    assertEquals '{"owner":"PLATFORM","region":"WEST"}' "$(./ysh --json '.metadata | with_entries(.value |= upcase)' test/expressions.yml)"
+}
+
+testExpressionSequenceAndStringHelpers() {
+    assertEquals '[1,1,2,3]' "$(./ysh -n --json '[3, 1, 2, 1] | sort')"
+    assertEquals '[3,1,2]' "$(./ysh -n --json '[3, 1, 2, 1] | unique')"
+    assertEquals '[1,2,3,4]' "$(./ysh -n --json '[[1, 2], [3, [4]]] | flatten')"
+    assertEquals '["yaml","sh"]' "$(./ysh -n --json '"yaml.sh" | split(".")')"
+    assertEquals '"yaml.sh"' "$(./ysh -n --json '["yaml", "sh"] | join(".")')"
+    assertEquals 'true' "$(./ysh -n --json '"yaml.sh" | startswith("yaml") and endswith(".sh")')"
+}
+
+testExpressionVariablesAndDynamicIndexes() {
+    assertEquals '"platform"' "$(./ysh -n --json '{key: "owner", data: {owner: "platform"}} | .key as $key | .data[$key]')"
+    assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' test/expressions.yml)"
+}
+
+testExpressionReduceAndDeepMerge() {
+    assertEquals '20170' "$(./ysh --json 'reduce .services[].port as $port (0; . + $port)' test/expressions.yml)"
+    assertEquals '{"a":{"x":1,"y":3,"z":4},"b":1,"c":2}' "$(./ysh -n --json '{a: {x: 1, y: 2}, b: 1} * {a: {y: 3, z: 4}, c: 2}')"
+}
+
+testExpandedYamlSyntax() {
+    assertEquals '"snowman ☃ rocket 🚀"' "$(printf '%s\n' 'unicode: "snowman \u2603 rocket \U0001F680"' | ./ysh --json '.unicode')"
+    assertEquals '["one",{"name":"two","enabled":true},"three"]' "$(printf '%s\n' 'items: [' '  one,' '  {name: two, enabled: true},' '  three' ']' | ./ysh --json '.items')"
+    assertEquals '"hello\nworld"' "$(printf '%s\n' 'message: |2-' '  hello' '  world' | ./ysh --json '.message')"
+}
+
 testYamlOutputRoundTrips() {
     assertEquals '"core"' "$(./ysh -o=yaml '.metadata.owner = "core"' test/expressions.yml | ./ysh --json '.metadata.owner')"
     assertEquals '"web"' "$(./ysh -o=yaml '.' test/expressions.yml | ./ysh --json '.services[2].name')"
@@ -220,17 +257,29 @@ testInplaceUpdate() {
     rm -f "$inplace_file"
 }
 
-testInplaceRejectsMultiDocumentStreamsWithoutChanges() {
+testInplaceTransformsAllDocuments() {
     inplace_file=test/.tmp-inplace-multi-$$.yml
-    original_file=test/.tmp-inplace-original-$$.yml
     cp test/test.yml "$inplace_file"
-    cp test/test.yml "$original_file"
-    result=$(./ysh -i '.key = "changed"' "$inplace_file" 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "does not yet support multi-document streams"
-    cmp "$original_file" "$inplace_file"
+    ./ysh -i '.key = "changed"' "$inplace_file"
     assertEquals 0 $?
-    rm -f "$inplace_file" "$original_file"
+    assertEquals 'changed' "$(./ysh -d 0 '.key' "$inplace_file")"
+    assertEquals 'changed' "$(./ysh -d 1 '.key' "$inplace_file")"
+    assertEquals 'changed' "$(./ysh -d 2 '.key' "$inplace_file")"
+    rm -f "$inplace_file"
+}
+
+testInplacePreservesScalarPresentation() {
+    inplace_file=test/.tmp-inplace-presentation-$$.yml
+    printf '%s\n' '# deployment settings' 'service:' '  name: api      # public name' '  label: "API service"' '  owner: '\''platform team'\''' '  enabled: true' > "$inplace_file"
+    ./ysh -i '.service.name = "worker" | .service.label = "Worker service" | .service.owner = "core team" | .service.enabled = false' "$inplace_file"
+    assertEquals 0 $?
+    result=$(cat "$inplace_file")
+    assertContains "$result" '# deployment settings'
+    assertContains "$result" 'name: worker      # public name'
+    assertContains "$result" 'label: "Worker service"'
+    assertContains "$result" "owner: 'core team'"
+    assertContains "$result" 'enabled: false'
+    rm -f "$inplace_file"
 }
 
 testExpressionErrors() {
@@ -363,9 +412,9 @@ testMalformedYamlIsRejected() {
     assertNotEquals 0 $?
     assertContains "$result" "unknown syntax"
 
-    result=$(printf "%s\n" "items: [one," "  two]" | ./ysh ".items" 2>&1)
+    result=$(printf "%s\n" "items: [one," "  two" | ./ysh ".items" 2>&1)
     assertNotEquals 0 $?
-    assertContains "$result" "multiline or unclosed flow collection"
+    assertContains "$result" "unclosed multiline flow collection"
 }
 
 testQueryErrors() {
@@ -394,12 +443,12 @@ testRunsWithPosixShell() {
 }
 
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.2.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.2.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.2.0/ysh"
-    assertContains "$(cat _static/_www/index.html)" "Install v1"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.2.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.2.0"
+    assertContains "$(cat README.md)" "v2.0.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v2.0.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v2.0.0/ysh"
+    assertContains "$(cat _static/_www/index.html)" "Install v2"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=2.0.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=2.0.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
     assertTrue "social preview image must exist" "[ -s _static/_www/og.png ]"
 }

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="_static/_www/og.png" alt="YAML.sh v1 — yq energy, zero baggage" width="900">
+  <img src="_static/_www/og.png" alt="YAML.sh v2 — yq energy, zero baggage" width="900">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.2.0" src="https://img.shields.io/badge/release-v1.2.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
+  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v2.0.0" src="https://img.shields.io/badge/release-v2.0.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
   <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
   <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
 </p>
@@ -54,7 +54,7 @@ Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys c
 ## Install one file
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.2.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v2.0.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -112,7 +112,7 @@ ysh '.missing // "fallback"' config.yml
 
 ## Make it change things
 
-Version 1.2 gives those node references teeth. Assign values, build missing paths, update relative to the current value, or delete a node:
+Version 2 gives those node references a small programming language. Assign values, build missing paths, update relative to the current value, or delete a node:
 
 ```sh
 ysh -o=yaml '.release.channel = "stable"' config.yml
@@ -126,7 +126,7 @@ Ready to commit to the bit?
 ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 ```
 
-`-i` requires a real single-document file, writes valid YAML only after the full parse and transformation succeeds, and preserves the existing file permissions. It intentionally normalizes presentation: comments, blank lines, scalar style, and key quoting are not retained. Multi-document streams remain queryable but are rejected by `-i` in v1.2 so unselected documents can never be silently dropped.
+`-i` requires a real file, writes only after every document parses and transforms successfully, and preserves its permissions. Version 2 patches scalar-only changes into the original source, retaining comments, blank lines, key layout, and plain/single/double quote style. Structural changes automatically fall back to deterministic semantic YAML. Multi-document files are transformed document by document.
 
 Construct a fresh document without reading input:
 
@@ -140,6 +140,17 @@ And yes, AWK is now doing arithmetic too:
 ysh -n --json '2 + 3 * 4'
 # 14
 ```
+
+Version 2 also crosses the line from query syntax into collection programming:
+
+```sh
+ysh '.services | map(.name) | unique' config.yml
+ysh '.metadata | with_entries(.value |= upcase)' config.yml
+ysh '.key as $key | .data[$key]' config.yml
+ysh 'reduce .services[].port as $port (0; . + $port)' config.yml
+```
+
+There are comma streams, variables, dynamic indexes, `map`/`map_values`, entries, sorting, uniqueness, flattening, string operations, reducers, and recursive mapping merge. It is still deliberately smaller than yq; the exact boundary is part of the documentation rather than a surprise in production.
 
 Pipe YAML in naturally:
 
@@ -166,7 +177,7 @@ ysh '.metadata["build[number]"]' config.yml
 | Partial merge handling | Alias lists, flow mappings, and block merge sequences |
 | Parser internals hidden | `--ast` and `--events` on tap |
 
-Version 1.1 added streaming reads. Version 1.2 adds recursive and optional traversal, construction, arithmetic, assignments, deletion, YAML output, null input, and in-place editing without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+Version 1 established the graph and writable evaluator. Version 2 adds collection programming, variables, reducers, deeper YAML syntax, multi-document mutation, and hybrid presentation-preserving edits without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
 
 ## Open the hood
 
@@ -223,7 +234,7 @@ That contract is the promise: supported syntax gets a test; neighboring unsuppor
 make all
 ```
 
-That rebuilds the standalone `ysh`, runs ShellCheck, and executes 57 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
+That rebuilds the standalone `ysh`, runs ShellCheck, and executes 64 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
 
 The constraint is the fun part. Come make AWK do something unreasonable.
 

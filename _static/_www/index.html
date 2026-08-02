@@ -3,24 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A yq-like YAML query tool in one portable shell script. No package manager, language runtime, or downloaded binary.">
+  <meta name="description" content="A yq-like YAML programming tool in one portable shell script. Map, reduce, update, and preserve comments without another runtime.">
   <meta name="theme-color" content="#101410">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="YAML.sh v1 — yq energy. zero baggage.">
-  <meta property="og:description" content="Query YAML with one portable /bin/sh + AWK script. No additional runtime or packages.">
+  <meta property="og:title" content="YAML.sh v2 — yq energy. zero baggage.">
+  <meta property="og:description" content="Program YAML with one portable /bin/sh + AWK script. No additional runtime or packages.">
   <meta property="og:url" content="https://yaml.azohra.com">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="YAML.sh v1.2 — yq energy, zero baggage">
+  <meta property="og:image:alt" content="YAML.sh v2 — yq energy, zero baggage">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="YAML.sh v1 — yq energy. zero baggage.">
-  <meta name="twitter:description" content="A yq-like YAML query tool in one portable shell script.">
+  <meta name="twitter:title" content="YAML.sh v2 — yq energy. zero baggage.">
+  <meta name="twitter:description" content="A yq-like YAML programming tool in one portable shell script.">
   <meta name="twitter:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com">
   <link rel="icon" href="favicon.ico">
-  <link rel="stylesheet" href="css/style.css?v=1.2.0">
-  <title>YAML.sh v1 — yq energy. zero baggage.</title>
+  <link rel="stylesheet" href="css/style.css?v=2.0.0">
+  <title>YAML.sh v2 — yq energy. zero baggage.</title>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -29,7 +29,7 @@
     <a class="brand" href="/" aria-label="YAML.sh home">
       <span class="brand-mark">Y</span>
       <span>YAML.sh</span>
-      <span class="version-pill">v1</span>
+      <span class="version-pill">v2</span>
     </a>
     <nav aria-label="Primary navigation">
       <a href="/docs/">Docs</a>
@@ -41,9 +41,9 @@
   <main id="main">
     <section class="hero section-shell">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-dot"></span> Version 1.2 · the tiny parser writes back</p>
+        <p class="eyebrow"><span class="status-dot"></span> Version 2 · comments survive the adventure</p>
         <h1>yq energy.<br><span>zero baggage.</span></h1>
-        <p class="hero-lede">Query YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a surprising amount of ambition.</p>
+        <p class="hero-lede">Program YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a frankly unreasonable amount of ambition.</p>
         <div class="hero-actions">
           <a class="button button-primary" href="#install">Get YAML.sh</a>
           <a class="button button-secondary" href="/docs/">Read the docs <span aria-hidden="true">↗</span></a>
@@ -51,7 +51,7 @@
         <ul class="hero-facts" aria-label="YAML.sh highlights">
           <li><strong>1</strong> file</li>
           <li><strong>0</strong> extra packages</li>
-          <li><strong>57</strong> behavioral tests</li>
+          <li><strong>64</strong> behavioral tests</li>
         </ul>
       </div>
 
@@ -85,7 +85,8 @@
 
     <section class="ticker" aria-label="Core capabilities">
       <div>
-        <span>QUERY + UPDATE</span><b>◆</b>
+        <span>MAP + REDUCE</span><b>◆</b>
+        <span>COMMENTS SURVIVE</span><b>◆</b>
         <span>PIPES + SELECT</span><b>◆</b>
         <span>ANCHORS + ALIASES</span><b>◆</b>
         <span>MERGE KEYS</span><b>◆</b>
@@ -116,8 +117,8 @@
         <span class="pipeline-arrow" aria-hidden="true">→</span>
         <article>
           <span class="step">03</span>
-          <h3>Query</h3>
-          <p>Paths, filters, construction, arithmetic, and assignments operate on real node references without flattening them.</p>
+          <h3>Program</h3>
+          <p>Paths, maps, variables, reducers, arithmetic, and assignments operate on real node references without flattening them.</p>
         </article>
       </div>
     </section>
@@ -129,16 +130,15 @@
       </div>
       <div class="demo-window">
         <div class="demo-tabs" role="tablist" aria-label="CLI examples">
-          <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Query</button>
+          <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Program</button>
           <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">JSON</button>
           <button id="tab-merge" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge">Update</button>
           <button id="tab-inspect" role="tab" aria-selected="false" aria-controls="panel-inspect" data-demo="inspect">Inspect</button>
         </div>
         <div class="demo-panel" id="panel-query" role="tabpanel" aria-labelledby="tab-query">
-          <p class="demo-label">Stream, filter, then ask for exactly what you need.</p>
-          <pre><code><span class="prompt">$</span> ysh '.services[] | select(.enabled) | .name' config.yml
-api
-web</code></pre>
+          <p class="demo-label">Stream, map, and reduce without inviting another runtime.</p>
+          <pre><code><span class="prompt">$</span> ysh '.services | map(.name) | unique' config.yml
+["api","worker","web"]</code></pre>
         </div>
         <div class="demo-panel" id="panel-json" role="tabpanel" aria-labelledby="tab-json" hidden>
           <p class="demo-label">Collections become clean, typed JSON.</p>
@@ -146,7 +146,7 @@ web</code></pre>
 {"name":"api","enabled":true,"port":8080}</code></pre>
         </div>
         <div class="demo-panel" id="panel-merge" role="tabpanel" aria-labelledby="tab-merge" hidden>
-          <p class="demo-label">Change a real file in place—no temporary runtime required.</p>
+          <p class="demo-label">Change a real file in place. The comments get to stay.</p>
           <pre><code><span class="prompt">$</span> ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 
 <span class="prompt">$</span> ysh '.services[].tier' config.yml
@@ -199,12 +199,12 @@ node  1  mapping  line=1</code></pre>
 
     <section class="install section-shell" id="install">
       <div class="install-copy">
-        <p class="kicker">Install v1</p>
+        <p class="kicker">Install v2</p>
         <h2>One pipe.<br>Then go query something.</h2>
         <p>The installer downloads a pinned release and places <code>ysh</code> in <code>/usr/local/bin</code>. Set <code>YSH_INSTALL_DIR</code> to choose another location.</p>
       </div>
       <div class="install-command">
-        <div class="install-command-label"><span>Terminal</span><span>v1.2.0</span></div>
+        <div class="install-command-label"><span>Terminal</span><span>v2.0.0</span></div>
         <pre><code id="install-code">curl -fsSL https://yaml.azohra.com/install | sh</code></pre>
         <button class="copy-button" type="button" data-copy="install-code"><span>Copy command</span><b aria-hidden="true">⌘</b></button>
         <p class="install-note">Prefer to inspect first? <a href="/install">Read the installer source.</a></p>

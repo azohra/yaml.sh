@@ -5,7 +5,7 @@ YAML.sh ships as one executable text file. The released file contains both the p
 ## Install the pinned release
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.2.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v2.0.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -89,7 +89,7 @@ Once the result looks right, update the file in place:
 ysh -i '.release.channel = "stable"' config.yml
 ```
 
-In-place output preserves the file permissions but normalizes YAML presentation. Comments and original formatting are not retained, so review the diff like the tiny chaos engineer you are.
+In-place output preserves file permissions. Scalar-only changes also preserve comments, blank lines, layout, and plain/single/double quote style. Structural changes use normalized semantic YAML, so review the diff like the tiny chaos engineer you are.
 
 ## Standard input
 
