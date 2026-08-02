@@ -26,6 +26,7 @@ All notable changes to YAML.sh are documented here.
 
 - The standalone build now embeds the readable AWK parser without the lossy minification step.
 - `-T` is documented as accepting one quoted intermediate-data argument.
+- The default GitHub branch and all three Cloudflare Pages production branches are now `main`.
 
 ## [0.2.1] - 2022-02-23
 
