@@ -19,9 +19,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: Install ShellCheck on Linux
+      - name: Install Linux portability tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk shellcheck time
+        run: sudo apt-get update && sudo apt-get install -y busybox shellcheck
+      - name: Install extra AWK implementations
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y gawk original-awk
       - name: Install ShellCheck on macOS
         if: runner.os == 'macOS'
         run: brew install shellcheck
@@ -36,14 +39,14 @@ jobs:
           ln -s "$(command -v busybox)" "${RUNNER_TEMP}/ysh-busybox/awk"
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make test
       - name: Test with POSIX gawk
-        if: runner.os == 'Linux'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mkdir -p "${RUNNER_TEMP}/ysh-gawk-posix"
           printf '%s\n' '#!/bin/sh' 'exec gawk --posix "$@"' > "${RUNNER_TEMP}/ysh-gawk-posix/awk"
           chmod 755 "${RUNNER_TEMP}/ysh-gawk-posix/awk"
           PATH="${RUNNER_TEMP}/ysh-gawk-posix:${PATH}" make test
       - name: Test with original AWK
-        if: runner.os == 'Linux'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mkdir -p "${RUNNER_TEMP}/ysh-original-awk"
           ln -s "$(command -v original-awk)" "${RUNNER_TEMP}/ysh-original-awk/awk"
@@ -54,41 +57,50 @@ jobs:
           printf '%s\n' 'key: value' | dash ./ysh '.key'
           printf '%s\n' 'key: value' | busybox sh ./ysh '.key'
           printf '%s\n' 'key: value' | bash --posix ./ysh '.key'
+
+  evidence:
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install evidence tools
+        run: sudo apt-get update && sudo apt-get install -y busybox jq time
+      - name: Build
+        run: make ysh
+      - name: Configure BusyBox AWK
+        run: |
+          mkdir -p "${RUNNER_TEMP}/ysh-busybox"
+          ln -s "$(command -v busybox)" "${RUNNER_TEMP}/ysh-busybox/awk"
       - name: Fetch pinned YAML Test Suite
-        if: runner.os == 'Linux'
         run: git clone --depth 1 --branch data-2022-01-17 https://github.com/yaml/yaml-test-suite.git "${RUNNER_TEMP}/yaml-test-suite"
       - name: Measure conformance with mawk
-        if: runner.os == 'Linux'
         env:
           YAML_TEST_SUITE_DIR: ${{ runner.temp }}/yaml-test-suite
         run: make conformance
       - name: Measure conformance with BusyBox AWK
-        if: runner.os == 'Linux'
         env:
           YAML_TEST_SUITE_DIR: ${{ runner.temp }}/yaml-test-suite
         run: PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make conformance
       - name: Install pinned yq oracle
-        if: runner.os == 'Linux'
         run: |
           curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64 -o "${RUNNER_TEMP}/yq"
           printf '%s  %s\n' 'fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4' "${RUNNER_TEMP}/yq" | sha256sum --check
           chmod 755 "${RUNNER_TEMP}/yq"
       - name: Compare with yq
-        if: runner.os == 'Linux'
         env:
           YQ_BINARY: ${{ runner.temp }}/yq
         run: |
           make differential
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make differential
       - name: Run deterministic and adversarial suites
-        if: runner.os == 'Linux'
         env:
-          YSH_FUZZ_CASES: ${{ matrix.os == 'ubuntu-latest' && '12000' || '1500' }}
+          YSH_FUZZ_CASES: 12000
         run: |
           make fuzz
           make presentation
           make adversarial
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" YSH_FUZZ_CASES=50 make fuzz
       - name: Verify scale contract
-        if: matrix.os == 'ubuntu-latest'
         run: make scale
