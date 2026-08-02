@@ -1,270 +1,255 @@
-#!/usr/bin/env bash
-# shellcheck disable=SC2034
-YSH_LIB=1
-
-# shellcheck source=/dev/null
-source ./ysh
-
-setUp() {
-    file=$(ysh -f test/test.yml)
-}
+#!/bin/sh
 
 testVersion() {
-    assertEquals 'v0.4.0' "$(ysh --version)"
+    assertEquals "v1.0.0" "$(./ysh --version)"
 }
 
-testLoadFile() {
-    assertNotNull "${file}"
+testHelp() {
+    result=$(./ysh --help)
+    assertEquals 0 $?
+    assertContains "$result" "yq-style paths"
+    assertContains "$result" "events"
 }
 
-testKeyValueFromFile() {
-    assertEquals '"value"' "$(ysh -f test/test.yml -q key_value.key)"
-    assertEquals 'value' "$(ysh -f test/test.yml -Q key_value.key)"
+testYqStyleFileQuery() {
+    assertEquals "value" "$(./ysh ".key_value.key" test/test.yml)"
+    assertEquals "three" "$(./ysh ".object_list.list[2].name" test/test.yml)"
 }
 
-testKeyValueTranspiled() {
-    assertEquals 'value' "$(ysh -T "${file}" -Q key_value.key)"
+testStandardInputQuery() {
+    assertEquals "42" "$(printf "%s\n" "answer: 42" | ./ysh ".answer")"
+    assertEquals "value" "$(printf "%s\n" "key: value" | ./ysh ".key")"
 }
 
-testLooseQuery() {
-    result=$(ysh -T "${file}" -q loose_query)
-    assertContains "${result}" 'key="value"'
-    assertContains "${result}" 'level1.top_key="another_value"'
-    assertEquals 2 "$(wc -l <<< "${result}" | tr -d ' ')"
+testFileOnlyEmitsRootAsJson() {
+    result=$(./ysh test/test.yml)
+    assertContains "$result" '"key_value":{"key":"value"}'
+    assertContains "$result" '"simple_list":{"list":["one","two","three","four"]}'
 }
 
-testLiteralQueryDoesNotInterpretRegex() {
-    assertEquals 'three' "$(ysh -T "${file}" -Q 'simple_list.list[2]')"
-    assertNull "$(ysh -T "${file}" -Q 'simple_listXlist[2]')"
+testFileFirstCompatibility() {
+    assertEquals "value" "$(./ysh test/test.yml ".key_value.key")"
 }
 
-testSubtree() {
-    result=$(ysh -T "${file}" -s subtree)
-    assertContains "${result}" 'lower1="value"'
-    assertContains "${result}" 'lower3.upper2.[1]="two"'
-    assertEquals 5 "$(wc -l <<< "${result}" | tr -d ' ')"
+testJsonScalarTypes() {
+    assertEquals '"text"' "$(./ysh ".types.string" test/advanced.yml --json)"
+    assertEquals '"12"' "$(./ysh ".types.quoted_number" test/advanced.yml --json)"
+    assertEquals "null" "$(./ysh ".types.null" test/advanced.yml --json)"
+    assertEquals "true" "$(./ysh ".types.boolean" test/advanced.yml --json)"
+    assertEquals "42" "$(./ysh ".types.binary" test/advanced.yml --json)"
+    assertEquals "15" "$(./ysh ".types.octal" test/advanced.yml --json)"
+    assertEquals "42" "$(./ysh ".types.hex" test/advanced.yml --json)"
+    assertEquals "5.0" "$(./ysh ".types.trailing_float" test/advanced.yml --json)"
+    assertEquals '"2026-08-02"' "$(./ysh ".types.timestamp" test/advanced.yml --json)"
 }
 
-testSimpleList() {
-    result=$(ysh -T "${file}" -l simple_list.list)
-    assertContains "${result}" '[0]="one"'
-    assertContains "${result}" '[3]="four"'
-    assertEquals 4 "$(wc -l <<< "${result}" | tr -d ' ')"
+testYqStyleOutputFlags() {
+    assertEquals '{"name":"two","value":2}' "$(./ysh -o=json ".object_list.list[1]" test/test.yml)"
+    assertEquals "value" "$(./ysh --output-format=raw ".key_value.key" test/test.yml)"
 }
 
-testSimpleListValues() {
-    assertEquals $'one\ntwo\nthree\nfour' "$(ysh -T "${file}" -L simple_list.list)"
+testCollectionsEmitJsonByDefault() {
+    assertEquals '["one","two","three","four"]' "$(./ysh ".simple_list.list" test/test.yml)"
+    assertEquals '{"name":"two","value":2}' "$(./ysh ".object_list.list[1]" test/test.yml)"
 }
 
-testSimpleCount() {
-    assertEquals 4 "$(ysh -T "${file}" -c simple_list.list)"
+testFlowCollections() {
+    assertEquals "request" "$(./ysh ".complex.details.type" test/issues.yml)"
+    assertEquals "three, four" "$(./ysh ".inline[2]" test/issues.yml)"
+    assertEquals "item" "$(./ysh ".inline[3].name" test/issues.yml)"
 }
 
-testObjectList() {
-    result=$(ysh -T "${file}" -l object_list.list)
-    assertContains "${result}" '[0].name="one"'
-    assertContains "${result}" '[2].value="3"'
-    assertEquals 6 "$(wc -l <<< "${result}" | tr -d ' ')"
+testBlockScalars() {
+    assertEquals "$(printf "This value\ncan span multiple lines")" "$(./ysh ".literal" test/issues.yml)"
+    assertEquals "This value folds onto one line" "$(./ysh ".folded" test/issues.yml)"
 }
 
-testExpandedList() {
-    result=$(ysh -T "${file}" -l expanded_list.list)
-    assertContains "${result}" '[0].name="one"'
-    assertContains "${result}" '[2].value="3"'
-    assertEquals 6 "$(wc -l <<< "${result}" | tr -d ' ')"
+testBlockAndIndentlessSequences() {
+    assertEquals '["item1","item2"]' "$(./ysh ".indented" test/issues.yml)"
+    assertEquals '["item1","item2"]' "$(./ysh ".indentless" test/issues.yml)"
+    assertEquals "ten" "$(./ysh ".long_list[10]" test/issues.yml)"
 }
 
-testChainedListAccess() {
-    assertEquals 'three' "$(ysh -T "${file}" -l simple_list.list -I 2)"
-    result=$(ysh -T "${file}" -l object_list.list -i 2)
-    assertContains "${result}" 'name="three"'
-    assertContains "${result}" 'value="3"'
-}
-
-testDirectListAccess() {
-    assertEquals 'two' "$(ysh -T "${file}" -Q 'simple_list.list[1]')"
-    assertEquals 'three' "$(ysh -T "${file}" -Q 'object_list.list[2].name')"
-}
-
-testTopKeys() {
-    result=$(ysh -T "${file}" -s top_values -t)
-    assertEquals $'lower1\nlower2\nlower3' "${result}"
-}
-
-testNextBlock() {
-    assertEquals 'value' "$(ysh -T "${file}" -Q key)"
-    file2=$(ysh -T "${file}" -n)
-    assertEquals 'block_2_value' "$(ysh -T "${file2}" -Q key)"
-    file2=$(ysh -T "${file2}" -n)
-    assertEquals 'block_3_value' "$(ysh -T "${file2}" -Q key)"
-
-    documents=$(printf '%s\n' '--- # first' 'key: first' '--- # second' 'key: second' | YSH_parse_stdin)
-    assertEquals 'first' "$(ysh -T "${documents}" -Q key)"
-    assertEquals 'second' "$(ysh -T "$(ysh -T "${documents}" --next)" -Q key)"
-}
-
-testComplexFlowObjectFromIssue1() {
-    assertEquals 'feature' "$(ysh -f test/issues.yml -Q complex.name)"
-    assertEquals 'request' "$(ysh -f test/issues.yml -Q complex.details.type)"
-    assertEquals 'medium' "$(ysh -f test/issues.yml -Q complex.details.priority)"
-}
-
-testMultilineValuesFromIssue2() {
-    assertEquals $'This value\ncan span multiple lines' "$(ysh -f test/issues.yml -Q literal)"
-    assertEquals 'This value folds onto one line' "$(ysh -f test/issues.yml -Q folded)"
-}
-
-testInlineListFromIssue3() {
-    assertEquals 4 "$(ysh -f test/issues.yml -c inline)"
-    assertEquals 'three, four' "$(ysh -f test/issues.yml -Q 'inline[2]')"
-    assertEquals 'item' "$(ysh -f test/issues.yml -Q 'inline[3].name')"
-}
-
-testListIndentationFromIssue5() {
-    assertEquals $'item1\nitem2' "$(ysh -f test/issues.yml -L indented)"
-    assertEquals $'item1\nitem2' "$(ysh -f test/issues.yml -L indentless)"
-}
-
-testCookbookQueriesFromIssue10() {
-    assertEquals '0' "$(printf '%s\n' 'block_no: 0' | ysh -Q block_no)"
-    assertEquals 'three' "$(ysh -f test/test.yml -Q 'expanded_list.list[2].name')"
-}
-
-testLinePointersFromIssue12() {
-    assertEquals '2' "$(ysh -f test/issues.yml --line complex.details.type)"
-    assertEquals '10' "$(ysh -f test/issues.yml --line literal)"
-}
-
-testQuotedTranspiledDataFromIssue15() {
-    transpiled=$(ysh -f test/issues.yml)
-    assertEquals 'rust' "$(ysh -T "${transpiled}" -Q lenguaje)"
-    assertEquals 'make.toml' "$(ysh -T "${transpiled}" -Q 'fichero_tareas[0]')"
-    assertEquals 'say "hello"' "$(ysh -T "${transpiled}" -Q quotes.double)"
-    assertEquals "it's fine" "$(ysh -T "${transpiled}" -Q quotes.single)"
-}
-
-testListsSupportMultipleDigitIndexes() {
-    assertEquals 12 "$(ysh -f test/issues.yml -c long_list)"
-    assertEquals 'ten' "$(ysh -f test/issues.yml -Q 'long_list[10]')"
-    assertEquals 'eleven' "$(ysh -f test/issues.yml -L long_list | tail -1)"
-}
-
-testCommentsAndCrLfInput() {
-    assertEquals 'value' "$(ysh -f test/issues.yml -Q comment)"
-    assertEquals 'value' "$(printf 'key: value\r\n' | ysh -Q key)"
-    assertEquals 'https://yaml.sh' "$(ysh -f test/issues.yml -Q 'urls[0]')"
-}
-
-testBackwardScalarAndCollectionAliases() {
-    assertEquals 'hello' "$(ysh -f test/advanced.yml -Q scalar_alias)"
-    assertEquals 'red' "$(ysh -f test/advanced.yml -Q mapping_alias.color)"
-    assertEquals 'true' "$(ysh -f test/advanced.yml -Q mapping_alias.nested.enabled)"
-    assertEquals $'first\nsecond' "$(ysh -f test/advanced.yml -L list_alias)"
-    assertEquals 'b' "$(ysh -f test/advanced.yml -Q 'flow_alias.y[1]')"
-    assertEquals 'hello' "$(ysh -f test/advanced.yml -Q 'sequence_aliases[0]')"
-    assertEquals '1' "$(ysh -f test/advanced.yml -Q 'sequence_aliases[1].x')"
+testScalarAndCollectionAliases() {
+    assertEquals "hello" "$(./ysh ".scalar_alias" test/advanced.yml)"
+    assertEquals "true" "$(./ysh ".mapping_alias.nested.enabled" test/advanced.yml)"
+    assertEquals '["first","second"]' "$(./ysh ".list_alias" test/advanced.yml)"
+    assertEquals "b" "$(./ysh ".flow_alias.y[1]" test/advanced.yml)"
+    assertEquals "1" "$(./ysh ".sequence_aliases[1].x" test/advanced.yml)"
 }
 
 testMergeKeysAndPrecedence() {
-    assertEquals 'red' "$(ysh -f test/advanced.yml -Q merged.color)"
-    assertEquals 'large' "$(ysh -f test/advanced.yml -Q merged.size)"
-    assertEquals 'square' "$(ysh -f test/advanced.yml -Q merged.shape)"
-    assertEquals 'green' "$(ysh -f test/advanced.yml -Q inline_merge.color)"
-    assertEquals 'small' "$(ysh -f test/advanced.yml -Q inline_merge.size)"
-    assertEquals 'flow' "$(ysh -f test/advanced.yml -Q literal_merge.from)"
-    assertEquals 'true' "$(ysh -f test/advanced.yml -Q literal_merge.active)"
-    assertEquals 'literal' "$(ysh -f test/advanced.yml -Q 'quoted_merge_key.<<')"
+    assertEquals '{"color":"red","size":"large","shape":"square"}' "$(./ysh ".merged" test/advanced.yml)"
+    assertEquals '{"color":"green","size":"small"}' "$(./ysh ".inline_merge" test/advanced.yml)"
+    assertEquals '{"from":"flow","active":true}' "$(./ysh ".literal_merge" test/advanced.yml)"
+    assertEquals '{"color":"purple","size":"small","shape":"square"}' "$(./ysh ".block_merge" test/advanced.yml)"
+    assertEquals "literal" "$(./ysh '.["quoted_merge_key"]["<<"]' test/advanced.yml)"
 }
 
-testDirectivesTagsAndExplicitScalarKeys() {
-    assertEquals '123' "$(ysh -f test/advanced.yml -Q types.forced_string)"
-    assertEquals 'payload' "$(ysh -f test/advanced.yml -Q types.custom)"
-    assertEquals 'explicit value' "$(ysh -f test/advanced.yml -Q 'explicit key')"
-    assertEquals 'value' "$(printf '%s\n' '%YAML 1.2' '---' 'key: value' | ysh -Q key)"
+testEmptyCollectionsSurviveParsing() {
+    assertEquals "{}" "$(./ysh ".empty_mapping" test/advanced.yml)"
+    assertEquals "[]" "$(./ysh ".empty_sequence" test/advanced.yml)"
+    assertEquals "mapping" "$(./ysh ".empty_mapping" test/advanced.yml --type)"
+    assertEquals "sequence" "$(./ysh ".empty_sequence" test/advanced.yml --type)"
 }
 
-testScalarTypeInspection() {
-    assertEquals 'string' "$(ysh -f test/advanced.yml --type types.string)"
-    assertEquals 'string' "$(ysh -f test/advanced.yml --type types.quoted_number)"
-    assertEquals 'null' "$(ysh -f test/advanced.yml --type types.null)"
-    assertEquals 'bool' "$(ysh -f test/advanced.yml --type types.boolean)"
-    assertEquals 'int' "$(ysh -f test/advanced.yml --type types.integer)"
-    assertEquals 'int' "$(ysh -f test/advanced.yml --type types.binary)"
-    assertEquals 'int' "$(ysh -f test/advanced.yml --type types.octal)"
-    assertEquals 'int' "$(ysh -f test/advanced.yml --type types.hex)"
-    assertEquals 'float' "$(ysh -f test/advanced.yml --type types.float)"
-    assertEquals 'float' "$(ysh -f test/advanced.yml --type types.trailing_float)"
-    assertEquals 'float' "$(ysh -f test/advanced.yml --type types.exponent)"
-    assertEquals 'timestamp' "$(ysh -f test/advanced.yml --type types.timestamp)"
-    assertEquals 'string' "$(ysh -f test/advanced.yml --type types.forced_string)"
-    assertEquals 'tagged' "$(ysh -f test/advanced.yml --type types.custom)"
-    assertEquals 'int' "$(printf '%s\n' 'answer: 42' | ysh --type answer)"
+testQuotedQueryKeys() {
+    assertEquals "dotted" "$(./ysh '.["key.with.dots"]' test/advanced.yml)"
+    assertEquals "dotted" "$(./ysh ".[\"key.with.dots\"]" test/advanced.yml)"
 }
 
-testAnchorsAreDocumentScopedAndCanBeRedefined() {
-    second_document=$(ysh -f test/advanced.yml --next)
-    assertEquals 'second' "$(ysh -T "${second_document}" -Q fresh_alias)"
+testScalarAndCollectionTypes() {
+    assertEquals "string" "$(./ysh ".types.quoted_number" test/advanced.yml --type)"
+    assertEquals "null" "$(./ysh ".types.null" test/advanced.yml --type)"
+    assertEquals "bool" "$(./ysh ".types.boolean" test/advanced.yml --type)"
+    assertEquals "int" "$(./ysh ".types.integer" test/advanced.yml --type)"
+    assertEquals "float" "$(./ysh ".types.exponent" test/advanced.yml --type)"
+    assertEquals "timestamp" "$(./ysh ".types.timestamp" test/advanced.yml --type)"
+    assertEquals "tagged" "$(./ysh ".types.custom" test/advanced.yml --type)"
+    assertEquals "mapping" "$(./ysh ".tagged_mapping" test/advanced.yml --type)"
 }
 
-testUnsupportedYamlFailsExplicitly() {
-    result=$(printf '%s\n' 'value: *later' 'later: &later yes' | ysh -Q value 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'undefined alias *later'
-
-    result=$(printf '%s\n' 'root: &root' '  child: *root' | ysh -Q root.child 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'recursive alias *root'
-
-    result=$(printf '%s\n' '? [one, two]' ': value' | ysh -Q key 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'collection-valued complex keys are not supported'
-
-    result=$(printf '%s\n' '%FOO bar' 'key: value' | ysh -Q key 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'unsupported or malformed directive'
-
-    result=$(printf '%s\n' 'base: &base' '  key: value' 'target:' '  <<:' '    - *base' | ysh -Q target.key 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'block merge lists are not supported'
-
-    result=$(printf '%s\n' 'items: [one,' '  two]' | ysh -Q items 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'multiline or unclosed flow collection'
-
-    result=$(printf '%s\n' 'scalar: &scalar value' 'target:' '  <<: *scalar' | ysh -Q target 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'does not reference a mapping'
-
-    result=$(printf '%s\n' 'key: first' 'key: second' | ysh -Q key 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'duplicate or ambiguous mapping path key'
-
-    result=$(printf '%s\n' '? key' | ysh -Q key 2>&1)
-    assertNotEquals 0 $?
-    assertContains "${result}" 'explicit scalar key has no mapping value'
+testExpandedTags() {
+    assertEquals "tag:yaml.org,2002:str" "$(./ysh ".types.forced_string" test/advanced.yml --tag)"
+    assertEquals "tag:example.com,2026:widget" "$(./ysh ".types.custom" test/advanced.yml --tag)"
+    assertEquals "tag:example.com,2026:box" "$(./ysh ".tagged_mapping" test/advanced.yml --tag)"
 }
 
-testInvalidYamlIsRejected() {
-    result=$(printf '%s\n' 'not yaml' | ysh -Q key 2>&1)
-    status=$?
-    assertNotEquals 0 "${status}"
-    assertContains "${result}" 'unknown syntax on line 1'
+testSourceLines() {
+    assertEquals "2" "$(./ysh ".complex.details.type" test/issues.yml --line)"
+    assertEquals "10" "$(./ysh ".literal" test/issues.yml --line)"
+}
+
+testMultipleDocuments() {
+    assertEquals "value" "$(./ysh ".key" test/test.yml)"
+    assertEquals "block_2_value" "$(./ysh -d 1 ".key" test/test.yml)"
+    assertEquals "block_3_value" "$(./ysh --document 2 ".key" test/test.yml)"
+    assertEquals "second" "$(./ysh -d 1 ".fresh_alias" test/advanced.yml)"
+}
+
+testExplicitScalarKeys() {
+    assertEquals "explicit value" "$(./ysh '.["explicit key"]' test/advanced.yml)"
+}
+
+testRootScalarsAndCollections() {
+    assertEquals "https://yaml.sh" "$(printf "%s\n" "https://yaml.sh" | ./ysh ".")"
+    assertEquals '["one","two"]' "$(printf "%s\n" "[one, two]" | ./ysh ".")"
+    result=$(printf "%s\n" "{one: 1, two: 2}" | ./ysh ".")
+    assertContains "$result" '"one":1'
+    assertContains "$result" '"two":2'
+}
+
+testEmptyDocumentsAreNull() {
+    assertEquals "null" "$(printf "" | ./ysh "." --json)"
+    assertEquals "null" "$(printf "%s\n" "---" "..." | ./ysh "." --json)"
+    assertEquals "null" "$(printf "%s\n" "---" "---" "key: value" | ./ysh -d 0 "." --json)"
+    assertEquals "value" "$(printf "%s\n" "---" "---" "key: value" | ./ysh -d 1 ".key")"
+}
+
+testPrimaryTagHandleExpansion() {
+    result=$(printf "%s\n" "%TAG ! tag:example.com,2026:" "---" "value: !widget payload" | ./ysh ".value" --tag)
+    assertEquals "tag:example.com,2026:widget" "$result"
+}
+
+testAstInspection() {
+    result=$(./ysh --ast test/advanced.yml)
+    assertContains "$result" "node"
+    assertContains "$result" 'anchor="defaults"'
+    assertContains "$result" 'key="merged"'
+    assertContains "$result" "merge=1"
+}
+
+testEventInspection() {
+    result=$(./ysh --events test/advanced.yml)
+    assertContains "$result" "STREAM_START"
+    assertContains "$result" 'ALIAS name="greeting"'
+    assertContains "$result" 'KEY value="<<" merge=1'
+    assertContains "$result" "STREAM_END"
+}
+
+testCommentsQuotesAndCrLf() {
+    assertEquals "value" "$(./ysh ".comment" test/issues.yml)"
+    assertEquals 'say "hello"' "$(./ysh ".quotes.double" test/issues.yml)"
+    assertEquals "it is fine" "$(printf "%s\n" "message: it is fine" | ./ysh ".message")"
+    assertEquals "value" "$(printf "key: value\r\n" | ./ysh ".key")"
+    assertEquals "https://yaml.sh" "$(./ysh ".urls[0]" test/issues.yml)"
+}
+
+testDuplicateKeysAreRejected() {
+    result=$(printf "%s\n" "key: first" "key: second" | ./ysh ".key" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "duplicate mapping key key"
+}
+
+testUndefinedAndForwardAliasesAreRejected() {
+    result=$(printf "%s\n" "value: *later" "later: &later yes" | ./ysh ".value" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "undefined or forward alias *later"
+}
+
+testRecursiveAliasesAreRejected() {
+    result=$(printf "%s\n" "root: &root" "  child: *root" | ./ysh ".root.child" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "recursive alias *root"
+}
+
+testInvalidMergeSourcesAreRejected() {
+    result=$(printf "%s\n" "scalar: &scalar value" "target:" "  <<: *scalar" | ./ysh ".target" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "merge source is not a mapping"
+}
+
+testUnsupportedComplexKeysAreRejected() {
+    result=$(printf "%s\n" "? [one, two]" ": value" | ./ysh "." 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "collection-valued complex keys are not supported"
+}
+
+testMalformedYamlIsRejected() {
+    result=$(printf "%s\n" "not yaml" "another root" | ./ysh "." 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "unknown syntax"
+
+    result=$(printf "%s\n" "items: [one," "  two]" | ./ysh ".items" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "multiline or unclosed flow collection"
+}
+
+testQueryErrors() {
+    result=$(./ysh ".missing" test/test.yml 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "query key not found"
+
+    result=$(./ysh "missing" test/test.yml 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "query must start with ."
+
+    result=$(./ysh ".simple_list.list[99]" test/test.yml 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "query index out of range"
 }
 
 testCliErrors() {
-    ysh -f does_not_exist.yaml -Q key >/dev/null 2>&1
+    ./ysh ".key" does-not-exist.yml >/dev/null 2>&1
     assertEquals 1 $?
-    ysh -T "${file}" -Q >/dev/null 2>&1
+    ./ysh --document nope ".key" test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
-    ysh -T "${file}" --line key >/dev/null 2>&1
+    ./ysh --output xml ".key" test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
-    ysh -T "${file}" --type key >/dev/null 2>&1
+    ./ysh --unknown ".key" test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
 }
 
-testHelpIsSuccessful() {
-    ysh --help >/dev/null
-    assertEquals 0 $?
+testRunsWithPosixShell() {
+    assertEquals "value" "$(/bin/sh ./ysh ".key_value.key" test/test.yml)"
+}
+
+testReleaseArtifactsStayInSync() {
+    assertContains "$(cat README.md)" "v1.0.0/ysh"
+    assertContains "$(cat _static/_docs/getting-started.md)" "v1.0.0/ysh"
+    assertContains "$(cat _static/_get/index.html)" "v1.0.0/ysh"
+    assertContains "$(cat _static/_www/index.html)" "Install v1"
+    assertTrue "social preview image must exist" "[ -s _static/_www/og.png ]"
 }
 
 # shellcheck source=/dev/null

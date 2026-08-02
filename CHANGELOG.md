@@ -2,6 +2,39 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [1.0.0] - 2026-08-01
+
+Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node graph and a yq-style command line.
+
+### Added
+
+- Direct queries such as `.server.host`, `.services[0].name`, and `.["key.with.dots"]`.
+- Native mapping, sequence, scalar, and alias nodes with source lines, tags, anchors, parent-child edges, and document boundaries.
+- JSON output for whole mappings and sequences, plus JSON-compatible core scalar resolution for nulls, booleans, integers, and finite floats.
+- `--type`, `--tag`, `--line`, `--ast`, and `--events` inspection modes.
+- Multi-document selection with `--document` and stdin input without a special flag.
+- Empty mappings, empty sequences, root scalars, root flow collections, explicit scalar keys, primary and named tag handles, aliases, and mapping merges.
+- A focused 37-test v1 suite and CI coverage for macOS AWK, Ubuntu AWK, BusyBox AWK, and POSIX shell syntax.
+- A rebuilt website, documentation site, migration guide, parser internals guide, and tested support contract.
+
+### Changed
+
+- Require only POSIX `/bin/sh` and a standard AWK implementation; Bash is no longer required.
+- Resolve the document graph before querying, avoiding the ambiguous flattened-path representation used by v0.x.
+- Emit decoded scalar text by default and JSON for selected collections.
+- Keep `ysh` and `src/ysh.awk` as the project and source names while clarifying that the delivered executable is a shell wrapper around an embedded AWK engine.
+
+### Removed
+
+- The v0.x `-f`, `-T`, `-q`, `-Q`, `-s`, `-l`, `-L`, `-c`, `-i`, `-I`, and `-p` command interface.
+- The public transpiled-data format and chainable shell helper API.
+
+### Known boundaries
+
+- YAML.sh remains a deliberately scoped YAML implementation rather than a complete YAML 1.2 processor.
+- Collection-valued explicit keys, recursive aliases, forward aliases, multiline flow collections, explicit block-scalar indentation indicators, and full schema-dependent resolution are not supported.
+- The exact contract is maintained in [`_static/_docs/supported_yml.md`](_static/_docs/supported_yml.md).
+
 ## [0.4.0] - 2026-08-01
 
 ### Added
@@ -54,6 +87,7 @@ All notable changes to YAML.sh are documented here.
 
 - Report missing files and make the help flag exit successfully.
 
+[1.0.0]: https://github.com/azohra/yaml.sh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/azohra/yaml.sh/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/azohra/yaml.sh/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/azohra/yaml.sh/releases/tag/v0.2.1

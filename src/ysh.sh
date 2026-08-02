@@ -1,419 +1,218 @@
-#!/usr/bin/env bash
-# shellcheck source=/dev/null
-YSH_version='0.4.0'
+#!/bin/sh
 
-# Replaced by the build with the embedded AWK parser.
+YSH_VERSION=1.0.0
+
+# Replaced by the build with the embedded AWK engine.
 YAML_AWK_PARSER=$(cat src/ysh.awk)
 
-YSH_error() {
-    printf 'Error: %s\n' "$*" >&2
+ysh_error() {
+    printf "Error: %s\n" "$*" >&2
 }
 
-YSH_normalize_query() {
-    local query="${1#.}"
-    printf '%s\n' "${query}" | sed -e 's/\[/.[/g' -e 's/^\.//' -e 's/\.\././g'
-}
+ysh_usage() {
+    cat <<EOF
+YAML.sh v${YSH_VERSION}
 
-# Kept as a library alias for callers that used the original helper.
-YSH_escape_query() {
-    YSH_normalize_query "${1}"
-}
+Usage:
+  ysh [options] QUERY [FILE]
+  ysh [options] FILE
+  command | ysh [options] QUERY
 
-YSH_parse() {
-    case "${2:-values}" in
-    1|lines) awk -v line_numbers=1 "${YAML_AWK_PARSER}" "${1}" ;;
-    types) awk -v value_types=1 "${YAML_AWK_PARSER}" "${1}" ;;
-    *) awk "${YAML_AWK_PARSER}" "${1}" ;;
-    esac
-}
+Examples:
+  ysh ".server.host" config.yml
+  ysh ".services[0]" config.yml --json
+  ysh ".[\"key.with.dots\"]" config.yml
+  printf "%s\\n" "answer: 42" | ysh ".answer"
 
-YSH_parse_stdin() {
-    case "${1:-values}" in
-    1|lines) awk -v line_numbers=1 "${YAML_AWK_PARSER}" ;;
-    types) awk -v value_types=1 "${YAML_AWK_PARSER}" ;;
-    *) awk "${YAML_AWK_PARSER}" ;;
-    esac
-}
+Output:
+  -o, --output FORMAT      value, raw, or json
+  -r, --raw-output        print scalar values without JSON quoting
+      --json              emit JSON
+      --type              print the selected node type
+      --tag               print the selected node tag
+      --line              print the selected node source line
+      --ast               print the parsed node graph
+      --events            print parser-style node events
 
-# Compatibility alias for the misspelled helper in v0.2.x.
-YSH_parse_sdin() {
-    YSH_parse_stdin "${1:-0}"
-}
+Documents:
+  -d, --document INDEX    select a zero-based YAML document
 
-YSH_query() {
-    local data="${1}"
-    local query
-    local line
-    query=$(YSH_normalize_query "${2}")
+Other:
+  -V, --version           print the version
+  -h, --help              print this help
 
-    while IFS= read -r line || [ -n "${line}" ]; do
-        case "${line}" in
-        "${query}="*)
-            printf '%s\n' "${line#"${query}="}"
-            ;;
-        "${query}."*)
-            printf '%s\n' "${line#"${query}."}"
-            ;;
-        esac
-    done <<< "${data}"
-}
-
-YSH_unescape_value() {
-    local encoded="${1}"
-    local decoded=""
-    local char
-    local next_char
-    local i=0
-    local size=${#encoded}
-
-    while [ "${i}" -lt "${size}" ]; do
-        char=${encoded:${i}:1}
-        if [ "${char}" != "\\" ] || [ $((i + 1)) -ge "${size}" ]; then
-            decoded="${decoded}${char}"
-            i=$((i + 1))
-            continue
-        fi
-
-        i=$((i + 1))
-        next_char=${encoded:${i}:1}
-        case "${next_char}" in
-        n) decoded="${decoded}"$'\n' ;;
-        r) decoded="${decoded}"$'\r' ;;
-        t) decoded="${decoded}"$'\t' ;;
-        \\) decoded="${decoded}\\" ;;
-        '"') decoded="${decoded}\"" ;;
-        *) decoded="${decoded}\\${next_char}" ;;
-        esac
-        i=$((i + 1))
-    done
-
-    printf '%s\n' "${decoded}"
-}
-
-YSH_safe_query() {
-    local result
-    local encoded
-    while IFS= read -r result || [ -n "${result}" ]; do
-        if [ "${result#\"}" != "${result}" ] && [ "${result%\"}" != "${result}" ]; then
-            encoded=${result#\"}
-            encoded=${encoded%\"}
-            YSH_unescape_value "${encoded}"
-        fi
-    done < <(YSH_query "${1}" "${2}")
-}
-
-YSH_sub() {
-    local data="${1}"
-    local query
-    local line
-    query=$(YSH_normalize_query "${2}")
-
-    while IFS= read -r line || [ -n "${line}" ]; do
-        case "${line}" in
-        "${query}."*) printf '%s\n' "${line#"${query}."}" ;;
-        esac
-    done <<< "${data}"
-}
-
-YSH_list() {
-    local line
-    while IFS= read -r line || [ -n "${line}" ]; do
-        case "${line}" in
-        \[[0-9]*\]*) printf '%s\n' "${line}" ;;
-        esac
-    done < <(YSH_sub "${1}" "${2}")
-}
-
-YSH_list_values() {
-    local line
-    local path
-    local index
-    local encoded
-
-    while IFS= read -r line || [ -n "${line}" ]; do
-        path=${line%%=*}
-        case "${path}" in
-        \[*\])
-            index=${path#\[}
-            index=${index%\]}
-            case "${index}" in
-            ''|*[!0-9]*) continue ;;
-            esac
-            ;;
-        *) continue ;;
-        esac
-
-        encoded=${line#*=}
-        if [ "${encoded#\"}" != "${encoded}" ] && [ "${encoded%\"}" != "${encoded}" ]; then
-            encoded=${encoded#\"}
-            encoded=${encoded%\"}
-            YSH_unescape_value "${encoded}"
-        fi
-    done < <(YSH_sub "${1}" "${2}")
-}
-
-YSH_count() {
-    local line
-    local first
-    local index
-    local seen=$'\n'
-    local count=0
-
-    while IFS= read -r line || [ -n "${line}" ]; do
-        first=${line%%]*}
-        first=${first#\[}
-        case "${first}" in
-        ''|*[!0-9]*) continue ;;
-        esac
-        index="[${first}]"
-        case "${seen}" in
-        *$'\n'"${index}"$'\n'*) ;;
-        *)
-            seen="${seen}${index}"$'\n'
-            count=$((count + 1))
-            ;;
-        esac
-    done < <(YSH_sub "${1}" "${2}")
-    printf '%s\n' "${count}"
-}
-
-YSH_index() {
-    YSH_query "${1}" "[${2}]"
-}
-
-YSH_safe_index() {
-    YSH_safe_query "${1}" "[${2}]"
-}
-
-YSH_tops() {
-    local line
-    local key
-    local seen=$'\n'
-
-    while IFS= read -r line || [ -n "${line}" ]; do
-        key=${line%%=*}
-        key=${key%%.*}
-        case "${seen}" in
-        *$'\n'"${key}"$'\n'*) ;;
-        *)
-            seen="${seen}${key}"$'\n'
-            printf '%s\n' "${key}"
-            ;;
-        esac
-    done <<< "${1}"
-}
-
-YSH_next_block() {
-    local line
-    while IFS= read -r line || [ -n "${line}" ]; do
-        case "${line}" in
-        -*) printf '%s\n' "${line#-}" ;;
-        esac
-    done <<< "${1}"
-}
-
-YSH_line_query() {
-    local data="${1}"
-    local query
-    local line
-    local pointer
-    local seen=$'\n'
-    query=$(YSH_normalize_query "${2}")
-
-    while IFS= read -r line || [ -n "${line}" ]; do
-        case "${line}" in
-        "${query}="*|"${query}."*)
-            pointer=${line##*=}
-            case "${seen}" in
-            *$'\n'"${pointer}"$'\n'*) ;;
-            *)
-                seen="${seen}${pointer}"$'\n'
-                printf '%s\n' "${pointer}"
-                ;;
-            esac
-            ;;
-        esac
-    done <<< "${data}"
-}
-
-YSH_usage() {
-    cat <<'EOF'
-
-Usage: ysh [-f FILE | -T DATA] [queries]
-
-input:
-  -f, --file        <file>         parse a YAML file
-  -T, --transpiled  <data>         use quoted, pre-transpiled data
-                                      (use -T "${data}")
-
-queries:
-  -q, --query       <query>        generic, chainable query
-  -Q, --query-val   <query>        return a decoded scalar value
-  -s, --sub         <query>        return a child structure
-  -l, --list        <query>        return a list structure
-  -L, --list-val    <query>        return all scalar list values
-  -c, --count       <query>        count list elements
-  -i, --index       <index>        select a list element
-  -I, --index-val   <index>        return a decoded list value
-  -p, --line        <query>        return source line number(s)
-      --type        <query>        return scalar type(s)
-  -t, --tops                       return top-level keys
-  -n, --next                       move to the next YAML document
-  -v, --version                    print the version
-  -h, --help                       print this message
-
-Documentation: https://docs.yaml.azohra.com
+QUERY uses yq-style paths such as .server.host, .items[0], and
+.["key.with.dots"]. Collections are emitted as JSON by default.
 EOF
 }
 
-YSH_needs_lines() {
-    local argument
-    for argument in "$@"; do
-        case "${argument}" in
-        -p|--line) return 0 ;;
-        esac
-    done
-    return 1
-}
-
-YSH_needs_types() {
-    local argument
-    for argument in "$@"; do
-        case "${argument}" in
-        --type) return 0 ;;
-        esac
-    done
-    return 1
-}
-
-ysh() {
-    local raw_string=""
-    local line_string=""
-    local type_string=""
-    local stdin_string=""
-    local status=0
-    local supports_lines=0
-    local supports_types=0
-
-    if [ "$#" -eq 0 ]; then
-        YSH_usage
-        return 1
-    fi
-
-    case "${1}" in
-    -v|--version)
-        printf 'v%s\n' "${YSH_version}"
-        return 0
-        ;;
-    -h|--help)
-        YSH_usage
-        return 0
-        ;;
-    -f|--file)
-        if [ "$#" -lt 2 ]; then
-            YSH_error "${1} requires a file"
-            return 2
-        fi
-        if [ ! -f "${2}" ]; then
-            YSH_error "file ${2} does not exist"
-            return 1
-        fi
-        raw_string=$(YSH_parse "${2}")
-        status=$?
-        if [ "${status}" -ne 0 ]; then
-            return "${status}"
-        fi
-        if YSH_needs_lines "$@"; then
-            line_string=$(YSH_parse "${2}" lines) || return $?
-            supports_lines=1
-        fi
-        if YSH_needs_types "$@"; then
-            type_string=$(YSH_parse "${2}" types) || return $?
-            supports_types=1
-        fi
-        shift 2
-        ;;
-    -T|--transpiled)
-        if [ "$#" -lt 2 ]; then
-            YSH_error "${1} requires one quoted data argument"
-            return 2
-        fi
-        raw_string=${2}
-        shift 2
-        ;;
+ysh_set_output_mode() {
+    case "$1" in
+    value|raw) YSH_OUTPUT_MODE="value" ;;
+    json) YSH_OUTPUT_MODE="json" ;;
     *)
-        stdin_string=$(cat)
-        raw_string=$(YSH_parse_stdin <<< "${stdin_string}")
-        status=$?
-        if [ "${status}" -ne 0 ]; then
-            return "${status}"
-        fi
-        if YSH_needs_lines "$@"; then
-            line_string=$(YSH_parse_stdin lines <<< "${stdin_string}") || return $?
-            supports_lines=1
-        fi
-        if YSH_needs_types "$@"; then
-            type_string=$(YSH_parse_stdin types <<< "${stdin_string}") || return $?
-            supports_types=1
-        fi
+        ysh_error "unsupported output format: $1"
+        return 2
         ;;
     esac
+}
+
+ysh_run_awk() {
+    if [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
+        awk \
+            -v query="$YSH_QUERY" \
+            -v output_mode="$YSH_OUTPUT_MODE" \
+            -v selected_document="$YSH_DOCUMENT" \
+            "$YAML_AWK_PARSER"
+    else
+        awk \
+            -v query="$YSH_QUERY" \
+            -v output_mode="$YSH_OUTPUT_MODE" \
+            -v selected_document="$YSH_DOCUMENT" \
+            "$YAML_AWK_PARSER" \
+            "$YSH_INPUT_FILE"
+    fi
+}
+
+ysh_main() {
+    YSH_OUTPUT_MODE="value"
+    YSH_DOCUMENT=0
+    YSH_QUERY=.
+    YSH_INPUT_FILE=
+    YSH_POSITIONAL_COUNT=0
+    YSH_POSITIONAL_ONE=
+    YSH_POSITIONAL_TWO=
 
     while [ "$#" -gt 0 ]; do
-        case "${1}" in
-        -q|--query|-Q|--query-val|-s|--sub|-l|--list|-L|--list-val|-c|--count|-i|--index|-I|--index-val|-p|--line|--type)
+        case "$1" in
+        -o|--output|--output-format)
             if [ "$#" -lt 2 ]; then
-                YSH_error "${1} requires an argument"
+                ysh_error "$1 requires a format"
                 return 2
             fi
+            ysh_set_output_mode "$2" || return $?
+            shift 2
             ;;
-        esac
-
-        case "${1}" in
-        -q|--query) raw_string=$(YSH_query "${raw_string}" "${2}"); shift ;;
-        -Q|--query-val) raw_string=$(YSH_safe_query "${raw_string}" "${2}"); shift ;;
-        -s|--sub) raw_string=$(YSH_sub "${raw_string}" "${2}"); shift ;;
-        -l|--list) raw_string=$(YSH_list "${raw_string}" "${2}"); shift ;;
-        -L|--list-val) raw_string=$(YSH_list_values "${raw_string}" "${2}"); shift ;;
-        -c|--count) raw_string=$(YSH_count "${raw_string}" "${2}"); shift ;;
-        -i|--index) raw_string=$(YSH_index "${raw_string}" "${2}"); shift ;;
-        -I|--index-val) raw_string=$(YSH_safe_index "${raw_string}" "${2}"); shift ;;
-        -p|--line)
-            if [ "${supports_lines}" -ne 1 ]; then
-                YSH_error "line queries require YAML input from a file or stdin"
-                return 2
-            fi
-            raw_string=$(YSH_line_query "${line_string}" "${2}")
+        -o=*|--output=*|--output-format=*)
+            ysh_set_output_mode "${1#*=}" || return $?
+            shift
+            ;;
+        -r|--raw-output)
+            YSH_OUTPUT_MODE="value"
+            shift
+            ;;
+        --json)
+            YSH_OUTPUT_MODE="json"
             shift
             ;;
         --type)
-            if [ "${supports_types}" -ne 1 ]; then
-                YSH_error "type queries require YAML input from a file or stdin"
-                return 2
-            fi
-            raw_string=$(YSH_line_query "${type_string}" "${2}")
+            YSH_OUTPUT_MODE="type"
             shift
             ;;
-        -n|--next) raw_string=$(YSH_next_block "${raw_string}") ;;
-        -t|--tops) raw_string=$(YSH_tops "${raw_string}") ;;
-        -h|--help) YSH_usage; return 0 ;;
-        -v|--version) printf 'v%s\n' "${YSH_version}"; return 0 ;;
+        --tag)
+            YSH_OUTPUT_MODE="tag"
+            shift
+            ;;
+        --line)
+            YSH_OUTPUT_MODE="line"
+            shift
+            ;;
+        --ast)
+            YSH_OUTPUT_MODE="ast"
+            shift
+            ;;
+        --events)
+            YSH_OUTPUT_MODE="events"
+            shift
+            ;;
+        -d|--document)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires a document index"
+                return 2
+            fi
+            case "$2" in
+            ""|*[!0-9]*)
+                ysh_error "document index must be a non-negative integer"
+                return 2
+                ;;
+            esac
+            YSH_DOCUMENT=$2
+            shift 2
+            ;;
+        -V|--version)
+            printf "v%s\n" "$YSH_VERSION"
+            return 0
+            ;;
+        -h|--help)
+            ysh_usage
+            return 0
+            ;;
+        --)
+            shift
+            while [ "$#" -gt 0 ]; do
+                YSH_POSITIONAL_COUNT=$((YSH_POSITIONAL_COUNT + 1))
+                if [ "$YSH_POSITIONAL_COUNT" -eq 1 ]; then
+                    YSH_POSITIONAL_ONE=$1
+                elif [ "$YSH_POSITIONAL_COUNT" -eq 2 ]; then
+                    YSH_POSITIONAL_TWO=$1
+                else
+                    ysh_error "too many positional arguments"
+                    return 2
+                fi
+                shift
+            done
+            ;;
         -*)
-            YSH_error "unknown option: ${1}; use --help for usage"
+            ysh_error "unknown option: $1"
             return 2
             ;;
         *)
-            YSH_error "invalid argument: ${1}; transpiled data must be passed as -T \"\${data}\""
-            return 2
+            YSH_POSITIONAL_COUNT=$((YSH_POSITIONAL_COUNT + 1))
+            if [ "$YSH_POSITIONAL_COUNT" -eq 1 ]; then
+                YSH_POSITIONAL_ONE=$1
+            elif [ "$YSH_POSITIONAL_COUNT" -eq 2 ]; then
+                YSH_POSITIONAL_TWO=$1
+            else
+                ysh_error "too many positional arguments"
+                return 2
+            fi
+            shift
             ;;
         esac
-        shift
     done
 
-    printf '%s\n' "${raw_string}"
+    if [ "$YSH_POSITIONAL_COUNT" -eq 2 ]; then
+        case "$YSH_POSITIONAL_ONE" in
+        .*)
+            YSH_QUERY=$YSH_POSITIONAL_ONE
+            YSH_INPUT_FILE=$YSH_POSITIONAL_TWO
+            ;;
+        *)
+            if [ -f "$YSH_POSITIONAL_ONE" ] && [ "${YSH_POSITIONAL_TWO#.}" != "$YSH_POSITIONAL_TWO" ]; then
+                YSH_INPUT_FILE=$YSH_POSITIONAL_ONE
+                YSH_QUERY=$YSH_POSITIONAL_TWO
+            else
+                ysh_error "query must start with ."
+                return 2
+            fi
+            ;;
+        esac
+    elif [ "$YSH_POSITIONAL_COUNT" -eq 1 ]; then
+        case "$YSH_POSITIONAL_ONE" in
+        .*) YSH_QUERY=$YSH_POSITIONAL_ONE ;;
+        *) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
+        esac
+    fi
+
+    if [ -n "$YSH_INPUT_FILE" ] && [ "$YSH_INPUT_FILE" != "-" ] && [ ! -f "$YSH_INPUT_FILE" ]; then
+        ysh_error "input file does not exist: $YSH_INPUT_FILE"
+        return 1
+    fi
+
+    ysh_run_awk
 }
 
-if [ "${YSH_LIB:-0}" != '1' ]; then
-    ysh "$@"
+if [ "${YSH_LIB:-0}" != 1 ]; then
+    ysh_main "$@"
     exit $?
 fi

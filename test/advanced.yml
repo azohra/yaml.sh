@@ -26,8 +26,17 @@ merged:
 inline_merge: {<<: *first, color: green}
 literal_merge:
   <<: {from: flow, active: true}
+block_merge:
+  <<:
+    - *first
+    - *second
+  color: purple
 quoted_merge_key:
   "<<": literal
+empty_mapping: {}
+empty_sequence: []
+"key.with.dots": dotted
+tagged_mapping: !example!box {item: value}
 types:
   string: text
   quoted_number: "12"

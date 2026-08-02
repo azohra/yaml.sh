@@ -1,67 +1,250 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="keywords" content="YAML, yml, Azohra, azohra">
-    <meta name="author" content="Azohra">
-    <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css?family=Text+Me+One" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-    <title>YAML.sh</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A yq-like YAML query tool in one portable shell script. No package manager, language runtime, or downloaded binary.">
+  <meta name="theme-color" content="#101410">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="YAML.sh v1 — yq energy. zero baggage.">
+  <meta property="og:description" content="Query YAML with one portable /bin/sh + AWK script. No additional runtime or packages.">
+  <meta property="og:url" content="https://yaml.azohra.com">
+  <meta property="og:image" content="https://yaml.azohra.com/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="YAML.sh v1.0 — yq energy, zero baggage">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="YAML.sh v1 — yq energy. zero baggage.">
+  <meta name="twitter:description" content="A yq-like YAML query tool in one portable shell script.">
+  <meta name="twitter:image" content="https://yaml.azohra.com/og.png">
+  <link rel="canonical" href="https://yaml.azohra.com">
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="css/style.css">
+  <title>YAML.sh v1 — yq energy. zero baggage.</title>
 </head>
-
 <body>
-    <a href="https://github.com/azohra/yaml.sh" class="github-corner" aria-label="View source on GitHub"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#151513; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-    <header>
-        <div class="banner">
-            <h1>yaml.sh</h1>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="YAML.sh home">
+      <span class="brand-mark">Y</span>
+      <span>YAML.sh</span>
+      <span class="version-pill">v1</span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="https://docs.yaml.azohra.com">Docs</a>
+      <a href="https://github.com/azohra/yaml.sh">GitHub</a>
+      <a class="nav-cta" href="#install">Install</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero section-shell">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> Version 1.0 · rebuilt from the nodes up</p>
+        <h1>yq energy.<br><span>zero baggage.</span></h1>
+        <p class="hero-lede">Query YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a surprising amount of ambition.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">Get YAML.sh</a>
+          <a class="button button-secondary" href="https://docs.yaml.azohra.com">Read the docs <span aria-hidden="true">↗</span></a>
         </div>
-    </header>
+        <ul class="hero-facts" aria-label="YAML.sh highlights">
+          <li><strong>1</strong> file</li>
+          <li><strong>0</strong> extra packages</li>
+          <li><strong>35+</strong> conformance tests</li>
+        </ul>
+      </div>
 
-    <div class="container">
-            <h4>YAML ready for your shell</h4>
-    </div>
-    <div class="container">
-        <span>
-            Made with ❤️ by the developers at <a href="https://azohra.com">azohra.com</a>
-        </span>
-    </div>
-
-    <div class="container">
-        <div class="snippit">
-            <p>$ curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v0.4.0/ysh -o ysh</p>
+      <div class="terminal-card" aria-label="YAML.sh example">
+        <div class="terminal-bar">
+          <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>config.yml — ysh</span>
+          <span class="terminal-badge">POSIX</span>
         </div>
-        <a href="https://docs.yaml.azohra.com">View the docs</a></p>
-    </div>
+        <div class="terminal-body">
+          <div class="yaml-preview" aria-label="Example YAML input">
+            <p><span class="line-no">1</span><span class="key">server</span>:</p>
+            <p><span class="line-no">2</span>&nbsp;&nbsp;<span class="key">host</span>: <span class="string">localhost</span></p>
+            <p><span class="line-no">3</span>&nbsp;&nbsp;<span class="key">port</span>: <span class="number">8080</span></p>
+            <p><span class="line-no">4</span><span class="key">features</span>:</p>
+            <p><span class="line-no">5</span>&nbsp;&nbsp;- <span class="string">aliases</span></p>
+            <p><span class="line-no">6</span>&nbsp;&nbsp;- <span class="string">merge keys</span></p>
+          </div>
+          <div class="terminal-command">
+            <span class="prompt">$</span> ysh <span class="query">'.server.port'</span> config.yml
+          </div>
+          <div class="terminal-output"><span>8080</span><i class="cursor" aria-hidden="true"></i></div>
+        </div>
+        <div class="terminal-footer">
+          <span>node graph → resolver → query</span>
+          <span class="success">● parsed</span>
+        </div>
+      </div>
+    </section>
 
+    <section class="ticker" aria-label="Core capabilities">
+      <div>
+        <span>YQ-STYLE PATHS</span><b>◆</b>
+        <span>ANCHORS + ALIASES</span><b>◆</b>
+        <span>MERGE KEYS</span><b>◆</b>
+        <span>TAGS + TYPES</span><b>◆</b>
+        <span>EMPTY COLLECTIONS</span><b>◆</b>
+        <span>MULTI-DOCUMENT</span>
+      </div>
+    </section>
 
+    <section class="architecture section-shell" id="architecture">
+      <div class="section-heading">
+        <p class="kicker">A real parser this time</p>
+        <h2>It parses before it queries.</h2>
+        <p>Version 1 replaces the old flattened intermediate format with a proper YAML node graph. Structure survives intact, so queries stop fighting the parser.</p>
+      </div>
+      <div class="pipeline" aria-label="YAML.sh processing pipeline">
+        <article>
+          <span class="step">01</span>
+          <h3>Read</h3>
+          <p>Portable AWK recognizes mappings, sequences, flow nodes, scalars, tags, anchors, and documents.</p>
+        </article>
+        <span class="pipeline-arrow" aria-hidden="true">→</span>
+        <article>
+          <span class="step">02</span>
+          <h3>Resolve</h3>
+          <p>Aliases and merge sources connect through node identity, with precedence and recursion validation.</p>
+        </article>
+        <span class="pipeline-arrow" aria-hidden="true">→</span>
+        <article>
+          <span class="step">03</span>
+          <h3>Query</h3>
+          <p>One path language selects real nodes—including empty collections and keys containing punctuation.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="playground section-shell" id="playground">
+      <div class="section-heading compact">
+        <p class="kicker">Tiny commands. Serious YAML.</p>
+        <h2>Meet the new CLI.</h2>
+      </div>
+      <div class="demo-window">
+        <div class="demo-tabs" role="tablist" aria-label="CLI examples">
+          <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Query</button>
+          <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">JSON</button>
+          <button id="tab-merge" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge">Merge</button>
+          <button id="tab-inspect" role="tab" aria-selected="false" aria-controls="panel-inspect" data-demo="inspect">Inspect</button>
+        </div>
+        <div class="demo-panel" id="panel-query" role="tabpanel" aria-labelledby="tab-query">
+          <p class="demo-label">Ask for exactly what you need.</p>
+          <pre><code><span class="prompt">$</span> ysh '.services[0].name' config.yml
+api</code></pre>
+        </div>
+        <div class="demo-panel" id="panel-json" role="tabpanel" aria-labelledby="tab-json" hidden>
+          <p class="demo-label">Collections become clean, typed JSON.</p>
+          <pre><code><span class="prompt">$</span> ysh -o=json '.services[0]' config.yml
+{"name":"api","enabled":true,"port":8080}</code></pre>
+        </div>
+        <div class="demo-panel" id="panel-merge" role="tabpanel" aria-labelledby="tab-merge" hidden>
+          <p class="demo-label">Aliases and merge precedence resolve before querying.</p>
+          <pre><code><span class="prompt">$</span> ysh '.production.retries' config.yml
+3</code></pre>
+        </div>
+        <div class="demo-panel" id="panel-inspect" role="tabpanel" aria-labelledby="tab-inspect" hidden>
+          <p class="demo-label">Open the hood whenever the YAML gets weird.</p>
+          <pre><code><span class="prompt">$</span> ysh --type '.release.date' config.yml
+timestamp
+
+<span class="prompt">$</span> ysh --ast config.yml
+node  1  mapping  line=1</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="features section-shell">
+      <div class="feature-grid">
+        <article class="feature feature-large">
+          <p class="feature-index">01 / PORTABLE</p>
+          <h2>Built for the machines between machines.</h2>
+          <p>Bootstrap containers, CI runners, old Macs, tiny servers, and recovery shells. If the system has <code>/bin/sh</code> and AWK, YAML.sh is ready.</p>
+          <div class="compat-row"><span>macOS AWK</span><span>Ubuntu AWK</span><span>BusyBox AWK</span></div>
+        </article>
+        <article class="feature">
+          <p class="feature-index">02 / PRECISE</p>
+          <h3>Keys stay keys.</h3>
+          <p>Use <code>.["key.with.dots"]</code> when punctuation belongs to the YAML—not the query.</p>
+        </article>
+        <article class="feature feature-accent">
+          <p class="feature-index">03 / HONEST</p>
+          <h3>A tested subset.</h3>
+          <p>No hand-waving about full YAML compliance. Every supported boundary is documented and exercised.</p>
+          <a href="https://docs.yaml.azohra.com/#/supported_yml">Read the support contract <span aria-hidden="true">→</span></a>
+        </article>
+        <article class="feature">
+          <p class="feature-index">04 / HACKABLE</p>
+          <h3>One file. Open book.</h3>
+          <p>The shipped executable contains the complete shell launcher and AWK engine. Read it, copy it, bend it.</p>
+        </article>
+        <article class="feature">
+          <p class="feature-index">05 / OBSERVABLE</p>
+          <h3>AST and events included.</h3>
+          <p><code>--ast</code> and <code>--events</code> turn parser internals into first-class debugging tools.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="install section-shell" id="install">
+      <div class="install-copy">
+        <p class="kicker">Install v1</p>
+        <h2>One pipe.<br>Then go query something.</h2>
+        <p>The installer downloads a pinned release and places <code>ysh</code> in <code>/usr/local/bin</code>. Set <code>YSH_INSTALL_DIR</code> to choose another location.</p>
+      </div>
+      <div class="install-command">
+        <div class="install-command-label"><span>Terminal</span><span>v1.0.0</span></div>
+        <pre><code id="install-code">curl -fsSL https://get.yaml.azohra.com | sh</code></pre>
+        <button class="copy-button" type="button" data-copy="install-code"><span>Copy command</span><b aria-hidden="true">⌘</b></button>
+        <p class="install-note">Prefer to inspect first? <a href="https://get.yaml.azohra.com">Read the installer source.</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand footer-brand" href="/">
+      <span class="brand-mark">Y</span>
+      <span>YAML.sh</span>
+    </a>
+    <p>Made for fun by <a href="https://azohra.com">Azohra</a>. Built in the open.</p>
+    <nav aria-label="Footer navigation">
+      <a href="https://docs.yaml.azohra.com">Docs</a>
+      <a href="https://github.com/azohra/yaml.sh">Source</a>
+      <a href="https://github.com/azohra/yaml.sh/releases">Releases</a>
+    </nav>
+  </footer>
+
+  <script>
+    const tabButtons = document.querySelectorAll('[data-demo]');
+    const demoPanels = document.querySelectorAll('.demo-panel');
+
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        tabButtons.forEach((item) => item.setAttribute('aria-selected', String(item === button)));
+        demoPanels.forEach((panel) => {
+          panel.hidden = panel.id !== `panel-${button.dataset.demo}`;
+        });
+      });
+    });
+
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const source = document.getElementById(button.dataset.copy);
+        try {
+          await navigator.clipboard.writeText(source.textContent);
+          const label = button.querySelector('span');
+          const original = label.textContent;
+          label.textContent = 'Copied';
+          window.setTimeout(() => { label.textContent = original; }, 1600);
+        } catch (_) {
+          source.focus();
+        }
+      });
+    });
+  </script>
 </body>
-
 </html>
-
-<script>
-    function openTab(evt, tabName) {
-        // Declare all variables
-        var i, tabcontent, tablinks;
-
-        // Get all elements with class="tabcontent" and hide them
-        tabcontent = document.getElementsByClassName("window");
-        for (i = 0; i < tabcontent.length; i++) {
-            tabcontent[i].style.display = "none";
-        }
-
-        // Get all elements with class="tablinks" and remove the class "active"
-        tablinks = document.getElementsByClassName("window-links");
-        for (i = 0; i < tablinks.length; i++) {
-            tablinks[i].className = tablinks[i].className.replace(" active", "");
-        }
-
-        // Show the current tab, and add an "active" class to the button that opened the tab
-        document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " active";
-    }
-
-    document.getElementById("initial").click();
-</script>

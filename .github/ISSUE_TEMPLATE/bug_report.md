@@ -27,7 +27,7 @@ Describe the expected output and, when possible, the relevant YAML syntax.
 
 - YAML.sh version:
 - Operating system and version:
-- Bash version (`bash --version`):
+- Shell (`/bin/sh` implementation and version, if known):
 - AWK implementation/version (`awk --version` or `awk -W version`):
 
 ## Additional context
