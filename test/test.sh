@@ -506,6 +506,20 @@ testMalformedYamlIsRejected() {
     assertContains "$result" "unclosed multiline flow collection"
 }
 
+testStrictGrammarAndEdgeSyntax() {
+    assertEquals '{"key":"value","foo":"key"}' "$(printf '%s\n' '&a: key: &a value' 'foo:' '  *a:' | ./ysh --json '.')"
+    assertEquals '{"block key\n":["one","two"]}' "$(printf '%s\n' '? |' '  block key' ': - one' '  - two' | ./ysh --json '.')"
+    assertEquals '"trailing\t tab"' "$(printf '"trailing\\\t\n  tab"\n' | ./ysh --json '.')"
+    assertEquals '"content\n"' "$(printf '%s\n' '|' 'content' | ./ysh --json '.')"
+
+    printf '%s\n' 'key:' ' ok: 1' '  wrong: 2' | ./ysh --json '.' >/dev/null 2>&1
+    assertNotEquals 0 $?
+    printf '%s\n' 'flow: [one,' 'two]' | ./ysh --json '.' >/dev/null 2>&1
+    assertNotEquals 0 $?
+    printf 'key:\n\tchild: value\n' | ./ysh --json '.' >/dev/null 2>&1
+    assertNotEquals 0 $?
+}
+
 testQueryErrors() {
     result=$(./ysh "missing" test/test.yml 2>&1)
     assertNotEquals 0 $?

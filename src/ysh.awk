@@ -20,6 +20,13 @@ function trim_right_horizontal(value) {
     return value
 }
 
+function trim_quoted_right(value, double_quoted) {
+    if (double_quoted && match(value, /\\[ \t]+$/)) {
+        return substr(value, 1, RSTART + 1)
+    }
+    return trim_right_horizontal(value)
+}
+
 function json_escape(value,    result, i, char) {
     result = ""
     for (i = 1; i <= length(value); i++) {
@@ -149,11 +156,11 @@ function fold_quoted_scalar(value, double_quoted,    count, i, line, result, con
     for (i = 1; i <= count; i++) {
         line = quoted_line[i]
         if (i == 1) {
-            content = trim_right_horizontal(line)
+            content = trim_quoted_right(line, double_quoted)
         } else if (i == count) {
             content = trim_left_horizontal(line)
         } else {
-            content = trim_right_horizontal(trim_left_horizontal(line))
+            content = trim_quoted_right(trim_left_horizontal(line), double_quoted)
         }
 
         if (escaped_break) {
@@ -326,6 +333,36 @@ function strip_flow_line_comment(value,    i, char, previous, quote, escaped) {
     return trim(value)
 }
 
+function start_flow_line(value,    prefix) {
+    prefix = value
+    sub(/[^ ].*$/, "", prefix)
+    return prefix strip_flow_line_comment(value)
+}
+
+function flow_continuation_indent(value,    prefix, indent, clean, separator) {
+    prefix = value
+    sub(/[^ ].*$/, "", prefix)
+    indent = length(prefix)
+    clean = trim(substr(value, indent + 1))
+    if (clean ~ /^---[[:space:]]/) {
+        clean = trim(substr(clean, 4))
+    }
+    if (clean ~ /^-[[:space:]]/) {
+        return indent + 1
+    }
+    separator = find_mapping_separator(clean, 1)
+    return separator ? indent + 1 : indent
+}
+
+function flow_opening(value,    square, brace) {
+    square = index(value, "[")
+    brace = index(value, "{")
+    if (square && (!brace || square < brace)) {
+        return "["
+    }
+    return brace ? "{" : ""
+}
+
 function find_top_level_colon(value, require_space,    i, char, next_char, previous, quote, escaped, braces, brackets) {
     quote = ""
     escaped = 0
@@ -371,6 +408,9 @@ function find_top_level_colon(value, require_space,    i, char, next_char, previ
 }
 
 function find_mapping_separator(value, require_space,    offset, remainder, space, separator) {
+    if (value ~ /^\*[^[:space:]\[\]{},]+:$/) {
+        return 0
+    }
     offset = 1
     remainder = value
     while (substr(remainder, 1, 1) == "&" || substr(remainder, 1, 1) == "!") {
@@ -623,6 +663,9 @@ function parse_scalar_key(value, source_line,    remainder, tag, anchor, node, r
     if (node_kind[resolved] != "scalar") {
         fail("collection-valued mapping keys are not supported on line " source_line)
     }
+    if (index(remainder, "\n")) {
+        fail("implicit mapping keys must fit on one line " source_line)
+    }
     parsed_key_is_merge = remainder == "<<" && tag == ""
     return node_value[resolved]
 }
@@ -748,6 +791,9 @@ function parse_value(value, source_line, indent, allow_block,    cleaned, remain
     if (!allow_block && remainder == "-") {
         fail("plain dash is not valid in a flow collection on line " source_line)
     }
+    if (allow_block && cleaned ~ /^[!&]/ && remainder ~ /^-[[:space:]]/) {
+        fail("block sequence entries must begin on their own line " source_line)
+    }
     if (allow_block && remainder ~ /^[|>]([-+]?[1-9]?|[1-9][-+]?)$/) {
         node = new_node("scalar", source_line, "", "string", tag)
         bind_anchor(anchor, node, source_line)
@@ -762,6 +808,13 @@ function parse_value(value, source_line, indent, allow_block,    cleaned, remain
         fail("mapping indicator inside plain scalar on line " source_line)
     }
     return parse_core(remainder, source_line, tag, anchor)
+}
+
+function is_plain_scalar_source(value, source_line,    remainder, first) {
+    remainder = parse_properties(strip_inline_comment(trim(value)), source_line)
+    first = substr(remainder, 1, 1)
+    return remainder != "" && first != "\"" && first != sprintf("%c", 39) &&
+        first != "[" && first != "{" && first != "|" && first != ">"
 }
 
 function clear_deeper(indent,    i) {
@@ -799,6 +852,22 @@ function find_parent(indent,    i) {
     return 0
 }
 
+function validate_container_indent(node, indent, source_line) {
+    if (!(node in container_entry_indent)) {
+        container_entry_indent[node] = indent
+    } else if (container_entry_indent[node] != indent) {
+        fail("inconsistent collection indentation on line " source_line)
+    }
+}
+
+function close_plain_contexts(    node) {
+    for (node = 1; node <= node_count; node++) {
+        if (node_plain_continuable[node]) {
+            node_plain_closed[node] = 1
+        }
+    }
+}
+
 function fail_pending_explicit_keys(source_line,    i) {
     for (i = 0; i <= max_indent; i++) {
         if (explicit_key_valid[i]) {
@@ -821,6 +890,7 @@ function start_block(node, indicator, indent, source_line,    digit) {
     digit = indicator
     gsub(/[^1-9]/, "", digit)
     block_content_indent = digit == "" ? -1 : block_base_indent + (digit + 0)
+    block_leading_blank_max = 0
     block_count = 0
     block_source_line = source_line
 }
@@ -899,11 +969,19 @@ function flush_block(    value, i, line, previous, more, previous_more, seen_non
     }
 
     node_value[block_node] = value
+    if (explicit_block_node == block_node) {
+        explicit_key[explicit_block_indent] = value
+        explicit_block_node = 0
+    }
     block_active = 0
     block_count = 0
 }
 
 function parse_mapping_into(value, parent, indent, source_line,    separator, raw_key, key, child, raw_value, is_merge) {
+    if (indent > max_indent) {
+        max_indent = indent
+    }
+    validate_container_indent(parent, indent, source_line)
     separator = find_mapping_separator(value, 1)
     if (!separator) {
         fail("invalid mapping syntax on line " source_line)
@@ -913,6 +991,9 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     key = parse_scalar_key(raw_key, source_line)
     is_merge = parsed_key_is_merge
     raw_value = trim(substr(value, separator + 1))
+    if (raw_key != "" && raw_value ~ /^-[[:space:]]/) {
+        fail("block sequence entries must begin on their own line " source_line)
+    }
     child = parse_value(raw_value, source_line, indent, 1)
     add_mapping(parent, key, child, source_line, is_merge)
 
@@ -921,11 +1002,12 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     if (node_kind[child] == "pending") {
         context_node[indent] = child
         context_valid[indent] = 1
-    } else if (node_kind[child] == "scalar" && raw_value != "" && substr(raw_value, 1, 1) != "\"" &&
-        substr(raw_value, 1, 1) != sprintf("%c", 39) && substr(raw_value, 1, 1) !~ /^[\[{!&*|>]$/) {
+    } else if (node_kind[child] == "scalar" && is_plain_scalar_source(raw_value, source_line)) {
         context_node[indent] = child
         context_valid[indent] = 1
         node_plain_continuable[child] = 1
+        node_plain_base_indent[child] = indent
+        node_plain_closed[child] = strip_inline_comment(raw_value) != trim(raw_value)
         node_last_content_line[child] = source_line
     } else {
         delete context_node[indent]
@@ -944,7 +1026,7 @@ function parse_mapping_line(value, indent, source_line,    parent) {
     parse_mapping_into(value, parent, indent, source_line)
 }
 
-function parse_sequence_line(value, indent, source_line,    sequence, parent, original, remainder, tag, anchor, item, separator, raw_key, key, child) {
+function parse_sequence_line(value, indent, source_line,    sequence, parent, original, remainder, tag, anchor, item, separator, raw_key, key, child, nested_indent) {
     if (indent > max_indent) {
         max_indent = indent
     }
@@ -963,9 +1045,17 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
         }
     }
 
+    validate_container_indent(sequence, indent, source_line)
+
     list_node[indent] = sequence
     list_valid[indent] = 1
-    original = trim(substr(value, 2))
+    remainder = substr(value, 2)
+    nested_indent = indent + 1
+    while (substr(remainder, 1, 1) == " " || substr(remainder, 1, 1) == "\t") {
+        nested_indent++
+        remainder = substr(remainder, 2)
+    }
+    original = trim(remainder)
 
     if (original == "") {
         item = new_node("pending", source_line, "", "", "")
@@ -974,7 +1064,7 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
         add_sequence(sequence, item, source_line)
         context_node[indent] = item
         context_valid[indent] = 1
-        parse_sequence_line(original, indent + 2, source_line)
+        parse_sequence_line(original, nested_indent, source_line)
         return
     } else {
         remainder = parse_properties(strip_inline_comment(original), source_line)
@@ -995,12 +1085,13 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
 
     add_sequence(sequence, item, source_line)
     if (node_kind[item] == "pending" || node_kind[item] == "mapping" ||
-        (node_kind[item] == "scalar" && original != "" && substr(original, 1, 1) != "\"" &&
-        substr(original, 1, 1) != sprintf("%c", 39))) {
+        (node_kind[item] == "scalar" && is_plain_scalar_source(original, source_line))) {
         context_node[indent] = item
         context_valid[indent] = 1
         if (node_kind[item] == "scalar") {
             node_plain_continuable[item] = 1
+            node_plain_base_indent[item] = indent
+            node_plain_closed[item] = strip_inline_comment(original) != trim(original)
             node_last_content_line[item] = source_line
         }
     } else {
@@ -1070,8 +1161,16 @@ function add_explicit_value(indent, text, source_line,    parent, child, raw_val
         ensure_container(parent, "mapping", source_line)
     }
     raw_value = trim(substr(text, 2))
-    child = parse_value(raw_value, source_line, indent, 1)
-    add_mapping(parent, explicit_key[indent], child, source_line, 0)
+    if (raw_value ~ /^-[[:space:]]/) {
+        child = new_node("sequence", source_line, "", "", "")
+        add_mapping(parent, explicit_key[indent], child, source_line, 0)
+        list_node[indent + 2] = child
+        list_valid[indent + 2] = 1
+        parse_sequence_line(raw_value, indent + 2, source_line)
+    } else {
+        child = parse_value(raw_value, source_line, indent, 1)
+        add_mapping(parent, explicit_key[indent], child, source_line, 0)
+    }
     delete explicit_key[indent]
     delete explicit_key_valid[indent]
     if (node_kind[child] == "pending" || (node_kind[child] == "scalar" && raw_value != "" &&
@@ -1111,13 +1210,28 @@ function find_explicit_key_indent(indent,    i) {
     return -1
 }
 
-function fill_pending_scalar(node, text, source_line,    cleaned, remainder, tag, anchor) {
+function fill_pending_scalar(node, text, source_line,    cleaned, remainder, tag, anchor, target) {
     cleaned = strip_inline_comment(trim(text))
     remainder = parse_properties(cleaned, source_line)
     tag = parsed_tag
     anchor = parsed_anchor
     if (remainder == "" || substr(remainder, 1, 1) == "[" || substr(remainder, 1, 1) == "{" || remainder ~ /^[|>]/) {
         return 0
+    }
+    if (substr(remainder, 1, 1) == "*" && valid_anchor_name(substr(remainder, 2))) {
+        target = document_index SUBSEP substr(remainder, 2)
+        if (!(target in anchor_target)) {
+            fail("undefined or forward alias " remainder " on line " source_line)
+        }
+        target = resolve_alias(anchor_target[target])
+        if (node_kind[target] != "scalar") {
+            fail("collection alias cannot fill a scalar value on line " source_line)
+        }
+        node_kind[node] = "scalar"
+        node_value[node] = node_value[target]
+        node_type[node] = node_type[target]
+        node_tag[node] = node_tag[target]
+        return 1
     }
     node_kind[node] = "scalar"
     node_value[node] = scalar_value(remainder)
@@ -1175,6 +1289,9 @@ function append_plain_scalar(node, text, source_line,    cleaned, separator) {
     node_value[node] = node_value[node] separator scalar_value(cleaned)
     node_type[node] = scalar_type(node_value[node], node_tag[node], node_value[node])
     node_last_content_line[node] = source_line
+    if (strip_inline_comment(text) != trim(text)) {
+        node_plain_closed[node] = 1
+    }
     return 1
 }
 
@@ -1189,7 +1306,23 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     }
 
     if (block_active) {
+        if (block_content_indent < 0 && raw ~ /^ *\t[ \t]*$/) {
+            prefix = raw
+            sub(/\t.*$/, "", prefix)
+            if (length(prefix) == 0) {
+                fail("tabs cannot begin block scalar indentation on line " source_line)
+            }
+            if (block_leading_blank_max > length(prefix)) {
+                fail("invalid block scalar indentation on line " source_line)
+            }
+            block_content_indent = length(prefix)
+            append_block_line(substr(raw, block_content_indent + 1), 1, 0)
+            return
+        }
         if (raw ~ /^[[:space:]]*$/) {
+            if (block_content_indent < 0 && length(raw) > block_leading_blank_max) {
+                block_leading_blank_max = length(raw)
+            }
             append_block_line(raw, 0, 1)
             return
         }
@@ -1197,6 +1330,9 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         sub(/[^ ].*$/, "", prefix)
         indent = length(prefix)
         if (block_content_indent < 0 && indent > block_base_indent) {
+            if (block_leading_blank_max > indent) {
+                fail("invalid block scalar indentation on line " source_line)
+            }
             block_content_indent = indent
         }
         if (block_content_indent >= 0 && indent >= block_content_indent) {
@@ -1216,7 +1352,30 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     }
 
     if (raw ~ /^[[:space:]]*$/ || raw ~ /^[[:space:]]*#/) {
+        if (raw ~ /^[[:space:]]*#/) {
+            close_plain_contexts()
+        }
         return
+    }
+
+    if (flow_balance(raw) > 0) {
+        if (raw ~ /,#[^[:space:]]/) {
+            fail("comments in flow collections require separation on line " source_line)
+        }
+        multiline_flow_active = 1
+        multiline_flow_line = source_line
+        multiline_flow_text = start_flow_line(raw)
+        multiline_flow_depth = flow_balance(multiline_flow_text)
+        multiline_flow_min_indent = flow_continuation_indent(raw)
+        multiline_flow_root = flow_opening(raw)
+        multiline_flow_comment_break = 0
+        return
+    }
+
+    if (raw ~ /^ *-[ ]*\t-([[:space:]]|$)/ ||
+        raw ~ /^ *\?[ ]*\t-([[:space:]]|$)/ ||
+        raw ~ /^ *:[ ]*\t-([[:space:]]|$)/) {
+        fail("tabs cannot separate block collection indicators on line " source_line)
     }
 
     prefix = raw
@@ -1224,8 +1383,10 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     if (index(prefix, "\t")) {
         candidate = substr(raw, length(prefix) + 1)
         tab_position = index(raw, "\t")
-        if (substr(candidate, 1, 1) == "[" || substr(candidate, 1, 1) == "{" ||
-            find_mapping_separator(candidate, 1)) {
+        if (find_mapping_separator(candidate, 1)) {
+            fail("tabs cannot be used for mapping indentation on line " source_line)
+        }
+        if (substr(candidate, 1, 1) == "[" || substr(candidate, 1, 1) == "{") {
             raw = candidate
         } else {
             raw = substr(raw, 1, tab_position - 1) candidate
@@ -1234,7 +1395,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
 
     root = (document_index in document_root) ? document_root[document_index] : 0
     candidate = strip_inline_comment(trim(raw))
-    if (!document_ended && root && node_kind[root] == "scalar" && node_plain_continuable[root] &&
+    if (!document_ended && root && node_kind[root] == "scalar" && node_plain_continuable[root] && !node_plain_closed[root] &&
         !(raw !~ /^[[:space:]]/ && (candidate == "---" || candidate ~ /^---[[:space:]]/ || candidate == "...")) &&
         (raw ~ /^[[:space:]]/ || !find_mapping_separator(candidate, 1))) {
         append_plain_scalar(root, raw, source_line)
@@ -1272,6 +1433,9 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
 
     if (clean == "---" || clean ~ /^---[[:space:]]/) {
         marker_content = trim(substr(clean, 4))
+        if (marker_content ~ /^[!&]/ && find_mapping_separator(marker_content, 1)) {
+            fail("node properties cannot introduce a mapping on a document marker line " source_line)
+        }
         fail_pending_explicit_keys(source_line)
         if (document_has_content[document_index] || document_explicit[document_index]) {
             if (!document_has_content[document_index]) {
@@ -1322,7 +1486,8 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         return
     }
     parent = find_parent(indent)
-    if (parent && node_kind[parent] == "scalar" && node_plain_continuable[parent]) {
+    if (parent && node_kind[parent] == "scalar" && node_plain_continuable[parent] &&
+        !node_plain_closed[parent] && indent > node_plain_base_indent[parent]) {
         append_plain_scalar(parent, text, source_line)
         return
     }
@@ -1338,7 +1503,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         text != "-" && text !~ /^-[[:space:]]/ &&
         text != "?" && text !~ /^\?[[:space:]]/ &&
         text != ":" && text !~ /^:[[:space:]]/ &&
-        !find_top_level_colon(text, 1)) {
+        !find_mapping_separator(text, 1)) {
         if (extend_pending_properties(parent, text, source_line)) {
             return
         }
@@ -1351,6 +1516,15 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
             add_explicit_null(indent, source_line)
         }
         key_text = trim(substr(text, 2))
+        if (key_text ~ /^[|>]([-+]?[1-9]?|[1-9][-+]?)$/) {
+            explicit_key[indent] = ""
+            explicit_key_valid[indent] = 1
+            explicit_key_last_line[indent] = source_line
+            explicit_block_node = new_node("scalar", source_line, "", "string", "")
+            explicit_block_indent = indent
+            start_block(explicit_block_node, key_text, indent, source_line)
+            return
+        }
         if (key_text == "" || substr(key_text, 1, 1) == "[" || substr(key_text, 1, 1) == "{" || find_top_level_colon(key_text, 1)) {
             fail("collection-valued complex keys are not supported on line " source_line)
         }
@@ -1372,9 +1546,9 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         return
     }
 
-    separator = find_mapping_separator(text, 1)
+    separator = find_mapping_separator(clean, 1)
     if (separator) {
-        parse_mapping_line(text, indent, source_line)
+        parse_mapping_line(clean, indent, source_line)
         return
     }
 
@@ -1385,9 +1559,13 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     root = parse_value(text, source_line, indent, 1)
     document_root[document_index] = root
     document_has_content[document_index] = 1
-    if (node_kind[root] == "scalar" && substr(trim(text), 1, 1) != "\"" &&
-        substr(trim(text), 1, 1) != sprintf("%c", 39)) {
+    if (block_active && block_node == root && indent == 0) {
+        block_base_indent = -1
+    }
+    if (node_kind[root] == "scalar" && is_plain_scalar_source(text, source_line)) {
         node_plain_continuable[root] = 1
+        node_plain_base_indent[root] = indent
+        node_plain_closed[root] = strip_inline_comment(text) != trim(text)
         node_last_content_line[root] = source_line
     }
 }
@@ -4256,6 +4434,14 @@ BEGIN {
         next
     }
     if (multiline_scalar_active) {
+        if ($0 ~ /^(---|\.\.\.)([[:space:]]|$)/) {
+            fail("document markers cannot appear inside quoted scalars on line " NR)
+        }
+        multiline_scalar_prefix = $0
+        sub(/[^ ].*$/, "", multiline_scalar_prefix)
+        if ($0 !~ /^[[:space:]]*$/ && length(multiline_scalar_prefix) < multiline_scalar_min_indent) {
+            fail("invalid quoted scalar indentation on line " NR)
+        }
         multiline_scalar_text = multiline_scalar_text "\n" $0
         if (!multiline_quote_is_open(multiline_scalar_text, multiline_scalar_delimiter)) {
             process_line(multiline_scalar_text, multiline_scalar_line)
@@ -4265,8 +4451,36 @@ BEGIN {
         next
     }
     if (multiline_flow_active) {
+        flow_line_prefix = $0
+        sub(/[^ ].*$/, "", flow_line_prefix)
+        flow_line_trimmed = trim($0)
+        if (flow_line_trimmed != "" && flow_line_trimmed !~ /^#/ && flow_line_trimmed !~ /^[}\]]/ &&
+            length(flow_line_prefix) < multiline_flow_min_indent) {
+            fail("invalid flow collection indentation on line " NR)
+        }
+        if (flow_line_trimmed == "---" || flow_line_trimmed == "...") {
+            fail("document markers cannot appear inside flow collections on line " NR)
+        }
+        if (multiline_flow_root == "[" && flow_line_trimmed ~ /^:/) {
+            fail("flow mapping values must follow their keys on line " NR)
+        }
+        if ($0 ~ /,#[^[:space:]]/) {
+            fail("comments in flow collections require separation on line " NR)
+        }
+        if ($0 ~ /^[[:space:]]*#/) {
+            multiline_flow_comment_break = 1
+            next
+        }
+        if (multiline_flow_comment_break) {
+            flow_previous = trim(multiline_flow_text)
+            flow_previous = substr(flow_previous, length(flow_previous), 1)
+            if (flow_previous != "," && flow_line_trimmed !~ /^[,}\]]/) {
+                fail("flow entries separated by a comment require a comma on line " NR)
+            }
+            multiline_flow_comment_break = 0
+        }
         flow_line_clean = strip_flow_line_comment($0)
-        if (flow_line_clean == "") {
+        if (trim(flow_line_clean) == "") {
             next
         }
         multiline_flow_text = multiline_flow_text " " flow_line_clean
@@ -4287,13 +4501,26 @@ BEGIN {
         multiline_scalar_active = 1
         multiline_scalar_line = NR
         multiline_scalar_text = $0
+        multiline_scalar_prefix = $0
+        sub(/[^ ].*$/, "", multiline_scalar_prefix)
+        multiline_scalar_min_indent = length(multiline_scalar_prefix)
+        multiline_scalar_first = substr($0, multiline_scalar_min_indent + 1)
+        if (multiline_scalar_first ~ /^-[[:space:]]/ || find_mapping_separator(multiline_scalar_first, 1)) {
+            multiline_scalar_min_indent++
+        }
         next
     }
     multiline_flow_depth = flow_balance($0)
     if (multiline_flow_depth > 0) {
+        if ($0 ~ /,#[^[:space:]]/) {
+            fail("comments in flow collections require separation on line " NR)
+        }
         multiline_flow_active = 1
         multiline_flow_line = NR
-        multiline_flow_text = strip_flow_line_comment($0)
+        multiline_flow_text = start_flow_line($0)
+        multiline_flow_min_indent = flow_continuation_indent($0)
+        multiline_flow_root = flow_opening($0)
+        multiline_flow_comment_break = 0
         next
     }
     process_line($0, NR)
