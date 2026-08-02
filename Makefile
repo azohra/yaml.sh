@@ -12,7 +12,7 @@ ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/adversarial.sh bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"

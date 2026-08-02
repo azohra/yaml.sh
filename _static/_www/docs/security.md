@@ -7,7 +7,7 @@ YAML.sh parses data. It does not evaluate YAML as shell, load neighboring files,
 - No `load`, dynamic `eval`, system execution, network, or plugin operators.
 - No application-specific object construction from YAML tags.
 - Environment access is limited to explicit `env`, `strenv`, and `envsubst` operators.
-- In-place writes reject symlinks and replace a file only after a successful complete transformation.
+- In-place writes reject symlinks and duplicate inputs, then preflight the complete file set before replacement.
 - Input bytes, graph nodes, and nesting depth have hard configurable ceilings.
 
 This is a narrower attack surface than a general automation language. It is not a sandbox for arbitrary expressions: a query can still consume CPU and memory up to the configured limits.
@@ -56,9 +56,9 @@ Use `--security-disable-env-ops` when even that environment read is inappropriat
 
 ## In-place writes
 
-`-i` requires one real file. YAML.sh creates a sibling temporary file, preserves permissions, transforms every document, and only then replaces the original. It refuses symlinks to avoid redirecting a write through an unexpected target.
+`-i` requires one or more real files. YAML.sh creates candidate and rollback siblings beside every input, preserves permissions, and transforms the complete set before replacing anything. It refuses symlinks and duplicate inputs. A commit failure or interrupt restores preserved originals.
 
-Keep normal backups and version control. Atomic replacement protects against partial output, not a logically wrong query.
+Keep normal backups and version control. The transaction protects against partial output, not a logically wrong query or a machine failure during rollback.
 
 ## Reporting a vulnerability
 

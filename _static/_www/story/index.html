@@ -47,7 +47,7 @@
         <span aria-hidden="true">◆</span>
         <span>6 minute read</span>
         <span aria-hidden="true">◆</span>
-        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.8.0">YAML.sh v1.8</a>
+        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.9.0">YAML.sh v1.9</a>
       </div>
     </header>
 
@@ -84,7 +84,7 @@
 
         <section id="estimate-stopped-helping">
           <h2>The estimate stopped helping</h2>
-          <p>Codex began with estimates that sounded responsible and were consistently wrong. Work described as weeks kept turning into passing tests in minutes. I kept raising the goal. The parser became a query language; the query language gained updates; updates became multi-file workflows; semantic edits learned to preserve the source presentation around them.</p>
+          <p>Codex began with estimates that sounded responsible and were consistently wrong. Work described as weeks kept turning into passing tests in minutes. I kept raising the goal. The parser became a query language; the query language gained updates; semantic edits learned to preserve the source around them; then multi-file updates became one preflighted transaction that could roll itself back.</p>
           <p>Speed created its own temptation. At one point we briefly treated a large capability jump as a new major version. I stopped it. More work is not a breaking change, and velocity is not permission for version-number theatre. We corrected the release line and made the version communicate compatibility again.</p>
           <p>The releases still moved quickly, but each one earned a bounded contract. The sequence mattered more than the spectacle.</p>
           <ol class="story-timeline" aria-label="Release milestones">
@@ -93,7 +93,7 @@
             <li><strong>v1.2</strong><span>Turn queries into writable transformations.</span></li>
             <li><strong>v1.4</strong><span>Measure compatibility instead of describing it vaguely.</span></li>
             <li><strong>v1.6</strong><span>Add practical language depth without losing the one-file runtime.</span></li>
-            <li><strong>v1.8</strong><span>Make edits surgical and explain what the tool will preserve.</span></li>
+            <li><strong>v1.9</strong><span>Make repository-wide edits surgical, explainable, and transactional.</span></li>
           </ol>
         </section>
 
@@ -101,10 +101,10 @@
           <h2>Make it real</h2>
           <p>The hard part was not producing more code. The hard part was deciding what evidence would let us believe it.</p>
           <p>We compared YAML.sh with the official YAML Test Suite and with yq itself. We added real configuration workflows from Kubernetes, Docker Compose, GitHub Actions, GitLab CI, and deployment overlays. We generated expressions, hostile inputs, large documents, deep collections, and presentation-preserving mutations. A supported behaviour needed a test; nearby unsupported behaviour needed an explicit error instead of a confident misparse.</p>
-          <p>That distinction matters. Matching 2,610 categorized yq programs does not mean YAML.sh contains all of yq. Passing 282 expected YAML Test Suite cases does not mean every corner of the YAML specification is implemented. The numbers describe the tested contract. They do not dissolve the boundary around it.</p>
-          <p>By v1.8, that contract was large enough to be useful and specific enough to be trusted.</p>
+          <p>That distinction matters. Matching 2,620 categorized yq programs does not mean YAML.sh contains all of yq. Passing 282 expected YAML Test Suite cases does not mean every corner of the YAML specification is implemented. The numbers describe the tested contract. They do not dissolve the boundary around it.</p>
+          <p>By v1.9, that contract was large enough to be useful and specific enough to be trusted. One command could also prepare changes across a repository, refuse to write if any candidate failed, roll back a broken commit, and leave a JSON audit trail containing paths but not values.</p>
           <dl class="story-evidence">
-            <div><dt>yq programs</dt><dd>2,610 / 2,610</dd><dd>in the categorized v1.8 corpus</dd></div>
+            <div><dt>yq programs</dt><dd>2,620 / 2,620</dd><dd>in the categorized v1.9 corpus</dd></div>
             <div><dt>YAML outcomes</dt><dd>282 / 282</dd><dd>expected YAML Test Suite cases</dd></div>
             <div><dt>generated properties</dt><dd>12,000 / 12,000</dd><dd>grammar-guided checks</dd></div>
             <div><dt>extra dependencies</dt><dd>0</dd><dd>the runtime is POSIX sh + AWK</dd></div>
@@ -122,7 +122,7 @@
         <section id="where-it-fits">
           <h2>Where it fits</h2>
           <p>YAML.sh is not yq in disguise. yq remains the right answer when you want its complete language, codecs, ecosystem, and mature performance envelope. YAML.sh deliberately leaves out dynamic evaluation, file-loading operators, dates, many codecs, and other capabilities that would weaken its small and inspectable runtime.</p>
-          <p>It is better at a narrower thing: arriving as one readable text file in an environment that already has a shell and AWK. There is no package manager, language runtime, YAML library, or mystery binary. The security model can also be smaller because several powerful classes of behaviour simply do not exist.</p>
+          <p>It is better at a narrower thing: arriving as one readable text file in an environment that already has a shell and AWK. There is no package manager, language runtime, YAML library, or mystery binary. The security model can also be smaller because several powerful classes of behaviour simply do not exist. Its repository-wide edits preflight every file, can roll back a partial commit, and explain their paths without recording the values they changed.</p>
           <p>That is enough of a difference to be a product, not just a stunt. Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.</p>
         </section>
 

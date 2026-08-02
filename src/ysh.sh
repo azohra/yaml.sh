@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.8.0
+YSH_VERSION=1.9.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -36,6 +36,9 @@ Output:
   -r, --raw-output        print scalar values without JSON quoting
       --json              emit JSON
   -y, --yaml-output       emit YAML
+  -I, --indent N         set YAML indentation from 1 through 9 (default: 2)
+      --unwrap-scalar=BOOL
+                          unwrap scalar values (default: true)
       --type              print the selected node type
       --tag               print the selected node tag
       --line              print the selected node source line
@@ -46,11 +49,12 @@ Documents:
   -d, --document INDEX    select a zero-based YAML document
       --all-documents     evaluate every document in a stream
   -n, --null-input        build output without reading input
-  -i, --inplace           update a YAML file in place
+  -i, --inplace           transactionally update YAML files in place
 
 Evaluation:
   -e, --exit-status       fail on no result, null, or false
       --explain           report selections, mutations, and presentation behavior
+      --explain=json      emit one value-free JSON audit record per input
       --security-disable-env-ops
                           disable env(), strenv(), and envsubst
 
@@ -93,6 +97,8 @@ ysh_invoke_awk() {
         -v inplace_mode="$YSH_INPLACE" \
         -v exit_status_mode="$YSH_EXIT_STATUS" \
         -v explain_mode="$YSH_EXPLAIN" \
+        -v yaml_indent="$YSH_INDENT" \
+        -v unwrap_scalar_mode="$YSH_UNWRAP_SCALAR" \
         -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
         -v input_filename="$YSH_INPUT_FILENAME" \
         -v input_file_index="$YSH_FILE_INDEX" \
@@ -161,37 +167,167 @@ ysh_run_files() {
     return "$YSH_FILES_STATUS"
 }
 
-ysh_run_inplace() {
-    case "$YSH_INPUT_FILE" in
-    */*)
-        YSH_INPUT_DIR=${YSH_INPUT_FILE%/*}
-        YSH_INPUT_NAME=${YSH_INPUT_FILE##*/}
-        ;;
-    *)
-        YSH_INPUT_DIR=.
-        YSH_INPUT_NAME=$YSH_INPUT_FILE
-        YSH_INPUT_FILE=./$YSH_INPUT_FILE
-        ;;
-    esac
-    if ! YSH_TEMP_FILE=$(umask 077 && mktemp "${YSH_INPUT_DIR}/.${YSH_INPUT_NAME}.ysh.XXXXXX") 2>/dev/null; then
-        ysh_error "could not create temporary file beside: $YSH_INPUT_FILE"
-        return 1
+ysh_cleanup_transaction() {
+    for YSH_CLEANUP_LIST in "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST"; do
+        if [ -n "$YSH_CLEANUP_LIST" ] && [ -f "$YSH_CLEANUP_LIST" ]; then
+            while IFS= read -r YSH_CLEANUP_FILE; do
+                [ -z "$YSH_CLEANUP_FILE" ] || rm -f "$YSH_CLEANUP_FILE"
+            done < "$YSH_CLEANUP_LIST"
+        fi
+    done
+    for YSH_CLEANUP_LIST in "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST" \
+        "$YSH_TRANSACTION_REPORT" "$YSH_TRANSACTION_CALL_LOG"; do
+        [ -z "$YSH_CLEANUP_LIST" ] || rm -f "$YSH_CLEANUP_LIST"
+    done
+}
+
+ysh_append_transaction_log() {
+    while IFS= read -r YSH_LOG_LINE; do
+        printf '%s\n' "$YSH_LOG_LINE" >> "$YSH_TRANSACTION_REPORT"
+    done < "$YSH_TRANSACTION_CALL_LOG"
+}
+
+ysh_emit_transaction_log() {
+    while IFS= read -r YSH_LOG_LINE; do
+        printf '%s\n' "$YSH_LOG_LINE" >&2
+    done < "$1"
+}
+
+ysh_rollback_transaction() {
+    YSH_ROLLBACK_STATUS=0
+    while IFS= read -r YSH_ROLLBACK_INPUT && IFS= read -r YSH_ROLLBACK_OLD <&4; do
+        if [ -n "$YSH_ROLLBACK_OLD" ] && [ -f "$YSH_ROLLBACK_OLD" ]; then
+            if ! mv -f "$YSH_ROLLBACK_OLD" "$YSH_ROLLBACK_INPUT"; then
+                ysh_error "could not roll back input file: $YSH_ROLLBACK_INPUT"
+                YSH_ROLLBACK_STATUS=1
+            fi
+        fi
+    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_OLD_LIST"
+    return "$YSH_ROLLBACK_STATUS"
+}
+
+ysh_interrupt_transaction() {
+    if [ "${YSH_TRANSACTION_COMMITTING:-0}" -eq 1 ]; then
+        ysh_rollback_transaction || :
     fi
-    trap 'rm -f "$YSH_TEMP_FILE"' 0
-    trap 'exit 1' 1 2 3 15
-    if ! cp -p "$YSH_INPUT_FILE" "$YSH_TEMP_FILE"; then
-        ysh_error "could not preserve input metadata: $YSH_INPUT_FILE"
+    exit 1
+}
+
+ysh_run_inplace_transaction() {
+    YSH_TRANSACTION_INPUT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-inputs.XXXXXX") || return 1
+    YSH_TRANSACTION_NEW_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-new.XXXXXX") || {
+        rm -f "$YSH_TRANSACTION_INPUT_LIST"
         return 1
-    fi
+    }
+    YSH_TRANSACTION_OLD_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-old.XXXXXX") || {
+        rm -f "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST"
+        return 1
+    }
+    YSH_TRANSACTION_REPORT=$(mktemp "${TMPDIR:-/tmp}/ysh-report.XXXXXX") || {
+        rm -f "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST"
+        return 1
+    }
+    YSH_TRANSACTION_CALL_LOG=$(mktemp "${TMPDIR:-/tmp}/ysh-call-log.XXXXXX") || {
+        rm -f "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST" "$YSH_TRANSACTION_REPORT"
+        return 1
+    }
+    trap 'ysh_cleanup_transaction' 0
+    trap 'ysh_interrupt_transaction' 1 2 3 15
+
+    YSH_SAVED_IFS=$IFS
+    IFS='
+'
+    set -f
+    # Input filenames are stored one per line; embedded newlines are unsupported.
+    # shellcheck disable=SC2086
+    set -- $YSH_INPUT_FILES
+    set +f
+    IFS=$YSH_SAVED_IFS
+
+    YSH_FILE_INDEX=0
     YSH_OUTPUT_MODE=yaml
-    if ! ysh_run_awk > "$YSH_TEMP_FILE"; then
+    for YSH_TRANSACTION_INPUT do
+        if [ "$YSH_TRANSACTION_INPUT" = "-" ]; then
+            ysh_error "--inplace requires real input files"
+            return 2
+        fi
+        if [ -L "$YSH_TRANSACTION_INPUT" ]; then
+            ysh_error "--inplace refuses symbolic links: $YSH_TRANSACTION_INPUT"
+            return 2
+        fi
+        if [ ! -f "$YSH_TRANSACTION_INPUT" ]; then
+            ysh_error "input file does not exist: $YSH_TRANSACTION_INPUT"
+            return 1
+        fi
+        case "$YSH_TRANSACTION_INPUT" in
+        */*)
+            YSH_INPUT_DIR=${YSH_TRANSACTION_INPUT%/*}
+            YSH_INPUT_NAME=${YSH_TRANSACTION_INPUT##*/}
+            ;;
+        *)
+            YSH_INPUT_DIR=.
+            YSH_INPUT_NAME=$YSH_TRANSACTION_INPUT
+            YSH_TRANSACTION_INPUT=./$YSH_TRANSACTION_INPUT
+            ;;
+        esac
+        while IFS= read -r YSH_TRANSACTION_EXISTING; do
+            if [ "$YSH_TRANSACTION_EXISTING" = "$YSH_TRANSACTION_INPUT" ]; then
+                ysh_error "--inplace received the same input more than once: $YSH_TRANSACTION_INPUT"
+                return 2
+            fi
+        done < "$YSH_TRANSACTION_INPUT_LIST"
+        if ! YSH_TRANSACTION_NEW=$(umask 077 && mktemp "${YSH_INPUT_DIR}/.${YSH_INPUT_NAME}.ysh-new.XXXXXX") 2>/dev/null; then
+            ysh_error "could not create candidate beside: $YSH_TRANSACTION_INPUT"
+            return 1
+        fi
+        if ! YSH_TRANSACTION_OLD=$(umask 077 && mktemp "${YSH_INPUT_DIR}/.${YSH_INPUT_NAME}.ysh-old.XXXXXX") 2>/dev/null; then
+            rm -f "$YSH_TRANSACTION_NEW"
+            ysh_error "could not create rollback copy beside: $YSH_TRANSACTION_INPUT"
+            return 1
+        fi
+        printf '%s\n' "$YSH_TRANSACTION_INPUT" >> "$YSH_TRANSACTION_INPUT_LIST"
+        printf '%s\n' "$YSH_TRANSACTION_NEW" >> "$YSH_TRANSACTION_NEW_LIST"
+        printf '%s\n' "$YSH_TRANSACTION_OLD" >> "$YSH_TRANSACTION_OLD_LIST"
+        if ! cp -p "$YSH_TRANSACTION_INPUT" "$YSH_TRANSACTION_NEW" ||
+            ! cp -p "$YSH_TRANSACTION_INPUT" "$YSH_TRANSACTION_OLD"; then
+            ysh_error "could not preserve input metadata: $YSH_TRANSACTION_INPUT"
+            return 1
+        fi
+        YSH_INPUT_FILE=$YSH_TRANSACTION_INPUT
+        YSH_INPUT_FILENAME=$YSH_TRANSACTION_INPUT
+        : > "$YSH_TRANSACTION_CALL_LOG"
+        if ! ysh_run_awk > "$YSH_TRANSACTION_NEW" 2> "$YSH_TRANSACTION_CALL_LOG"; then
+            ysh_emit_transaction_log "$YSH_TRANSACTION_CALL_LOG"
+            ysh_error "transaction aborted before writing any files"
+            return 1
+        fi
+        ysh_append_transaction_log
+        YSH_FILE_INDEX=$((YSH_FILE_INDEX + 1))
+    done
+
+    YSH_TRANSACTION_STATUS=0
+    YSH_TRANSACTION_COMMITTING=1
+    while IFS= read -r YSH_TRANSACTION_INPUT && IFS= read -r YSH_TRANSACTION_NEW <&4; do
+        if ! mv -f "$YSH_TRANSACTION_NEW" "$YSH_TRANSACTION_INPUT"; then
+            ysh_error "could not replace input file: $YSH_TRANSACTION_INPUT"
+            YSH_TRANSACTION_STATUS=1
+            break
+        fi
+    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_NEW_LIST"
+    if [ "$YSH_TRANSACTION_STATUS" -ne 0 ]; then
+        ysh_rollback_transaction || :
+        YSH_TRANSACTION_COMMITTING=0
         return 1
     fi
-    if ! mv -f "$YSH_TEMP_FILE" "$YSH_INPUT_FILE"; then
-        ysh_error "could not replace input file: $YSH_INPUT_FILE"
-        return 1
-    fi
-    YSH_TEMP_FILE=
+
+    YSH_TRANSACTION_COMMITTING=0
+    ysh_emit_transaction_log "$YSH_TRANSACTION_REPORT"
+    ysh_cleanup_transaction
+    YSH_TRANSACTION_INPUT_LIST=
+    YSH_TRANSACTION_NEW_LIST=
+    YSH_TRANSACTION_OLD_LIST=
+    YSH_TRANSACTION_REPORT=
+    YSH_TRANSACTION_CALL_LOG=
     trap - 0 1 2 3 15
 }
 
@@ -206,10 +342,17 @@ ysh_main() {
     YSH_INPLACE=0
     YSH_EXIT_STATUS=0
     YSH_EXPLAIN=0
+    YSH_INDENT=2
+    YSH_UNWRAP_SCALAR=1
     YSH_DISABLE_ENV_OPS=0
     YSH_INPUT_FILENAME=-
     YSH_FILE_INDEX=0
     YSH_INPUT_FILES=
+    YSH_TRANSACTION_INPUT_LIST=
+    YSH_TRANSACTION_NEW_LIST=
+    YSH_TRANSACTION_OLD_LIST=
+    YSH_TRANSACTION_REPORT=
+    YSH_TRANSACTION_CALL_LOG=
     YSH_MAX_INPUT_BYTES=${YSH_MAX_INPUT_BYTES:-16777216}
     YSH_MAX_NODES=${YSH_MAX_NODES:-100000}
     YSH_MAX_DEPTH=${YSH_MAX_DEPTH:-256}
@@ -242,6 +385,46 @@ ysh_main() {
             ;;
         -y|--yaml-output)
             YSH_OUTPUT_MODE="yaml"
+            shift
+            ;;
+        -I|--indent)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires an integer from 1 through 9"
+                return 2
+            fi
+            case "$2" in
+            [1-9]) YSH_INDENT=$2 ;;
+            *)
+                ysh_error "$1 requires an integer from 1 through 9"
+                return 2
+                ;;
+            esac
+            shift 2
+            ;;
+        -I[1-9])
+            YSH_INDENT=${1#-I}
+            shift
+            ;;
+        -I=*|--indent=*)
+            YSH_INDENT=${1#*=}
+            case "$YSH_INDENT" in
+            [1-9]) ;;
+            *)
+                ysh_error "--indent requires an integer from 1 through 9"
+                return 2
+                ;;
+            esac
+            shift
+            ;;
+        --unwrap-scalar=*|--unwrapScalar=*)
+            case "${1#*=}" in
+            true) YSH_UNWRAP_SCALAR=1 ;;
+            false) YSH_UNWRAP_SCALAR=0 ;;
+            *)
+                ysh_error "--unwrap-scalar must be true or false"
+                return 2
+                ;;
+            esac
             shift
             ;;
         --type)
@@ -278,6 +461,10 @@ ysh_main() {
             ;;
         --explain)
             YSH_EXPLAIN=1
+            shift
+            ;;
+        --explain=json)
+            YSH_EXPLAIN=2
             shift
             ;;
         --security-disable-env-ops)
@@ -441,15 +628,10 @@ ${YSH_POSITIONAL_REST}"
             ysh_error "--inplace requires an input file"
             return 2
         fi
-        if [ -L "$YSH_INPUT_FILE" ]; then
-            ysh_error "--inplace refuses symbolic links"
-            return 2
+        if [ -z "$YSH_INPUT_FILES" ]; then
+            YSH_INPUT_FILES=$YSH_INPUT_FILE
         fi
-        if [ -n "$YSH_INPUT_FILES" ]; then
-            ysh_error "--inplace accepts exactly one input file"
-            return 2
-        fi
-        ysh_run_inplace
+        ysh_run_inplace_transaction
         return $?
     fi
 

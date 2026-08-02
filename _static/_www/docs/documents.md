@@ -31,3 +31,11 @@ ysh -i '.release.channel = "stable"' stream.yml
 ```
 
 The update is committed only after the entire stream parses and every document transforms successfully.
+
+Several files form one in-place transaction:
+
+```sh
+ysh -i '.release.channel = "stable"' services/*.yml
+```
+
+Every file is parsed and transformed into a sibling candidate first. Only then are originals replaced; a commit failure or interrupt rolls back files already changed.

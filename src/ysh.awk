@@ -2504,10 +2504,12 @@ function expression_parse_primary(    expression, name, step, argument, value, v
                 }
             }
         } else if (expression_token_type == "identifier" &&
-            (tolower(expression_token_value) == "style" || tolower(expression_token_value) == "line_comment")) {
+            (tolower(expression_token_value) == "style" || tolower(expression_token_value) == "line_comment" ||
+            tolower(expression_token_value) == "tag" || tolower(expression_token_value) == "anchor" ||
+            tolower(expression_token_value) == "alias")) {
             value = tolower(expression_token_value)
             expression_lex_next()
-            expression = expression_new("presentation_property", expression, 0, value)
+            expression = expression_new("node_property", expression, 0, value)
         } else {
             break
         }
@@ -2582,7 +2584,7 @@ function explain_record_mutation(kind, path) {
     } else {
         explain_replacement_count++
     }
-    if (explain_mutation_count <= 20) {
+    if (explain_mode == 2 || explain_mutation_count <= 20) {
         explain_mutation_kind[explain_mutation_count] = kind
         explain_mutation_path[explain_mutation_count] = path
     }
@@ -3429,55 +3431,209 @@ function expression_follow_path(root, path_node, create,    path, current, segme
     return current
 }
 
-function expression_presentation_value(node, property,    value) {
+function expression_node_property_value(node, property,    value) {
     if (property == "style") {
         value = node_style[node]
         return value == "plain" ? "" : value
     }
-    return node_line_comment[node]
+    if (property == "line_comment") {
+        return node_line_comment[node]
+    }
+    if (property == "tag") {
+        return expression_type_name(node)
+    }
+    if (property == "anchor") {
+        return node_anchor[node]
+    }
+    return node_kind[node] == "alias" ? node_value[node] : ""
 }
 
-function expression_set_presentation(node, property, value_node,    resolved, value, old_value, new_value) {
-    expression_last_presentation_changed = 0
+function expression_normalize_tag(value) {
+    if (value == "") {
+        return ""
+    }
+    if (substr(value, 1, 2) == "!!") {
+        return "tag:yaml.org,2002:" substr(value, 3)
+    }
+    if (substr(value, 1, 2) == "!<" && substr(value, length(value), 1) == ">") {
+        return substr(value, 3, length(value) - 3)
+    }
+    if (substr(value, 1, 1) == "!" || value ~ /^tag:/) {
+        return value
+    }
+    fail("tag must be empty, a YAML tag such as !!str, or an absolute tag URI")
+}
+
+function expression_node_document(node,    current, document) {
+    current = node
+    while (current in node_parent) {
+        current = node_parent[current]
+    }
+    for (document = 0; document <= document_index; document++) {
+        if ((document in document_root) && document_root[document] == current) {
+            return document
+        }
+    }
+    return -1
+}
+
+function expression_anchor_references(node,    candidate, count) {
+    count = 0
+    for (candidate = 1; candidate <= node_count; candidate++) {
+        if (node_kind[candidate] == "alias" && alias_target[candidate] == node) {
+            count++
+        }
+    }
+    return count
+}
+
+function expression_refresh_anchor_target(document, name,    candidate, best) {
+    if (name == "") {
+        return
+    }
+    delete anchor_target[document SUBSEP name]
+    best = 0
+    for (candidate = 1; candidate <= node_count; candidate++) {
+        if (node_anchor[candidate] == name && expression_node_document(candidate) == document && candidate > best) {
+            best = candidate
+        }
+    }
+    if (best) {
+        anchor_target[document SUBSEP name] = best
+    }
+}
+
+function expression_set_anchor(node, value,    candidate, document, old_value) {
+    if (node_kind[node] == "alias") {
+        fail("anchor cannot be set on an alias")
+    }
+    if (value != "" && !valid_anchor_name(value)) {
+        fail("invalid anchor name: " value)
+    }
+    if (value == "" && expression_anchor_references(node)) {
+        fail("cannot remove an anchor while aliases still reference it")
+    }
+    document = expression_node_document(node)
+    for (candidate = 1; candidate <= node_count; candidate++) {
+        if (candidate != node && node_anchor[candidate] == value && value != "" &&
+            expression_node_document(candidate) == document) {
+            fail("duplicate anchor name: " value)
+        }
+    }
+    old_value = node_anchor[node]
+    node_anchor[node] = value
+    if (old_value != value) {
+        for (candidate = 1; candidate <= node_count; candidate++) {
+            if (node_kind[candidate] == "alias" && alias_target[candidate] == node) {
+                node_value[candidate] = value
+            }
+        }
+        expression_refresh_anchor_target(document, old_value)
+        expression_refresh_anchor_target(document, value)
+    }
+}
+
+function expression_set_alias(node, value,    document, target, parent) {
+    if (value == "") {
+        fail("alias must name an anchor")
+    }
+    if (!valid_anchor_name(value)) {
+        fail("invalid alias name: " value)
+    }
+    if (expression_anchor_references(node)) {
+        fail("cannot replace an anchor while aliases still reference it")
+    }
+    document = expression_node_document(node)
+    target = anchor_target[document SUBSEP value]
+    if (!target) {
+        fail("unknown anchor for alias: " value)
+    }
+    if (target >= node) {
+        fail("forward alias is not supported: " value)
+    }
+    parent = node_parent[node]
+    while (parent) {
+        if (parent == target) {
+            fail("recursive alias: " value)
+        }
+        parent = node_parent[parent]
+    }
+    expression_clear_node(node)
+    node_kind[node] = "alias"
+    node_value[node] = value
+    node_type[node] = ""
+    node_tag[node] = ""
+    delete node_style[node]
+    alias_target[node] = target
+}
+
+function expression_set_node_property(node, property, value_node,    resolved, value, old_value, new_value, tag) {
+    expression_last_property_changed = 0
     resolved = resolve_alias(value_node)
     if (node_kind[resolved] != "scalar" || node_type[resolved] != "string") {
         fail(property " must be set to a string")
     }
     value = node_value[resolved]
-    old_value = expression_presentation_value(node, property)
+    old_value = expression_node_property_value(node, property)
     new_value = property == "style" && value == "plain" ? "" : value
     if (new_value == old_value) {
         return
     }
     if (property == "style") {
         if (node_kind[node] == "scalar") {
-            if (value != "" && value != "plain" && value != "single" && value != "double") {
-                fail("scalar style must be plain, single, or double")
+            if (value != "" && value != "plain" && value != "single" && value != "double" &&
+                value != "literal" && value != "folded") {
+                fail("scalar style must be plain, single, double, literal, or folded")
             }
-            if ((value == "" || value == "plain") && node_type[node] == "string" && !presentation_plain_safe(node_value[node])) {
+            if (value == "plain" && node_type[node] == "string" && !presentation_plain_safe(node_value[node])) {
                 fail("value cannot be represented safely in plain style")
             }
-            node_style[node] = value == "" ? "plain" : value
-        } else if (node_kind[node] == "mapping" || node_kind[node] == "sequence") {
-            if (value != "flow") {
-                fail("collection style must be flow")
+            if ((value == "literal" || value == "folded") && node_type[node] != "string") {
+                fail(value " style requires a string scalar")
             }
-            node_style[node] = value
+            if (value == "") {
+                delete node_style[node]
+            } else {
+                node_style[node] = value
+            }
+        } else if (node_kind[node] == "mapping" || node_kind[node] == "sequence") {
+            if (value != "" && value != "flow") {
+                fail("collection style must be flow or empty")
+            }
+            if (value == "") {
+                delete node_style[node]
+            } else {
+                node_style[node] = value
+            }
         } else {
             fail("style cannot be set on an alias")
         }
-    } else {
+    } else if (property == "line_comment") {
         node_line_comment[node] = value
         node_line_comment_modified[node] = 1
+    } else if (property == "tag") {
+        if (node_kind[node] == "alias") {
+            fail("tag cannot be set on an alias")
+        }
+        tag = expression_normalize_tag(value)
+        node_tag[node] = tag
+        if (node_kind[node] == "scalar") {
+            node_type[node] = scalar_type(node_value[node], tag, node_value[node])
+        }
+    } else if (property == "anchor") {
+        expression_set_anchor(node, value)
+    } else if (property == "alias") {
+        expression_set_alias(node, value)
     }
     if (inplace_mode) {
-        if (node_kind[node] == "scalar") {
+        if ((property == "style" || property == "line_comment") && node_kind[node] == "scalar" &&
+            node_style[node] != "literal" && node_style[node] != "folded") {
             presentation_track_replace(node, node)
         } else {
             presentation_possible = 0
         }
     }
-    expression_last_presentation_changed = 1
+    expression_last_property_changed = 1
 }
 
 function expression_collect_recursive(node, stream, serial,    resolved, seen_key, i, collection, key) {
@@ -3833,11 +3989,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
-    if (kind == "presentation_property") {
+    if (kind == "node_property") {
         middle = expression_evaluate(expression_left[expression], input)
         for (i = 1; i <= expression_stream_count[middle]; i++) {
             node = expression_stream_node[middle, i]
-            expression_stream_push(output, expression_scalar(expression_presentation_value(node, expression_value[expression]), "string"))
+            expression_stream_push(output, expression_scalar(expression_node_property_value(node, expression_value[expression]), "string"))
         }
         return output
     }
@@ -4323,7 +4479,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
-    if ((kind == "assign" || kind == "update") && expression_kind[expression_left[expression]] == "presentation_property") {
+    if ((kind == "assign" || kind == "update") && expression_kind[expression_left[expression]] == "node_property") {
         property_expression = expression_left[expression]
         property = expression_value[property_expression]
         for (i = 1; i <= expression_stream_count[input]; i++) {
@@ -4339,7 +4495,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
             for (j = 1; j <= expression_stream_count[left_stream]; j++) {
                 child = expression_stream_node[left_stream, j]
                 if (kind == "update") {
-                    middle = expression_stream_single(expression_scalar(expression_presentation_value(child, property), "string"))
+                    middle = expression_stream_single(expression_scalar(expression_node_property_value(child, property), "string"))
                     right_stream = expression_evaluate(expression_right[expression], middle)
                     if (!expression_stream_count[right_stream]) {
                         expression_stream_push(right_stream, expression_scalar("", "string"))
@@ -4353,8 +4509,8 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     input_target = explain_input_target(child)
                     mutation_path = explain_path(child) " " property
                 }
-                expression_set_presentation(child, property, argument)
-                if (explain_mode && input_target && expression_last_presentation_changed) {
+                expression_set_node_property(child, property, argument)
+                if (explain_mode && input_target && expression_last_property_changed) {
                     explain_record_mutation("replace", mutation_path)
                 }
             }
@@ -5120,6 +5276,8 @@ function yaml_properties(node,    result, tag) {
     if (tag != "") {
         if (tag ~ /^tag:yaml.org,2002:/) {
             tag = "!!" substr(tag, length("tag:yaml.org,2002:") + 1)
+        } else if (substr(tag, 1, 1) == "!") {
+            tag = tag
         } else {
             tag = "!<" tag ">"
         }
@@ -5164,6 +5322,31 @@ function yaml_scalar_text(node,    value, properties, lowered, quote) {
         return properties value
     }
     return properties json_quote(value)
+}
+
+function yaml_block_indicator(node,    value, trailing) {
+    value = node_value[node]
+    trailing = 0
+    while (length(value) > trailing && substr(value, length(value) - trailing, 1) == "\n") {
+        trailing++
+    }
+    return (node_style[node] == "folded" ? ">" : "|") (trailing == 0 ? "-" : (trailing == 1 ? "" : "+"))
+}
+
+function emit_yaml_block_scalar(node, indent,    value, position, line, folded) {
+    value = node_value[node]
+    folded = node_style[node] == "folded"
+    while ((position = index(value, "\n"))) {
+        line = substr(value, 1, position - 1)
+        print yaml_spaces(indent) line
+        if (folded) {
+            print ""
+        }
+        value = substr(value, position + 1)
+    }
+    if (value != "") {
+        print yaml_spaces(indent) value
+    }
 }
 
 function yaml_flow_node(node,    result, i, key) {
@@ -5221,6 +5404,12 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
                 printf "%s%s:", yaml_spaces(indent), json_quote(key)
             }
             child = mapping_child[node, i]
+            if (node_kind[child] == "scalar" && (node_style[child] == "literal" || node_style[child] == "folded")) {
+                properties = yaml_properties(child)
+                printf " %s%s%s\n", (properties == "" ? "" : properties " "), yaml_block_indicator(child), yaml_line_comment(child)
+                emit_yaml_block_scalar(child, indent + yaml_indent)
+                continue
+            }
             inline = yaml_inline_node(child)
             if (inline != "") {
                 printf " %s%s\n", inline, yaml_line_comment(child)
@@ -5230,7 +5419,7 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
                     printf " %s", properties
                 }
                 printf "%s\n", yaml_line_comment(child)
-                emit_yaml_collection(child, indent + 2)
+                emit_yaml_collection(child, indent + yaml_indent)
             }
         }
         return
@@ -5238,6 +5427,12 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
     for (i = 1; i <= sequence_count[node]; i++) {
         child = sequence_child[node, i]
         printf "%s-", yaml_spaces(indent)
+        if (node_kind[child] == "scalar" && (node_style[child] == "literal" || node_style[child] == "folded")) {
+            properties = yaml_properties(child)
+            printf " %s%s%s\n", (properties == "" ? "" : properties " "), yaml_block_indicator(child), yaml_line_comment(child)
+            emit_yaml_block_scalar(child, indent + yaml_indent)
+            continue
+        }
         inline = yaml_inline_node(child)
         if (inline != "") {
             printf " %s%s\n", inline, yaml_line_comment(child)
@@ -5247,12 +5442,18 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
                 printf " %s", properties
             }
             printf "%s\n", yaml_line_comment(child)
-            emit_yaml_collection(child, indent + 2)
+            emit_yaml_collection(child, indent + yaml_indent)
         }
     }
 }
 
 function emit_yaml(node,    inline, properties) {
+    if (node_kind[node] == "scalar" && (node_style[node] == "literal" || node_style[node] == "folded")) {
+        properties = yaml_properties(node)
+        print (properties == "" ? "" : properties " ") yaml_block_indicator(node) yaml_line_comment(node)
+        emit_yaml_block_scalar(node, yaml_indent)
+        return
+    }
     inline = yaml_inline_node(node)
     if (inline != "") {
         print inline yaml_line_comment(node)
@@ -5627,7 +5828,7 @@ function emit_presented_insert(key, node, indent,    inline, properties) {
         printf " %s", properties
     }
     printf "\n"
-    emit_yaml_collection(node, indent + 2)
+    emit_yaml_collection(node, indent + yaml_indent)
 }
 
 function emit_presented_reorder(line,    item, source_line, start, end) {
@@ -5780,7 +5981,11 @@ function output_expression_node(target, output_mode,    resolved) {
     } else if (output_mode == "yaml") {
         emit_yaml(target)
     } else if (node_kind[resolved] == "scalar") {
-        print node_value[resolved]
+        if (unwrap_scalar_mode) {
+            print node_value[resolved]
+        } else {
+            emit_yaml(target)
+        }
     } else {
         emit_json(target)
         printf "\n"
@@ -5820,6 +6025,19 @@ function output_explain(    documents, document, generated, presentation, shown,
         presentation = "preserved"
     } else {
         presentation = "regenerated"
+    }
+    if (explain_mode == 2) {
+        printf "{\"input\":%s,\"documents\":%d,\"parsed_nodes\":%d,\"generated_nodes\":%d,", json_quote(source), documents, parsed_node_count, generated > "/dev/stderr"
+        printf "\"results\":%d,\"mutations\":%d,\"replacements\":%d,\"insertions\":%d,\"deletions\":%d,", explain_result_count + 0, explain_mutation_count + 0, explain_replacement_count + 0, explain_insertion_count + 0, explain_deletion_count + 0 > "/dev/stderr"
+        printf "\"presentation\":%s,\"changes\":[", json_quote(presentation) > "/dev/stderr"
+        for (i = 1; i <= explain_mutation_count; i++) {
+            if (i > 1) {
+                printf "," > "/dev/stderr"
+            }
+            printf "{\"kind\":%s,\"path\":%s}", json_quote(explain_mutation_kind[i]), json_quote(explain_mutation_path[i]) > "/dev/stderr"
+        }
+        print "]}" > "/dev/stderr"
+        return
     }
     print "Explain: input=" json_quote(source) " documents=" documents " parsed_nodes=" parsed_node_count " generated_nodes=" generated > "/dev/stderr"
     print "Explain: results=" (explain_result_count + 0) " mutations=" (explain_mutation_count + 0) \
@@ -5885,6 +6103,12 @@ BEGIN {
     }
     if (selected_document == "") {
         selected_document = 0
+    }
+    if (yaml_indent == "") {
+        yaml_indent = 2
+    }
+    if (unwrap_scalar_mode == "") {
+        unwrap_scalar_mode = 1
     }
     presentation_possible = 1
     current_input_file_index = input_file_index + 0

@@ -29,7 +29,7 @@
     <a class="brand" href="/" aria-label="YAML.sh home">
       <span class="brand-mark">Y</span>
       <span>YAML.sh</span>
-      <span class="version-pill" data-ysh-version>v1.8.0</span>
+      <span class="version-pill" data-ysh-version>v1.9.0</span>
     </a>
     <nav aria-label="Primary navigation">
       <a href="/story/">Story</a>
@@ -42,7 +42,7 @@
   <main id="main">
     <section class="hero section-shell">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.8.0</span> · 35 real workflows agree with yq</p>
+        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.9.0</span> · 35 real workflows agree with yq</p>
         <h1>yq energy.<br><span>zero baggage.</span></h1>
         <p class="hero-lede">Program YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a frankly unreasonable amount of ambition.</p>
         <div class="hero-actions">
@@ -93,7 +93,7 @@
         <span>MERGE KEYS</span><b>◆</b>
         <span>TAGS + TYPES</span><b>◆</b>
         <span>EMPTY COLLECTIONS</span><b>◆</b>
-        <span>ENV + EVAL-ALL</span>
+        <span>TRANSACTIONAL EDITS</span>
       </div>
     </section>
 
@@ -119,7 +119,7 @@
         <article>
           <span class="step">03</span>
           <h3>Program</h3>
-          <p>Paths, environment values, reducers, assignments, and cross-file merges operate on real node references with identity and type intact.</p>
+          <p>Paths, reducers, assignments, graph metadata, and repository transactions operate on real node references with identity and type intact.</p>
         </article>
       </div>
     </section>
@@ -147,13 +147,10 @@
 {"name":"api","enabled":true,"port":8080}</code></pre>
         </div>
         <div class="demo-panel" id="panel-merge" role="tabpanel" aria-labelledby="tab-merge" hidden>
-          <p class="demo-label">Change a real file in place. The comments get to stay.</p>
-          <pre><code><span class="prompt">$</span> ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
+          <p class="demo-label">Preflight a repository. Commit together. Keep a value-free audit.</p>
+          <pre><code><span class="prompt">$</span> ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2&gt;changes.jsonl
 
-<span class="prompt">$</span> ysh '.services[].tier' config.yml
-active
-backend
-active</code></pre>
+<span class="success">✓</span> 6 files committed as one transaction</code></pre>
         </div>
         <div class="demo-panel" id="panel-inspect" role="tabpanel" aria-labelledby="tab-inspect" hidden>
           <p class="demo-label">Open the hood whenever the YAML gets weird.</p>
@@ -192,8 +189,8 @@ node  1  mapping  line=1</code></pre>
         </article>
         <article class="feature">
           <p class="feature-index">05 / OBSERVABLE</p>
-          <h3>Edits explain themselves.</h3>
-          <p><code>--explain</code> reports mutation paths and whether presentation was preserved, without printing values.</p>
+          <h3>Repository edits explain themselves.</h3>
+          <p>Multi-file changes preflight together and roll back commit failures. <code>--explain=json</code> records paths and presentation decisions without values.</p>
         </article>
       </div>
     </section>
@@ -216,7 +213,7 @@ node  1  mapping  line=1</code></pre>
         <p>The installer downloads and checksum-verifies a pinned release, then places <code>ysh</code> in <code>/usr/local/bin</code>. Set <code>YSH_INSTALL_DIR</code> to choose another location.</p>
       </div>
       <div class="install-command">
-        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.8.0</span></div>
+        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.9.0</span></div>
         <pre><code id="install-code">curl -fsSL https://yaml.azohra.com/install | sh</code></pre>
         <button class="copy-button" type="button" data-copy="install-code"><span>Copy command</span><b aria-hidden="true">⌘</b></button>
         <p class="install-note">Prefer to inspect first? <a href="/install">Read the installer source.</a></p>

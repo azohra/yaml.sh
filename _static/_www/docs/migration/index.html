@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.8.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.9.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -99,7 +99,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.8.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.9.0</span></div>
       <article>
           <h1 id="migrate-from-v0-x">Migrate from v0.x</h1>
           <p>Version 1 intentionally breaks the old CLI. The public transpiled representation and chainable query operations were the architectural constraint preventing YAML.sh from preserving real YAML structure.</p>
@@ -165,7 +165,7 @@ ysh --document 1 '.name' stream.yml
             <li><code>-f</code>, because the input file is positional.</li>
             <li><code>-T</code>, because the transpiled representation is gone.</li>
             <li><code>-q</code> and <code>-Q</code>, because the positional query replaces them.</li>
-            <li><code>-s</code>, <code>-l</code>, <code>-L</code>, <code>-c</code>, and <code>-I</code>, because node selection uses one query grammar.</li>
+            <li><code>-s</code>, <code>-l</code>, <code>-L</code>, and <code>-c</code>, because node selection uses one query grammar. The old <code>-I</code> meaning is gone; modern <code>-I N</code> controls YAML indentation.</li>
             <li>The v0.x meaning of <code>-i</code>. Modern YAML.sh uses <code>-i</code> for atomic yq-style file updates and preserves rich presentation for common edits.</li>
             <li><code>--next</code>, because <code>--document N</code> addresses a document directly.</li>
           </ul>

@@ -12,10 +12,10 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 | Collections | Strong | `map`, `map_values`, entries, sort/group/unique/min/max families, flatten, reverse, add, first, pick, omit, pivot |
 | Context | Strong | `path`, `parent`, `key`, `line`, `tag`, `filename`, `fileIndex`, `documentIndex` |
 | Environment | Strong | `env`, `strenv`, `envsubst`, defaults, `nu`/`ne`/`ff`, security disable switch |
-| Files and documents | Focused | normal evaluation over many files; all-document mode; practical `eval-all`, slurp, metadata, and cross-file merge |
+| Files and documents | Strong | independent or combined evaluation; all-document mode; practical `eval-all`; preflighted multi-file in-place transactions |
 | Strings | Focused | interpolation, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
-| YAML graph | Focused | anchors and aliases retain identity; `anchor`, `alias`, and `explode` inspect or materialize relationships |
-| YAML presentation | Focused | comments and styles survive common edits; `style` and `line_comment` inspect and edit the supported subset |
+| YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
+| YAML presentation | Focused | comments and styles survive common edits; line comments and scalar/collection styles are writable |
 
 “Strong” still means the forms covered by the test suite, not every obscure polymorphic combination accepted by yq.
 
@@ -27,6 +27,7 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 - It runs where `/bin/sh` and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.
 - Input bytes, graph nodes, and collection depth are bounded; file-loading and dynamic-code operators do not exist, and environment access can be disabled.
 - `--ast` and `--events` expose the parser directly when a strange document needs explaining.
+- Multi-file edits preflight the entire set and roll back commit failures; `--explain=json` produces value-free audit records for CI.
 - Every release pins semantic YAML outcomes, strict-invalid rejection, differential programs, generated properties, presentation edits, and a time/memory scale contract.
 
 yq remains the better choice for its complete operator surface, many codecs, polished platform packaging, and broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, and a deliberately narrow security model matter more than total surface area.
@@ -38,12 +39,12 @@ yq remains the better choice for its complete operator surface, many codecs, pol
 | XML, CSV, TSV, TOML, INI, properties, Base64, URI codecs | YAML.sh is a YAML tool; codecs would add a second product and substantial code. |
 | `load*`, dynamic `eval`, system execution | File and code execution widen the security model and audit surface. |
 | Date/time and timezone operators | Portable AWK has no reliable cross-platform date library. |
-| Head/foot comments; literal/folded style conversion | Line comments and common scalar/flow styles are first-class; the remaining writer surface is deliberately smaller. |
+| Head/foot comments and key-node presentation | The graph stores mapping keys as edges rather than full nodes; pretending to support their metadata would be misleading. |
 | `match` captures, named captures, regex flags | AWK regex is intentionally the portable POSIX intersection. |
 | `shuffle` | Portable deterministic behavior would not match yq's randomized output. |
 | Complete yq CLI flag parity | Format conversion, colors, XML flags, splitting, shell completion, and similar surfaces are out of scope. |
 
-Some areas remain partial: anchor and tag syntax is parsed and emitted, but anchor/alias/tag setters are not implemented; `eval-all` covers slurp, metadata, filtering, construction, and practical merges but is not a general clone of yq's stream engine.
+Some areas remain partial: `eval-all` covers slurp, metadata, filtering, construction, and practical merges but is not a general clone of yq's stream engine. Anchor renames deliberately keep existing aliases valid, even where yq leaves their displayed alias name unchanged.
 
 ## Measured, not hand-waved
 

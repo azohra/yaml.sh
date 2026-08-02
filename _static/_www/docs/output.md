@@ -46,9 +46,13 @@ ysh -o=yaml '.release.channel = "stable"' config.yml
 
 Multiple results are separated with `---`, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.
 
-The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/flow styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.
+Set YAML indentation from one through nine spaces with `-I N` or `--indent=N`. Use `--unwrap-scalar=false` when default value output should retain a scalar's YAML quoting, tag, and line comment.
 
-Version 1.8 keeps the rich `-i` presentation layer. Common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders patch the original source. Other structural changes use the semantic emitter. Replacement is atomic through a sibling temporary file, preserves permission bits, and refuses symlinks.
+The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/collection styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.
+
+Version 1.9 keeps the rich `-i` presentation layer. Common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders patch the original source. Other structural changes use the semantic emitter.
+
+With several inputs, every candidate is built before the first replacement. Preserved siblings allow rollback if a later commit fails or the process is interrupted. Permission bits survive, and symlinks are refused.
 
 ## Type
 
@@ -115,3 +119,11 @@ ysh --explain -i '.image.tag = "stable"' deploy.yml
 ```
 
 The report includes parsed/generated node counts, result and mutation counts, changed paths, and whether presentation was preserved or regenerated. Values are intentionally omitted.
+
+Use `--explain=json` for JSON Lines, with one value-free audit record per input:
+
+```sh
+ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
+```
+
+Transaction reports are released only after every file commits. An aborted or rolled-back transaction emits an error and no audit records.

@@ -4,6 +4,29 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.9.0] - 2026-08-02
+
+Version 1.9 makes YAML.sh safe at repository scale: one transaction can update several files, YAML graph metadata is writable, and CI can retain machine-readable change evidence without retaining values.
+
+### Added
+
+- Preflighted multi-file `-i`: every input parses and transforms before the first replacement; commit failure or interruption rolls changed files back from preserved siblings.
+- `--explain=json` emits one JSON Lines audit record per input with counts, paths, mutation kinds, and the presentation decision, never changed values.
+- Writable `tag`, `anchor`, and `alias` properties. Anchor renames keep referring aliases valid; unsafe removal and recursive references fail explicitly.
+- Literal and folded scalar style conversion, collection style reset, `-I`/`--indent`, and `--unwrap-scalar=false`.
+- A YAML-metadata differential family covering 22/22 graph and presentation programs against yq v4.53.3.
+
+### Changed
+
+- The categorized yq corpus grows to 2,620/2,620 programs and the behavioral suite to 94 tests.
+- In-place writes reject duplicate inputs and symlinks before committing. Single-file updates use the same transaction path as repository-wide edits.
+- Transaction preparation, cleanup, rollback, and interruption handling are explicit shell functions while the released runtime remains one readable POSIX shell + AWK file.
+
+### Boundaries
+
+- Head/foot comments and key-node presentation remain outside the graph. Line comments and scalar/collection styles are writable.
+- Codecs, file loading, dynamic evaluation, date/time, regex captures, and randomized operators remain deliberate non-goals.
+
 ## [1.8.0] - 2026-08-02
 
 Version 1.8 makes YAML-aware automation more surgical: computed transformations, explicit graph and presentation controls, and explainable in-place edits remain portable to plain POSIX shell and AWK.
@@ -280,6 +303,9 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.9.0]: https://github.com/azohra/yaml.sh/compare/v1.8.0...v1.9.0
+[1.8.0]: https://github.com/azohra/yaml.sh/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/azohra/yaml.sh/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/azohra/yaml.sh/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/azohra/yaml.sh/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/azohra/yaml.sh/compare/v1.3.0...v1.4.0

@@ -59,7 +59,7 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Multiple documents using `---` and `...`.
 - Empty explicit documents represented as null.
 - Source lines retained on nodes.
-- Anchor, alias, scalar/flow style, and line-comment metadata available to queries.
+- Anchor, alias, tag, scalar/collection style, and line-comment metadata available to queries and supported setters.
 
 ## Intentional limitations
 
@@ -69,11 +69,13 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Collection-valued mapping keys are rejected. Explicit scalar keys are supported.
 - Tags and anchors before scalar keys are accepted, but mapping keys remain text in the graph.
 - Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.
-- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded line comments, and supported scalar/flow styles where representable. It does not reconstruct original spacing or head/foot comments.
+- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded line comments, and supported scalar/collection styles where representable. It does not reconstruct original spacing or head/foot comments.
 - Common in-place replacements, direct block inserts/deletes, and pure sequence reorders preserve comments, whitespace, quoting, block/flow style, anchors, tags, and directives. Other structural changes fall back to semantic YAML.
 - Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
 - Sequence slices, scalar interpolation, grouping, `ireduce`, computed object keys, `setpath`/`delpaths`, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
-- `style` can inspect all recognized styles and set plain/single/double scalar or flow collection styles. `line_comment` can inspect and set line comments. Literal/folded conversion and head/foot comment operators remain outside the writer.
+- `style` can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. `line_comment` can inspect and set line comments. Head/foot comments and key-node presentation remain outside the graph.
+- `tag`, `anchor`, and `alias` are writable properties. Anchor renames keep referring aliases valid; duplicate anchors, unsafe removal, missing or forward targets, and recursive aliases are rejected.
+- Multi-file `-i` preflights every transformed candidate, rejects symlinks and duplicates, preserves permissions, and rolls back commit failures or interrupts.
 - The expression language does not implement file-loading operators, date operators, dynamic evaluation, or yq's non-YAML codecs.
 
 YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond this contract is required.
@@ -82,14 +84,15 @@ YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth 
 
 Pinned release gates:
 
-| Gate | v1.8 |
+| Gate | v1.9 |
 | --- | ---: |
 | YAML Test Suite expected outcomes | 282/282 |
 | YAML Test Suite strict-invalid inputs rejected | 91/91 |
-| Categorized programs matching yq v4.53.3 | 2,610/2,610 |
+| Categorized programs matching yq v4.53.3 | 2,620/2,620 |
 | Real-world workflow programs matching yq v4.53.3 | 35/35 |
 | Cross-file programs matching yq v4.53.3 | 8/8 |
-| Behavioral tests | 90 |
+| YAML-metadata differential programs | 22/22 |
+| Behavioral tests | 94 |
 | Grammar-guided generated properties | 12,000/12,000 |
 | Exact presentation mutations | 400/400 |
 | Scale contract | 125,000 payload nodes; 1,500 documents; at most 224 MiB RSS |

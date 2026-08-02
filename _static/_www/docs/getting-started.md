@@ -92,6 +92,12 @@ ysh -i '.release.channel = "stable"' config.yml
 
 In-place output is atomic and preserves file permissions. Common replacements, inserts, deletes, and sequence reorders retain comments, blank lines, directives, properties, block/flow layout, and quote style. Unsupported presentation edits fall back to stable semantic YAML—review the diff like the tiny chaos engineer you are.
 
+The same expression can update several files as one preflighted transaction:
+
+```sh
+ysh -i '.release.channel = "stable"' services/*.yml
+```
+
 ## Bound hostile input
 
 Defaults are generous; automation can tighten them:

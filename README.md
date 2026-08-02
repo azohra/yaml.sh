@@ -31,6 +31,8 @@ api
 web
 
 $ ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
+
+$ ysh -i '.image.tag = "stable"' deploy/*.yml
 ```
 
 ## Install one file
@@ -74,6 +76,7 @@ ysh -n -o=yaml '{name: "api", enabled: true, ports: [8080, 8443]}'
 ysh -o=yaml '.replicas += 1 | del(.metadata.internal)' deploy.yml
 ysh -i '.image.tag = "stable"' deploy.yml
 ysh -i 'setpath(["jobs", "deploy", "runs-on"]; "ubuntu-latest")' workflow.yml
+ysh -i '.metadata.release = "2026-08"' services/*.yml
 ```
 
 Compose files and environment:
@@ -91,9 +94,10 @@ ysh --line '.services[0].port' config.yml
 ysh --events config.yml
 ysh --ast config.yml
 ysh --explain -i '.image.tag = "stable"' deploy.yml
+ysh --explain=json -i '.image.tag = "stable"' deploy/*.yml 2>changes.jsonl
 ```
 
-`--explain` writes mutation paths and the presentation decision to stderr, without echoing values.
+`--explain` writes mutation paths and the presentation decision to stderr, without echoing values. Its JSON form emits one audit record per input.
 
 The [recipe book](https://yaml.azohra.com/docs/recipes/) starts with tasks. The [query guide](https://yaml.azohra.com/docs/queries/) covers the language.
 
@@ -107,7 +111,9 @@ YAML stream → node graph → aliases + merges → expression stream → values
 
 Mappings remain mappings. Empty collections survive. Tags and source lines stay attached. Anchors and aliases retain shared identity. Updates operate on selected nodes rather than reconstructed strings.
 
-Common in-place replacements, inserts, deletes, and sequence reorders preserve comments, whitespace, quoting, styles, anchors, tags, and directives. Larger structural changes fall back to deterministic semantic YAML.
+Common in-place replacements, inserts, deletes, and sequence reorders preserve comments, whitespace, quoting, styles, anchors, tags, and directives. Styles, tags, anchors, and aliases are writable graph metadata. Larger structural changes fall back to deterministic semantic YAML.
+
+Multi-file `-i` is one transaction: every candidate is parsed and transformed before the first replacement. A commit failure or interrupt restores preserved originals.
 
 ## Useful, measured, bounded
 
@@ -117,10 +123,10 @@ The release contract is evidence, not a universal compliance claim:
 | --- | ---: |
 | Expected YAML Test Suite outcomes | 282/282 |
 | Strict-invalid inputs rejected | 91/91 |
-| Categorized programs matching yq v4.53.3 | 2,610/2,610 |
+| Categorized programs matching yq v4.53.3 | 2,620/2,620 |
 | Real-world workflow programs matching yq | 35/35 |
 | Cross-file programs matching yq | 8/8 |
-| Behavioral tests | 90 |
+| Behavioral tests | 94 |
 | Grammar-guided properties | 12,000/12,000 |
 | Exact presentation mutations | 400/400 |
 | Scale contract | 125,000 nodes; 1,500 documents; ≤224 MiB RSS |
@@ -155,13 +161,14 @@ ysh eval-all QUERY FILE...
 | --- | --- |
 | `-o value|raw|json|yaml` | Select output form |
 | `-r`, `--json`, `-y` | Raw scalar, JSON, or YAML shortcuts |
-| `-i` | Atomically update one real file |
+| `-i` | Transactionally update one or more real files |
 | `-n` | Build output without reading input |
 | `-e` | Fail on empty, null, or false output |
+| `-I N`, `--unwrap-scalar=false` | Control YAML indentation or retain scalar presentation |
 | `-d N`, `--all-documents` | Select one or every YAML document |
 | `--type`, `--tag`, `--line` | Inspect selected node metadata |
 | `--ast`, `--events` | Inspect parser structure |
-| `--explain` | Report mutations and presentation behavior to stderr |
+| `--explain`, `--explain=json` | Report value-free mutations and presentation behavior |
 | `--max-input-bytes`, `--max-nodes`, `--max-depth` | Bound hostile input |
 
 Run `ysh --help` for the complete interface.
