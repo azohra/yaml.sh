@@ -2,6 +2,24 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [1.5.0] - 2026-08-02
+
+Version 1.5 closes the pinned parser corpus, triples yq differential coverage, and hardens the one-file runtime.
+
+### Added
+
+- Full expected outcomes for 282/282 pinned YAML Test Suite fixtures and rejection of all 91/91 strict-invalid fixtures.
+- A 330-program differential corpus with 330/330 parity against yq v4.53.3.
+- Input-byte, node-count, and depth limits with CLI controls.
+- 250 deterministic round-trip/query properties, adversarial limit tests, and a repeatable benchmark.
+- CI coverage for macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells.
+
+### Changed
+
+- Block and quoted scalar handling, explicit entries, flow state, indentation validation, tab handling, anchor punctuation, and document boundaries now cover the complete pinned outcome corpus.
+- Compound in-place edits preserve directives, tags, anchors, aliases, comments, block/flow layout, and quote style across replacements, inserts, deletes, and sequence reorders.
+- Optional lookups, empty-sequence `length`, and negative-index `has(...)` now match yq.
+
 ## [1.4.0] - 2026-08-02
 
 Version 1.4 is a measured compatibility release: more YAML, more yq-shaped programs, safer writes, same one-file runtime.
@@ -191,6 +209,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.5.0]: https://github.com/azohra/yaml.sh/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/azohra/yaml.sh/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/azohra/yaml.sh/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/azohra/yaml.sh/compare/v1.1.0...v1.2.0

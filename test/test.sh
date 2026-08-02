@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.4.0" "$(./ysh --version)"
+    assertEquals "v1.5.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -166,7 +166,8 @@ testExpressionJsonStreams() {
 testExpressionRecursiveAndOptionalTraversal() {
     assertEquals "$(printf '%s\n' api worker web)" "$(./ysh '.. | select(has("name")) | .name' test/expressions.yml)"
     assertEquals "" "$(./ysh '.metadata.owner[]?' test/expressions.yml)"
-    assertEquals "" "$(./ysh '.missing?' test/expressions.yml)"
+    assertEquals "null" "$(./ysh --json '.missing?' test/expressions.yml)"
+    assertEquals "null" "$(./ysh --json '.services[99]?' test/expressions.yml)"
 }
 
 testExpressionArrayAndObjectConstruction() {
@@ -365,6 +366,16 @@ testInplacePreservesSortedSequenceBlocks() {
     rm -f "$inplace_file"
 }
 
+testInplacePreservesRichYamlPresentation() {
+    inplace_file=test/.tmp-inplace-rich-$$.yml
+    cp test/presentation.yml "$inplace_file"
+    ./ysh -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .service.region = "west"' "$inplace_file"
+
+    expected=$(printf '%s\n' '%YAML 1.2' '%TAG !e! tag:example.com,2026:' '---' '# deployment' 'defaults: &defaults {retries: 3, mode: safe} # flow stays' 'service: !e!app' '  name: "worker"       # public name' "  owner: 'platform team'" '  notes: |-' '    keep this' '    exactly' '  inherited: *defaults' '  region: "west"' 'items: # order' '  # second item' "  - !e!item 'two'" '  # first item' '  - &first "uno"' 'footer: kept # tail')
+    assertEquals "$expected" "$(cat "$inplace_file")"
+    rm -f "$inplace_file"
+}
+
 testExpressionErrors() {
     result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
     assertNotEquals 0 $?
@@ -425,11 +436,13 @@ testRootScalarsAndCollections() {
     assertContains "$result" '"two":2'
 }
 
-testEmptyDocumentsAreNull() {
-    assertEquals "null" "$(printf "" | ./ysh "." --json)"
+testEmptyStreamsAndDocuments() {
+    assertEquals "" "$(printf "" | ./ysh "." --json)"
+    assertEquals "" "$(printf '%s\n' '...' | ./ysh "." --json)"
     assertEquals "null" "$(printf "%s\n" "---" "..." | ./ysh "." --json)"
     assertEquals "null" "$(printf "%s\n" "---" "---" "key: value" | ./ysh -d 0 "." --json)"
     assertEquals "value" "$(printf "%s\n" "---" "---" "key: value" | ./ysh -d 1 ".key")"
+    assertEquals "value" "$(printf '%s\n' 'first' '...' 'key: value' | ./ysh -d 1 '.key')"
 }
 
 testPrimaryTagHandleExpansion() {
@@ -504,6 +517,37 @@ testMalformedYamlIsRejected() {
     assertContains "$result" "unclosed multiline flow collection"
 }
 
+testStrictGrammarAndEdgeSyntax() {
+    assertEquals '{"key":"value","foo":"key"}' "$(printf '%s\n' '&a: key: &a value' 'foo:' '  *a:' | ./ysh --json '.')"
+    assertEquals '{"block key\n":["one","two"]}' "$(printf '%s\n' '? |' '  block key' ': - one' '  - two' | ./ysh --json '.')"
+    assertEquals '"trailing\t tab"' "$(printf '"trailing\\\t\n  tab"\n' | ./ysh --json '.')"
+    assertEquals '"content\n"' "$(printf '%s\n' '|' 'content' | ./ysh --json '.')"
+
+    printf '%s\n' 'key:' ' ok: 1' '  wrong: 2' | ./ysh --json '.' >/dev/null 2>&1
+    assertNotEquals 0 $?
+    printf '%s\n' 'flow: [one,' 'two]' | ./ysh --json '.' >/dev/null 2>&1
+    assertNotEquals 0 $?
+    printf 'key:\n\tchild: value\n' | ./ysh --json '.' >/dev/null 2>&1
+    assertNotEquals 0 $?
+}
+
+testResourceLimits() {
+    result=$(printf '%s\n' 'key: value' | ./ysh --max-input-bytes 4 --json '.' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "input size limit exceeded"
+
+    result=$(printf '%s\n' 'key: value' | ./ysh --max-nodes 2 --json '.' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "node limit exceeded"
+
+    result=$(printf '%s\n' 'one:' '  two:' '    three: value' | ./ysh --max-depth 1 --json '.' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "depth limit exceeded"
+
+    ./ysh --max-nodes nope '.' test/test.yml >/dev/null 2>&1
+    assertEquals 2 $?
+}
+
 testQueryErrors() {
     result=$(./ysh "missing" test/test.yml 2>&1)
     assertNotEquals 0 $?
@@ -530,19 +574,19 @@ testRunsWithPosixShell() {
 }
 
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.4.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.4.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.4.0/ysh"
-    assertContains "$(cat _static/_www/index.html)" "Install v1.4"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.4.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.4.0"
+    assertContains "$(cat README.md)" "v1.5.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.5.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.5.0/ysh"
+    assertContains "$(cat _static/_www/index.html)" "Install v1.5"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.5.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.5.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
-    assertContains "$(cat README.md)" "og-v1.4.png"
-    assertContains "$(cat _static/_www/index.html)" "og-v1.4.png"
-    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.4.png ]"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "245/282"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "56/91"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "110/110"
+    assertContains "$(cat README.md)" "og-v1.5.png"
+    assertContains "$(cat _static/_www/index.html)" "og-v1.5.png"
+    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.5.png ]"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "282/282"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "91/91"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "330/330"
 }
 
 # shellcheck source=/dev/null

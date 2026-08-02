@@ -5,7 +5,7 @@ YAML.sh ships as one executable text file. The released file contains both the p
 ## Install the pinned release
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.4.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.5.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -27,7 +27,7 @@ curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR="$HOME/.local/bin" 
 - A POSIX-style `/bin/sh`.
 - A compatible AWK implementation.
 
-The release suite covers macOS AWK, Ubuntu AWK, and BusyBox AWK. Bash, Python, Ruby, Node.js, Go, `jq`, and a package manager are not required.
+The release suite covers macOS AWK, mawk, original AWK, POSIX-mode gawk, and BusyBox AWK across several POSIX shells. Bash, Python, Ruby, Node.js, Go, `jq`, and a package manager are not runtime requirements.
 
 ## First query
 
@@ -89,7 +89,15 @@ Once the result looks right, update the file in place:
 ysh -i '.release.channel = "stable"' config.yml
 ```
 
-In-place output preserves file permissions. Scalar-only changes also preserve comments, blank lines, layout, and plain/single/double quote style. Structural changes use normalized semantic YAML, so review the diff like the tiny chaos engineer you are.
+In-place output is atomic and preserves file permissions. Common replacements, inserts, deletes, and sequence reorders retain comments, blank lines, directives, properties, block/flow layout, and quote style. Unsupported presentation edits fall back to stable semantic YAML—review the diff like the tiny chaos engineer you are.
+
+## Bound hostile input
+
+Defaults are generous; automation can tighten them:
+
+```sh
+ysh --max-input-bytes 1048576 --max-nodes 20000 --max-depth 64 '.' config.yml
+```
 
 ## Standard input
 

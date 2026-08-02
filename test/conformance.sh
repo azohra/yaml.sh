@@ -33,6 +33,18 @@ find "$SUITE_DIR" -name in.json -type f | sort | while IFS= read -r expected_fil
     yaml_file=$case_dir/in.yaml
     case_id=${case_dir#"$SUITE_DIR"/}
 
+    # Some error fixtures include partial event-stream JSON. A document loader
+    # must reject those inputs; reproducing a parser's partial AST would be
+    # permissive and misleading.
+    if [ -f "$case_dir/error" ]; then
+        if "$YSH_BINARY" --json '.' "$yaml_file" >/dev/null 2>&1; then
+            printf 'mismatch\t%s\n' "$case_id"
+        else
+            printf 'pass\t%s\n' "$case_id"
+        fi
+        continue
+    fi
+
     if ! expected=$(jq -cS . "$expected_file" 2>/dev/null); then
         continue
     fi

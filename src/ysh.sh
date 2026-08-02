@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.4.0
+YSH_VERSION=1.5.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -46,6 +46,11 @@ Documents:
   -n, --null-input        build output without reading input
   -i, --inplace           update a YAML file in place
 
+Safety:
+      --max-input-bytes N reject larger inputs (default: 16777216)
+      --max-nodes N       cap parser and query nodes (default: 100000)
+      --max-depth N       cap collection depth (default: 256)
+
 Other:
   -V, --version           print the version
   -h, --help              print this help
@@ -75,21 +80,33 @@ ysh_run_awk() {
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v null_input_mode="$YSH_NULL_INPUT" \
             -v inplace_mode="$YSH_INPLACE" \
+            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
+            -v max_nodes="$YSH_MAX_NODES" \
+            -v max_depth="$YSH_MAX_DEPTH" \
             /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
         ysh_awk_program \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v null_input_mode="$YSH_NULL_INPUT" \
             -v inplace_mode="$YSH_INPLACE" \
+            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
+            -v max_nodes="$YSH_MAX_NODES" \
+            -v max_depth="$YSH_MAX_DEPTH" \
             /dev/fd/3 3<&0
     else
         ysh_awk_program \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v null_input_mode="$YSH_NULL_INPUT" \
             -v inplace_mode="$YSH_INPLACE" \
+            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
+            -v max_nodes="$YSH_MAX_NODES" \
+            -v max_depth="$YSH_MAX_DEPTH" \
             "$YSH_INPUT_FILE"
     fi
 }
@@ -135,6 +152,9 @@ ysh_main() {
     YSH_INPUT_FILE=
     YSH_NULL_INPUT=0
     YSH_INPLACE=0
+    YSH_MAX_INPUT_BYTES=${YSH_MAX_INPUT_BYTES:-16777216}
+    YSH_MAX_NODES=${YSH_MAX_NODES:-100000}
+    YSH_MAX_DEPTH=${YSH_MAX_DEPTH:-256}
     YSH_POSITIONAL_COUNT=0
     YSH_POSITIONAL_ONE=
     YSH_POSITIONAL_TWO=
@@ -205,6 +225,24 @@ ysh_main() {
                 ;;
             esac
             YSH_DOCUMENT=$2
+            shift 2
+            ;;
+        --max-input-bytes|--max-nodes|--max-depth)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires a positive integer"
+                return 2
+            fi
+            case "$2" in
+            ""|*[!0-9]*|0)
+                ysh_error "$1 requires a positive integer"
+                return 2
+                ;;
+            esac
+            case "$1" in
+            --max-input-bytes) YSH_MAX_INPUT_BYTES=$2 ;;
+            --max-nodes) YSH_MAX_NODES=$2 ;;
+            --max-depth) YSH_MAX_DEPTH=$2 ;;
+            esac
             shift 2
             ;;
         -V|--version)

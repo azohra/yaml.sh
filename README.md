@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="_static/_www/og-v1.4.png" alt="YAML.sh v1.4 — yq energy, zero baggage" width="900">
+  <img src="_static/_www/og-v1.5.png" alt="YAML.sh v1.5 — yq energy, zero baggage" width="900">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.4.0" src="https://img.shields.io/badge/release-v1.4.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
+  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.5.0" src="https://img.shields.io/badge/release-v1.5.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
   <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
   <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
 </p>
@@ -54,7 +54,7 @@ Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys c
 ## Install one file
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.4.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.5.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -112,7 +112,7 @@ ysh '.missing // "fallback"' config.yml
 
 ## Make it change things
 
-Version 1.4 gives those node references a small programming language. Assign values, build missing paths, update relative to the current value, or delete a node:
+Version 1.5 gives those node references a small programming language. Assign values, build missing paths, update relative to the current value, or delete a node:
 
 ```sh
 ysh -o=yaml '.release.channel = "stable"' config.yml
@@ -126,7 +126,7 @@ Ready to commit to the bit?
 ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 ```
 
-`-i` is atomic: it transforms every document into a sibling temporary file, then replaces the original only after success. It preserves permissions and refuses symlinks. Safe scalar edits, direct inserts/deletes, and pure sequence reorders retain comments and layout; other structural changes fall back to deterministic semantic YAML.
+`-i` is atomic: it transforms every document into a sibling temporary file, then replaces the original only after success. It preserves permissions and refuses symlinks. Common replacements, inserts, deletes, and sequence reorders retain comments, whitespace, quoting, block/flow style, anchors, tags, and directives. Other structural changes fall back to deterministic semantic YAML.
 
 Construct a fresh document without reading input:
 
@@ -141,7 +141,7 @@ ysh -n --json '2 + 3 * 4'
 # 14
 ```
 
-Version 1.4 also crosses the line from query syntax into collection programming:
+The evaluator crosses the line from query syntax into collection programming:
 
 ```sh
 ysh '.services | map(.name) | unique' config.yml
@@ -177,7 +177,7 @@ ysh '.metadata["build[number]"]' config.yml
 | Partial merge handling | Alias lists, flow mappings, and block merge sequences |
 | Parser internals hidden | `--ast` and `--events` on tap |
 
-Version 1 established the graph and writable evaluator. Version 1.4 broadens YAML and yq compatibility, makes in-place writes atomic, and preserves comments through common structural edits without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+Version 1 established the graph and writable evaluator. Version 1.5 completes the pinned parser outcome corpus, expands yq parity, bounds hostile inputs, and preserves rich presentation through compound edits without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
 
 ## Open the hood
 
@@ -215,6 +215,9 @@ ysh --document 1 '.project.name' stream.yml
 | `-d, --document N` | Select a zero-based document. |
 | `-n, --null-input` | Build output without reading input. |
 | `-i, --inplace` | Transform and replace one YAML file. |
+| `--max-input-bytes N` | Reject larger input. |
+| `--max-nodes N` | Cap parser and query nodes. |
+| `--max-depth N` | Cap collection depth. |
 | `-V, --version` | Print the installed version. |
 | `-h, --help` | Print help. |
 
@@ -222,9 +225,9 @@ ysh --document 1 '.project.name' stream.yml
 
 ## The honest bit
 
-YAML is enormous. YAML.sh is not a complete YAML 1.2 processor, and it does not cosplay as one.
+YAML is enormous. A perfect score on one pinned corpus is evidence, not a universal certificate.
 
-The tested subset includes block and multiline flow collections, multiline scalars, anchors, aliases, merge keys, tags, directives, explicit scalar keys, and document streams. Against the pinned YAML Test Suite it semantically loads 245/282 valid fixtures and rejects 56/91 invalid fixtures; 110 shared programs also match yq v4.53.3. The remaining boundaries are in the [support contract](_static/_www/docs/supported_yml.md).
+Version 1.5 records 282/282 expected outcomes on the pinned YAML Test Suite, rejects 91/91 strict-invalid fixtures, and matches yq v4.53.3 on 330/330 representative programs. The exact boundary remains in the [support contract](_static/_www/docs/supported_yml.md).
 
 That contract is the promise: supported syntax gets a test; neighboring unsupported syntax gets an explicit error instead of a confident misparse.
 
@@ -238,7 +241,7 @@ YAML.sh follows [Semantic Versioning](VERSIONING.md). Compatible features grow t
 make all
 ```
 
-That rebuilds the standalone `ysh`, runs ShellCheck, and executes 64 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
+That rebuilds the standalone `ysh`, runs ShellCheck, and executes 73 behavioral tests. `make fuzz` adds 250 deterministic round-trip properties; `make adversarial` exercises resource guards. Hosted CI covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells.
 
 The constraint is the fun part. Come make AWK do something unreasonable.
 
