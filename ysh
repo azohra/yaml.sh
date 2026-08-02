@@ -1227,8 +1227,16 @@ function output_ast(document,    node, i) {
     }
 }
 
+function event_indent(depth,    prefix, i) {
+    prefix = ""
+    for (i = 0; i < depth; i++) {
+        prefix = prefix "  "
+    }
+    return prefix
+}
+
 function output_node_events(node, depth,    i, prefix) {
-    prefix = sprintf("%*s", depth * 2, "")
+    prefix = event_indent(depth)
     if (node_kind[node] == "alias") {
         print prefix "ALIAS name=" json_quote(node_value[node]) " line=" node_line[node]
         return

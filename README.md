@@ -1,19 +1,51 @@
-# YAML.sh
+<p align="center">
+  <img src="_static/_www/og.png" alt="YAML.sh v1 — yq energy, zero baggage" width="900">
+</p>
 
-> **yq energy. zero baggage.**
+<p align="center">
+  <strong>One file. Two old friends. A suspiciously capable YAML parser.</strong>
+</p>
 
-[![CI](https://github.com/azohra/yaml.sh/actions/workflows/ci.yml/badge.svg)](https://github.com/azohra/yaml.sh/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/azohra/yaml.sh)](https://github.com/azohra/yaml.sh/releases/latest)
+<p align="center">
+  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.0.0" src="https://img.shields.io/badge/release-v1.0.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
+  <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
+  <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
+</p>
 
-[Website](https://yaml.azohra.com) · [Documentation](https://docs.yaml.azohra.com) · [Install script](https://get.yaml.azohra.com)
+<p align="center">
+  <a href="https://yaml.azohra.com">Website</a> ·
+  <a href="https://docs.yaml.azohra.com">Documentation</a> ·
+  <a href="https://get.yaml.azohra.com">Install</a> ·
+  <a href="_static/_docs/supported_yml.md">YAML support</a>
+</p>
 
-YAML.sh is a yq-like YAML query tool delivered as one portable shell script. It needs only `/bin/sh` and AWK—no package manager, language runtime, downloaded binary, or YAML library.
+---
 
-The parser builds a real YAML node graph before resolving aliases, merge keys, tags, types, and queries. YAML.sh intentionally implements a tested YAML subset rather than claiming complete YAML 1.2 compliance; see the [support contract](_static/_docs/supported_yml.md) for exact boundaries.
+YAML.sh is the tool for the moment immediately before you can install tools.
 
-## Install
+It brings yq-shaped queries to bootstrap scripts, tiny containers, old machines, CI runners, and mildly cursed recovery shells. The released `ysh` is one readable text file containing a POSIX `/bin/sh` launcher and an embedded AWK engine—no package manager, language runtime, YAML library, or mystery binary required.
 
-Download a pinned release:
+```console
+$ ysh '.services[0].port' config.yml
+8080
+
+$ ysh -o=json '.services[0]' config.yml
+{"name":"api","enabled":true,"port":8080}
+```
+
+## The tiny idea
+
+Sometimes `yq` is exactly the right answer. Sometimes you are writing the script that would install `yq`.
+
+YAML.sh lives in that second moment. Version 1 stopped pretending YAML was flattened text and built a real node graph instead:
+
+```text
+YAML stream → node graph → aliases + merges → query → value / JSON / metadata
+```
+
+Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys containing dots no longer turn into existential crises.
+
+## Install one file
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.0.0/ysh -o ysh
@@ -21,13 +53,21 @@ chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
 
-Or use the installer:
+Or let the tiny installer do those three lines:
 
 ```sh
 curl -fsSL https://get.yaml.azohra.com | sh
 ```
 
-## Quick start
+No `sudo` mood today?
+
+```sh
+curl -fsSL https://get.yaml.azohra.com | YSH_INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+## Query something
+
+Given:
 
 ```yaml
 server:
@@ -37,6 +77,8 @@ services:
   - name: api
     enabled: true
 ```
+
+Ask small, direct questions:
 
 ```sh
 ysh '.server.host' config.yml
@@ -49,101 +91,88 @@ ysh '.services[0]' config.yml
 # {"name":"api","enabled":true}
 ```
 
-Standard input works without a special flag:
+Pipe YAML in naturally:
 
 ```sh
 printf '%s\n' 'answer: 42' | ysh '.answer'
 # 42
 ```
 
-## Queries
-
-Queries begin with `.` and support mapping keys and zero-based sequence indexes:
-
-```sh
-ysh '.' config.yml
-ysh '.server.host' config.yml
-ysh '.services[0].name' config.yml
-```
-
-Use bracket notation when a key contains query punctuation:
+When punctuation belongs to the key, make the boundary explicit:
 
 ```sh
 ysh '.["key.with.dots"]' config.yml
 ysh '.metadata["build[number]"]' config.yml
 ```
 
-This query model does not flatten the document, so empty collections and keys containing `.`, `[` or `]` remain unambiguous.
+## Version 1 changed the deal
 
-## Output
+| v0.x | v1 |
+| --- | --- |
+| Flattened `path="value"` records | Mapping, sequence, scalar, and alias nodes |
+| Bash | Portable `/bin/sh` |
+| Chainable query flags | One yq-style path |
+| Collection identity lost | Empty `{}` and `[]` preserved |
+| Partial merge handling | Alias lists, flow mappings, and block merge sequences |
+| Parser internals hidden | `--ast` and `--events` on tap |
 
-Scalar queries print their decoded text value. Mapping and sequence queries emit JSON by default. `--json` or `-o=json` forces JSON scalar encoding and converts recognized core types where JSON can represent them.
+The CLI break is intentional. See the [migration guide](_static/_docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+
+## Open the hood
 
 ```sh
-ysh '.enabled' config.yml
-ysh -o=json '.services' config.yml
 ysh --type '.enabled' config.yml
 ysh --tag '.custom' config.yml
 ysh --line '.server.host' config.yml
+ysh --ast config.yml
+ysh --events config.yml
 ```
 
-Available type reports are `mapping`, `sequence`, `string`, `null`, `bool`, `int`, `float`, `timestamp`, and `tagged`.
+Selected collections emit compact JSON by default. `--json` or `-o=json` also turns recognized nulls, booleans, integers, and finite floats into native JSON scalar values.
 
-## Multiple documents
-
-Select a zero-based document with `--document` or `-d`:
+Multi-document streams are zero-indexed:
 
 ```sh
 ysh --document 1 '.project.name' stream.yml
 ```
 
-## Inspect the parser
-
-The node graph and parser-style event stream are public debugging surfaces:
-
-```sh
-ysh --ast config.yml
-ysh --events config.yml
-```
-
-They expose mappings, sequences, scalar types, tags, anchors, alias targets, merge entries, source lines, and parent-child edges without exposing a lossy transpiled data format.
-
-## Command reference
+<details>
+<summary><strong>Command reference</strong></summary>
 
 | Flag | Purpose |
 | --- | --- |
-| `QUERY [FILE]` | Run a yq-style query against a file or standard input. |
+| `QUERY [FILE]` | Query a file or standard input. |
 | `-o, --output FORMAT` | Select `value`, `raw`, or `json`. |
-| `-r, --raw-output` | Print a scalar value without JSON quoting. |
+| `-r, --raw-output` | Print scalar text without JSON quoting. |
 | `--json` | Emit JSON. |
 | `--type` | Print the selected node type. |
-| `--tag` | Print the selected node tag. |
-| `--line` | Print the selected node source line. |
-| `--ast` | Print the parsed node graph. |
-| `--events` | Print parser-style node events. |
-| `-d, --document N` | Select a zero-based YAML document. |
+| `--tag` | Print its expanded tag. |
+| `--line` | Print its source line. |
+| `--ast` | Print the node graph. |
+| `--events` | Print parser-style events. |
+| `-d, --document N` | Select a zero-based document. |
 | `-V, --version` | Print the installed version. |
-| `-h, --help` | Print CLI help. |
+| `-h, --help` | Print help. |
 
-## Version 1 migration
+</details>
 
-Version 1 intentionally removes the v0.x `-f`, `-T`, `-q`, `-Q`, `-s`, `-l`, `-i`, and chainable transpiled-data interface. Use one query directly against a file or standard input instead:
+## The honest bit
 
-```sh
-# v0.x
-ysh -f config.yml -Q 'server.host'
+YAML is enormous. YAML.sh is not a complete YAML 1.2 processor, and it does not cosplay as one.
 
-# v1
-ysh '.server.host' config.yml
-```
+The tested subset includes common block and flow collections, quoted and block scalars, anchors, aliases, merge keys, tags, directives, explicit scalar keys, source lines, and multiple documents. The boundaries—including multiline flow collections, recursive aliases, collection-valued keys, and full schema resolution—are written down in the [support contract](_static/_docs/supported_yml.md).
 
-## Development
+That contract is the promise: supported syntax gets a test; neighboring unsupported syntax gets an explicit error instead of a confident misparse.
+
+## Hack on it
 
 ```sh
 make all
 ```
 
-This rebuilds the single-file executable, runs ShellCheck, and executes the suite. CI covers macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh` execution.
+That rebuilds the standalone `ysh`, runs ShellCheck, and executes 37 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
+
+The constraint is the fun part. Come make AWK do something unreasonable.
 
 ## License
 
