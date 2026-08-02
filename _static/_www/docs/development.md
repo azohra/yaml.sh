@@ -16,6 +16,9 @@ src/ysh.awk             YAML engine
 test/test.sh            behavioral suite
 test/conformance.sh     pinned YAML Test Suite gate
 test/differential.sh    pinned yq comparison gate
+test/fuzz.sh            deterministic generated properties
+test/adversarial.sh     resource and recursion guards
+bench/benchmark.sh      repeatable throughput sample
 test/advanced.yml       v1 conformance fixture
 test/expressions.yml    v1 expression and transformation fixture
 _static/_www            unified Cloudflare Pages site
@@ -35,7 +38,7 @@ For every supported feature:
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 
-Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available.
+Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available. `make fuzz`, `make adversarial`, and `make benchmark` cover generated structure, hostile shapes, and throughput.
 
 ## Add expression behavior
 
@@ -43,6 +46,6 @@ Expression operators must preserve node references unless they intentionally com
 
 ## Portability
 
-Hosted CI runs the suite with the platform AWK on Ubuntu and macOS, then repeats it with BusyBox AWK on Linux. The generated executable is parsed and executed by `/bin/sh`.
+Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`.
 
 Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.

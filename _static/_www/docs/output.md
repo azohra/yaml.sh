@@ -48,7 +48,7 @@ Multiple results are separated with `---`, producing a valid YAML stream. Anchor
 
 The emitter is semantic. It deliberately uses a stable block layout and quotes string values and ordinary mapping keys. Comments, blank lines, original quote choices, flow-vs-block style, directive spelling, and exact scalar formatting are not retained when this emitter is selected directly.
 
-Version 1.4 extends the `-i` presentation layer. Safe scalar edits, direct block inserts/deletes, and pure sequence reorders patch the original source, preserving comments and layout. Other structural changes use the semantic emitter. Replacement is atomic through a sibling temporary file, preserves permission bits, and refuses symlinks.
+Version 1.5 extends the `-i` presentation layer. Common replacements, direct block inserts/deletes, and pure sequence reorders patch the original source, retaining comments, whitespace, quoting, flow/block style, anchors, tags, and directives. Other structural changes use the semantic emitter. Replacement is atomic through a sibling temporary file, preserves permission bits, and refuses symlinks.
 
 ## Type
 

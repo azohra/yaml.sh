@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.4.0" "$(./ysh --version)"
+    assertEquals "v1.5.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -574,19 +574,19 @@ testRunsWithPosixShell() {
 }
 
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.4.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.4.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.4.0/ysh"
-    assertContains "$(cat _static/_www/index.html)" "Install v1.4"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.4.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.4.0"
+    assertContains "$(cat README.md)" "v1.5.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.5.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.5.0/ysh"
+    assertContains "$(cat _static/_www/index.html)" "Install v1.5"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.5.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.5.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
-    assertContains "$(cat README.md)" "og-v1.4.png"
-    assertContains "$(cat _static/_www/index.html)" "og-v1.4.png"
-    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.4.png ]"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "245/282"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "56/91"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "110/110"
+    assertContains "$(cat README.md)" "og-v1.5.png"
+    assertContains "$(cat _static/_www/index.html)" "og-v1.5.png"
+    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.5.png ]"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "282/282"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "91/91"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "330/330"
 }
 
 # shellcheck source=/dev/null
