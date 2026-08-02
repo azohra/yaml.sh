@@ -3952,24 +3952,37 @@ function presentation_plain_safe(value,    lowered, i) {
     return 1
 }
 
-function presentation_scalar_text(node, original,    quote, value) {
+function presentation_scalar_text(node, original,    quote, value, properties, remainder, space, token, rendered) {
     value = node_value[node]
-    if (node_type[node] != "string") {
-        return yaml_scalar_text(node)
-    }
     original = trim(original)
+    properties = ""
+    remainder = original
+    while (substr(remainder, 1, 1) == "&" || substr(remainder, 1, 1) == "!") {
+        space = match(remainder, /[[:space:]]/)
+        if (!space) {
+            break
+        }
+        token = substr(remainder, 1, space - 1)
+        properties = properties (properties == "" ? "" : " ") token
+        remainder = trim(substr(remainder, space + 1))
+    }
+    original = remainder
+    if (node_type[node] != "string") {
+        rendered = yaml_scalar_text(node)
+        return properties == "" ? rendered : properties " " rendered
+    }
     quote = sprintf("%c", 39)
     if (substr(original, 1, 1) == quote && substr(original, length(original), 1) == quote) {
         gsub(quote, quote quote, value)
-        return quote value quote
+        rendered = quote value quote
+    } else if (substr(original, 1, 1) == "\"") {
+        rendered = json_quote(value)
+    } else if (presentation_plain_safe(value)) {
+        rendered = value
+    } else {
+        rendered = json_quote(value)
     }
-    if (substr(original, 1, 1) == "\"") {
-        return json_quote(value)
-    }
-    if (presentation_plain_safe(value)) {
-        return value
-    }
-    return json_quote(value)
+    return properties == "" ? rendered : properties " " rendered
 }
 
 function presentation_attached_start(child, lower_bound,    line, raw, indent) {
@@ -4242,7 +4255,11 @@ function emit_presented_reorder(line,    item, source_line, start, end) {
         start = presentation_reorder_start[line, item]
         end = presentation_reorder_end[line, item]
         for (source_line = start; source_line <= end; source_line++) {
-            print raw_input_line[source_line]
+            if (source_line in presentation_line_node) {
+                emit_presented_line(source_line, presentation_line_node[source_line])
+            } else {
+                print raw_input_line[source_line]
+            }
         }
     }
 }

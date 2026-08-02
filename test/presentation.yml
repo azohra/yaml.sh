@@ -1,0 +1,19 @@
+%YAML 1.2
+%TAG !e! tag:example.com,2026:
+---
+# deployment
+defaults: &defaults {retries: 3, mode: safe} # flow stays
+service: !e!app
+  name: "api"       # public name
+  owner: 'platform team'
+  notes: |-
+    keep this
+    exactly
+  inherited: *defaults
+  obsolete: remove-me # delete
+items: # order
+  # first item
+  - &first "one"
+  # second item
+  - !e!item 'two'
+footer: kept # tail

@@ -366,6 +366,16 @@ testInplacePreservesSortedSequenceBlocks() {
     rm -f "$inplace_file"
 }
 
+testInplacePreservesRichYamlPresentation() {
+    inplace_file=test/.tmp-inplace-rich-$$.yml
+    cp test/presentation.yml "$inplace_file"
+    ./ysh -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .service.region = "west"' "$inplace_file"
+
+    expected=$(printf '%s\n' '%YAML 1.2' '%TAG !e! tag:example.com,2026:' '---' '# deployment' 'defaults: &defaults {retries: 3, mode: safe} # flow stays' 'service: !e!app' '  name: "worker"       # public name' "  owner: 'platform team'" '  notes: |-' '    keep this' '    exactly' '  inherited: *defaults' '  region: "west"' 'items: # order' '  # second item' "  - !e!item 'two'" '  # first item' '  - &first "uno"' 'footer: kept # tail')
+    assertEquals "$expected" "$(cat "$inplace_file")"
+    rm -f "$inplace_file"
+}
+
 testExpressionErrors() {
     result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
     assertNotEquals 0 $?
