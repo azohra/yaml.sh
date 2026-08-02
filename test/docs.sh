@@ -36,6 +36,12 @@ if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROO
     exit 1
 fi
 
+if ! grep -Fq 'css/style.css?v=4.1' "$ROOT/_static/_www/index.html" ||
+    ! grep -Fq 'css/style.css?v=4.1' "$STORY/index.html"; then
+    printf '%s\n' 'Homepage and story stylesheet cache keys are not synchronized.' >&2
+    exit 1
+fi
+
 if grep -En 'docsify|cdn\.jsdelivr|href="#/|theme\.css' "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html >/dev/null; then
     printf '%s\n' 'Generated documentation still references the retired runtime renderer.' >&2
     exit 1
