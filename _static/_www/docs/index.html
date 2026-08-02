@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="YAML.sh v1 documentation — a yq-like YAML query tool in one portable shell script.">
+  <meta name="theme-color" content="#101410">
+  <meta property="og:title" content="YAML.sh v1 documentation">
+  <meta property="og:description" content="Queries, output formats, YAML support, migration, and parser internals.">
+  <meta property="og:image" content="https://yaml.azohra.com/og.png">
+  <link rel="canonical" href="https://yaml.azohra.com/docs/">
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+  <link rel="stylesheet" href="theme.css?v=1.0.0">
+  <title>YAML.sh v1 docs</title>
+</head>
+<body>
+  <a class="skip-link" href="#app">Skip to documentation</a>
+  <header class="docs-header">
+    <a class="docs-brand" href="https://yaml.azohra.com" aria-label="YAML.sh home">
+      <span>Y</span><b>YAML.sh</b><i>v1 docs</i>
+    </a>
+    <nav aria-label="Documentation links">
+      <a href="/">Website</a>
+      <a href="https://github.com/azohra/yaml.sh">GitHub</a>
+      <a class="install-link" href="/install">Install</a>
+    </nav>
+  </header>
+  <div id="app">Loading the node graph…</div>
+  <script>
+    window.$docsify = {
+      name: 'YAML.sh',
+      nameLink: '/docs/',
+      repo: 'https://github.com/azohra/yaml.sh',
+      loadSidebar: true,
+      subMaxLevel: 3,
+      auto2top: true,
+      relativePath: true,
+      search: {
+        placeholder: 'Search v1 docs',
+        noData: 'No matching nodes.',
+        depth: 4
+      },
+      copyCode: {
+        buttonText: 'Copy',
+        errorText: 'Error',
+        successText: 'Copied'
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2/dist/docsify-copy-code.min.js"></script>
+</body>
+</html>

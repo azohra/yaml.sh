@@ -12,7 +12,7 @@ ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh test/test.sh _static/_get/index.html
+	@shellcheck -e SC2016 ysh test/test.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
@@ -33,8 +33,9 @@ docs: ysh
 	$(eval VERSION := $(shell sed -n 's/^YSH_VERSION=//p' ysh | head -n 1))
 	@awk -v version=$(VERSION) -f build/docbuilder.awk README.md > .tmp_README.md
 	@mv .tmp_README.md README.md
-	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_get/index.html > .tmp_index.html
-	@mv .tmp_index.html _static/_get/index.html
+	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/install > .tmp_install
+	@mv .tmp_install _static/_www/install
+	@chmod 755 _static/_www/install
 
 clean:
 	@rm -f ysh

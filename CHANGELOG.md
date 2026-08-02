@@ -33,7 +33,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - YAML.sh remains a deliberately scoped YAML implementation rather than a complete YAML 1.2 processor.
 - Collection-valued explicit keys, recursive aliases, forward aliases, multiline flow collections, explicit block-scalar indentation indicators, and full schema-dependent resolution are not supported.
-- The exact contract is maintained in [`_static/_docs/supported_yml.md`](_static/_docs/supported_yml.md).
+- The exact contract is maintained in [`_static/_www/docs/supported_yml.md`](_static/_www/docs/supported_yml.md).
 
 ## [0.4.0] - 2026-08-01
 

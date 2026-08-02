@@ -246,11 +246,12 @@ testRunsWithPosixShell() {
 
 testReleaseArtifactsStayInSync() {
     assertContains "$(cat README.md)" "v1.0.0/ysh"
-    assertContains "$(cat _static/_docs/getting-started.md)" "v1.0.0/ysh"
-    assertContains "$(cat _static/_get/index.html)" "v1.0.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.0.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.0.0/ysh"
     assertContains "$(cat _static/_www/index.html)" "Install v1"
     assertContains "$(cat _static/_www/index.html)" "style.css?v=1.0.0"
-    assertContains "$(cat _static/_docs/index.html)" "theme.css?v=1.0.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.0.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
     assertTrue "social preview image must exist" "[ -s _static/_www/og.png ]"
 }
 
