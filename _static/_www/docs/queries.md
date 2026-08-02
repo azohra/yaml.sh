@@ -1,6 +1,6 @@
 # Queries
 
-Version 2 evaluates a focused yq-style programming language over streams of writable node references. Paths select exact nodes; pipes and comma expressions shape streams; assignments change the graph those references belong to.
+Version 1.3 evaluates a focused yq-style programming language over streams of writable node references. Paths select exact nodes; pipes and comma expressions shape streams; assignments change the graph those references belong to.
 
 ## Paths
 
@@ -200,6 +200,6 @@ Aliases are genuine shared graph references. Updating through an alias or an inh
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 2 does not implement string interpolation, regular expressions, slices, grouping, ireduce, date operators, file-loading operators, XML/CSV/TOML codecs, comment/style mutation operators, or yq's complete cross-document and flag surface.
+This is a useful yq-shaped language, not the complete yq language. Version 1.3 does not implement string interpolation, regular expressions, slices, grouping, ireduce, date operators, file-loading operators, XML/CSV/TOML codecs, comment/style mutation operators, or yq's complete cross-document and flag surface.
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.

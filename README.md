@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="_static/_www/og.png" alt="YAML.sh v2 — yq energy, zero baggage" width="900">
+  <img src="_static/_www/og-v1.3.png" alt="YAML.sh v1.3 — yq energy, zero baggage" width="900">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v2.0.0" src="https://img.shields.io/badge/release-v2.0.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
+  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.3.0" src="https://img.shields.io/badge/release-v1.3.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
   <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
   <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
 </p>
@@ -54,7 +54,7 @@ Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys c
 ## Install one file
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v2.0.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.3.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -112,7 +112,7 @@ ysh '.missing // "fallback"' config.yml
 
 ## Make it change things
 
-Version 2 gives those node references a small programming language. Assign values, build missing paths, update relative to the current value, or delete a node:
+Version 1.3 gives those node references a small programming language. Assign values, build missing paths, update relative to the current value, or delete a node:
 
 ```sh
 ysh -o=yaml '.release.channel = "stable"' config.yml
@@ -126,7 +126,7 @@ Ready to commit to the bit?
 ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 ```
 
-`-i` requires a real file, writes only after every document parses and transforms successfully, and preserves its permissions. Version 2 patches scalar-only changes into the original source, retaining comments, blank lines, key layout, and plain/single/double quote style. Structural changes automatically fall back to deterministic semantic YAML. Multi-document files are transformed document by document.
+`-i` requires a real file, writes only after every document parses and transforms successfully, and preserves its permissions. Version 1.3 patches scalar-only changes into the original source, retaining comments, blank lines, key layout, and plain/single/double quote style. Structural changes automatically fall back to deterministic semantic YAML. Multi-document files are transformed document by document.
 
 Construct a fresh document without reading input:
 
@@ -141,7 +141,7 @@ ysh -n --json '2 + 3 * 4'
 # 14
 ```
 
-Version 2 also crosses the line from query syntax into collection programming:
+Version 1.3 also crosses the line from query syntax into collection programming:
 
 ```sh
 ysh '.services | map(.name) | unique' config.yml
@@ -177,7 +177,7 @@ ysh '.metadata["build[number]"]' config.yml
 | Partial merge handling | Alias lists, flow mappings, and block merge sequences |
 | Parser internals hidden | `--ast` and `--events` on tap |
 
-Version 1 established the graph and writable evaluator. Version 2 adds collection programming, variables, reducers, deeper YAML syntax, multi-document mutation, and hybrid presentation-preserving edits without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+Version 1 established the graph and writable evaluator. Version 1.3 adds collection programming, variables, reducers, deeper YAML syntax, multi-document mutation, and hybrid presentation-preserving edits without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
 
 ## Open the hood
 
@@ -227,6 +227,10 @@ YAML is enormous. YAML.sh is not a complete YAML 1.2 processor, and it does not 
 The tested subset includes common block and flow collections, quoted and block scalars, anchors, aliases, merge keys, tags, directives, explicit scalar keys, source lines, and multiple documents. The boundaries—including multiline flow collections, recursive aliases, collection-valued keys, and full schema resolution—are written down in the [support contract](_static/_www/docs/supported_yml.md).
 
 That contract is the promise: supported syntax gets a test; neighboring unsupported syntax gets an explicit error instead of a confident misparse.
+
+## Versions that mean something
+
+YAML.sh follows [Semantic Versioning](VERSIONING.md). Compatible features grow the current major with a minor release, fixes use patch releases, and v2 is reserved for an intentional break in the public CLI or documented behavior. Capability targets belong in the test matrix—not in an inflated major number.
 
 ## Hack on it
 

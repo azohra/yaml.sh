@@ -8,5 +8,6 @@
   - [Multiple documents](documents.md)
 - **Understand**
   - [YAML support](supported_yml.md)
+  - [Versioning](versioning.md)
   - [Parser internals](internals.md)
   - [Development](development.md)

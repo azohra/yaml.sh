@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=2.0.0
+YSH_VERSION=1.3.0
 
 # Replaced by the build with the embedded AWK engine.
 YAML_AWK_PARSER=$(cat src/ysh.awk)
