@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.0.0" src="https://img.shields.io/badge/release-v1.0.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
+  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.1.0" src="https://img.shields.io/badge/release-v1.1.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
   <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
   <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
 </p>
@@ -31,6 +31,10 @@ $ ysh '.services[0].port' config.yml
 
 $ ysh -o=json '.services[0]' config.yml
 {"name":"api","enabled":true,"port":8080}
+
+$ ysh '.services[] | select(.enabled) | .name' config.yml
+api
+web
 ```
 
 ## The tiny idea
@@ -40,7 +44,7 @@ Sometimes `yq` is exactly the right answer. Sometimes you are writing the script
 YAML.sh lives in that second moment. Version 1 stopped pretending YAML was flattened text and built a real node graph instead:
 
 ```text
-YAML stream → node graph → aliases + merges → query → value / JSON / metadata
+YAML stream → node graph → aliases + merges → expression stream → values
 ```
 
 Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys containing dots no longer turn into existential crises.
@@ -48,7 +52,7 @@ Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys c
 ## Install one file
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.0.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.1.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -91,6 +95,19 @@ ysh '.services[0]' config.yml
 # {"name":"api","enabled":true}
 ```
 
+Then let v1.1 stream and filter real nodes:
+
+```sh
+ysh '.services[] | select(.enabled) | .name' config.yml
+# api
+
+ysh '.services | length' config.yml
+# 1
+
+ysh '.missing // "fallback"' config.yml
+# fallback
+```
+
 Pipe YAML in naturally:
 
 ```sh
@@ -111,12 +128,12 @@ ysh '.metadata["build[number]"]' config.yml
 | --- | --- |
 | Flattened `path="value"` records | Mapping, sequence, scalar, and alias nodes |
 | Bash | Portable `/bin/sh` |
-| Chainable query flags | One yq-style path |
+| Chainable query flags | One yq-style expression stream |
 | Collection identity lost | Empty `{}` and `[]` preserved |
 | Partial merge handling | Alias lists, flow mappings, and block merge sequences |
 | Parser internals hidden | `--ast` and `--events` on tap |
 
-The CLI break is intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+Version 1.1 adds `[]`, pipes, `select`, comparisons, booleans, defaults, and collection helpers without changing the node graph. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
 
 ## Open the hood
 
@@ -170,7 +187,7 @@ That contract is the promise: supported syntax gets a test; neighboring unsuppor
 make all
 ```
 
-That rebuilds the standalone `ysh`, runs ShellCheck, and executes 37 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
+That rebuilds the standalone `ysh`, runs ShellCheck, and executes 47 behavioral tests. Hosted CI repeats the suite with macOS AWK, Ubuntu AWK, BusyBox AWK, and `/bin/sh`.
 
 The constraint is the fun part. Come make AWK do something unreasonable.
 

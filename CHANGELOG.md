@@ -2,6 +2,32 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [1.1.0] - 2026-08-01
+
+Version 1.1 moves beyond exact paths with a read-only expression engine modeled on the highest-value parts of yq.
+
+### Added
+
+- Sequence and mapping iteration with `[]`, including chained forms such as `.services[].name`.
+- Pipe expressions that pass streams of node references between operations.
+- `select(...)` filters with numeric and string comparisons using `==`, `!=`, `>`, `>=`, `<`, and `<=`.
+- Boolean `and`, `or`, and `not` operations using YAML null/false truthiness.
+- The `//` alternative operator for defaults when a result is null, false, or absent.
+- `length`, `keys`, `has(...)`, `kind`, and yq-compatible `type` filters.
+- Multi-result output with one value or compact JSON document per line.
+- A focused expression fixture and ten new behavioral test groups, bringing the suite to 47 tests.
+
+### Changed
+
+- Missing mapping keys and out-of-range indexes now produce null, matching yq traversal semantics and enabling defaults.
+- Queries may begin with a filter such as `length`; a leading `.` is no longer required.
+- The evaluator retains node references, source metadata, aliases, and merge resolution throughout pipelines.
+
+### Known boundaries
+
+- Version 1.1 expressions are read-only. Assignment, deletion, construction, arithmetic, variables, recursive descent, optional traversal, and in-place updates remain future work.
+- YAML output and presentation-preserving edits require an emitter and are not part of this release.
+
 ## [1.0.0] - 2026-08-01
 
 Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node graph and a yq-style command line.
@@ -87,6 +113,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.1.0]: https://github.com/azohra/yaml.sh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/azohra/yaml.sh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/azohra/yaml.sh/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/azohra/yaml.sh/compare/v0.2.1...v0.3.0

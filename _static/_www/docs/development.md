@@ -15,6 +15,7 @@ src/ysh.sh              POSIX shell CLI
 src/ysh.awk             YAML engine
 test/test.sh            behavioral suite
 test/advanced.yml       v1 conformance fixture
+test/expressions.yml    v1.1 expression fixture
 _static/_www            unified Cloudflare Pages site
 _static/_www/docs       documentation
 _static/_www/install    installer
@@ -31,6 +32,10 @@ For every supported feature:
 5. Update the support contract.
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
+
+## Add expression behavior
+
+Expression operators must preserve node references unless they intentionally compute a new value. Add tests for precedence, empty streams, null traversal, scalar and collection inputs, multi-result output, and parity with the equivalent yq expression where one exists.
 
 ## Portability
 

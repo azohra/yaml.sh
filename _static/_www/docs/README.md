@@ -2,7 +2,7 @@
 
 YAML.sh is a yq-like query tool delivered as one portable shell script. It runs with the system `/bin/sh` and AWK, making it useful in bootstrap scripts, minimal containers, CI jobs, old machines, and every awkward environment where installing a language runtime feels absurd.
 
-> Version 1 is a ground-up architecture change: YAML is parsed into a node graph, references are resolved, and only then does the query engine select a result.
+> Version 1 is a ground-up architecture change: YAML is parsed into a node graph, references are resolved, and only then does the expression engine stream results.
 
 ```sh
 ysh '.server.host' config.yml
@@ -10,13 +10,17 @@ ysh '.server.host' config.yml
 
 ysh -o=json '.services[0]' config.yml
 # {"name":"api","enabled":true}
+
+ysh '.services[] | select(.enabled) | .name' config.yml
+# api
+# web
 ```
 
 ## Why it exists
 
 Sometimes `yq` is exactly the right answer. Sometimes you are writing the script that would install `yq`.
 
-YAML.sh aims for the useful middle: a familiar path-based interface, serious handling of common YAML structures, one auditable file, and no additional packages. It does not pretend that YAML is simple or claim complete specification compliance.
+YAML.sh aims for the useful middle: familiar yq-style paths, streams and filters; serious handling of common YAML structures; one auditable file; and no additional packages. It does not pretend that YAML is simple or claim complete specification compliance.
 
 ## What changed in v1
 
@@ -28,6 +32,8 @@ YAML.sh aims for the useful middle: a familiar path-based interface, serious han
 | Collection identity lost | Empty mappings and sequences preserved |
 | Tag syntax mostly discarded | Expanded tags attached to nodes |
 | Inline merge subset | Alias lists, flow mappings, and block merge sequences |
+
+Version 1.1 adds iteration, pipes, selection, comparisons, booleans, defaults, and collection helpers above that graph.
 
 ## Pick a path
 

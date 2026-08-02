@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.0.0" "$(./ysh --version)"
+    assertEquals "v1.1.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -96,6 +96,81 @@ testEmptyCollectionsSurviveParsing() {
 testQuotedQueryKeys() {
     assertEquals "dotted" "$(./ysh '.["key.with.dots"]' test/advanced.yml)"
     assertEquals "dotted" "$(./ysh ".[\"key.with.dots\"]" test/advanced.yml)"
+}
+
+testExpressionIterationAndPipes() {
+    assertEquals "$(printf "%s\n" api worker web)" "$(./ysh '.services[].name' test/expressions.yml)"
+    assertEquals "$(printf "%s\n" api worker web)" "$(./ysh '.services[] | .name' test/expressions.yml)"
+    assertEquals "$(printf "%s\n" platform west)" "$(./ysh '.metadata[]' test/expressions.yml)"
+}
+
+testExpressionSelectAndComparisons() {
+    assertEquals "$(printf "%s\n" api web)" "$(./ysh '.services[] | select(.enabled == true) | .name' test/expressions.yml)"
+    assertEquals "$(printf "%s\n" api worker)" "$(./ysh '.services[] | select(.port >= 8080) | .name' test/expressions.yml)"
+    assertEquals "web" "$(./ysh '.services[] | select(.tier == "frontend") | .name' test/expressions.yml)"
+    assertEquals "worker" "$(./ysh '.services[] | select(.name != "api" and .enabled == false) | .name' test/expressions.yml)"
+    assertEquals "$(printf "%s\n" true true false)" "$(./ysh '.services[] | .port >= 8080' test/expressions.yml)"
+}
+
+testExpressionBooleanFilters() {
+    assertEquals "$(printf "%s\n" api web)" "$(./ysh '.services[] | select(.enabled and .port < 9000) | .name' test/expressions.yml)"
+    assertEquals "$(printf "%s\n" false true false)" "$(./ysh '.services[] | .enabled | not' test/expressions.yml)"
+    assertEquals "$(printf "%s\n" api web)" "$(./ysh '.services[] | select(.enabled) | .name' test/expressions.yml)"
+}
+
+testExpressionAlternativeDefaults() {
+    assertEquals "fallback" "$(./ysh '.missing // "fallback"' test/expressions.yml)"
+    assertEquals "fallback" "$(./ysh '.unset // "fallback"' test/expressions.yml)"
+    assertEquals "fallback" "$(./ysh '.disabled // "fallback"' test/expressions.yml)"
+    assertEquals "platform" "$(./ysh '.metadata.owner // "fallback"' test/expressions.yml)"
+}
+
+testExpressionCollectionHelpers() {
+    assertEquals "3" "$(./ysh '.services | length' test/expressions.yml)"
+    assertEquals "8" "$(./ysh '.metadata.owner | length' test/expressions.yml)"
+    assertEquals '["owner","region"]' "$(./ysh '.metadata | keys' test/expressions.yml)"
+    assertEquals '[0,1,2]' "$(./ysh '.services | keys' test/expressions.yml)"
+    assertEquals "true" "$(./ysh '.metadata | has("owner")' test/expressions.yml)"
+    assertEquals "false" "$(./ysh '.metadata | has("missing")' test/expressions.yml)"
+    assertEquals "true" "$(./ysh '.services | has(2)' test/expressions.yml)"
+    assertEquals "false" "$(./ysh '.services | has(9)' test/expressions.yml)"
+}
+
+testExpressionKindAndType() {
+    assertEquals "map" "$(./ysh '.metadata | kind' test/expressions.yml)"
+    assertEquals "seq" "$(./ysh '.services | kind' test/expressions.yml)"
+    assertEquals "scalar" "$(./ysh '.services[0].name | kind' test/expressions.yml)"
+    assertEquals "!!int" "$(./ysh '.services[0].port | type' test/expressions.yml)"
+    assertEquals "!!bool" "$(./ysh '.services[0].enabled | type' test/expressions.yml)"
+}
+
+testExpressionMissingValuesAreNull() {
+    assertEquals "null" "$(./ysh --json '.missing' test/expressions.yml)"
+    assertEquals "null" "$(./ysh --json '.services[99]' test/expressions.yml)"
+    assertEquals "null" "$(./ysh --json '.services[0].missing' test/expressions.yml)"
+}
+
+testExpressionBareRootFilters() {
+    assertEquals "5" "$(./ysh 'length' test/expressions.yml)"
+    assertEquals "2" "$(printf '%s\n' '[one, two]' | ./ysh 'length')"
+}
+
+testExpressionJsonStreams() {
+    assertEquals "$(printf '%s\n' '{"name":"api","enabled":true,"port":8080,"tier":"backend"}' '{"name":"web","enabled":true,"port":3000,"tier":"frontend"}')" "$(./ysh --json '.services[] | select(.enabled)' test/expressions.yml)"
+}
+
+testExpressionErrors() {
+    result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "expected expression"
+
+    result=$(./ysh '.metadata.owner[]' test/expressions.yml 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "cannot iterate over string"
+
+    result=$(./ysh '.services | mystery' test/expressions.yml 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "unknown expression operator"
 }
 
 testScalarAndCollectionTypes() {
@@ -216,17 +291,9 @@ testMalformedYamlIsRejected() {
 }
 
 testQueryErrors() {
-    result=$(./ysh ".missing" test/test.yml 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "query key not found"
-
     result=$(./ysh "missing" test/test.yml 2>&1)
     assertNotEquals 0 $?
-    assertContains "$result" "query must start with ."
-
-    result=$(./ysh ".simple_list.list[99]" test/test.yml 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "query index out of range"
+    assertContains "$result" "unknown expression operator"
 }
 
 testCliErrors() {
@@ -245,12 +312,12 @@ testRunsWithPosixShell() {
 }
 
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.0.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.0.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.0.0/ysh"
+    assertContains "$(cat README.md)" "v1.1.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.1.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.1.0/ysh"
     assertContains "$(cat _static/_www/index.html)" "Install v1"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.0.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.0.0"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.1.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.1.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
     assertTrue "social preview image must exist" "[ -s _static/_www/og.png ]"
 }

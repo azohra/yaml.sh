@@ -18,6 +18,14 @@ ysh '.server.ports' config.yml
 # [8080,8443]
 ```
 
+Expressions may return more than one node. Each scalar or compact JSON collection is written on its own line:
+
+```sh
+ysh '.services[] | select(.enabled) | .name' config.yml
+# api
+# web
+```
+
 ## JSON
 
 Use `--json`, `-o=json`, or `--output-format=json`:
@@ -61,6 +69,8 @@ ysh --line '.server.host' config.yml
 ```
 
 For an alias selection, the reported line is the alias occurrence. Type, tag, and value output resolve through the alias target.
+
+Computed expression values such as comparison results, `length`, `keys`, `kind`, and literals have source line zero because they do not occur in the YAML stream.
 
 ## AST
 
