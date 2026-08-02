@@ -89,7 +89,7 @@ Pinned release gates:
 | Behavioral tests | 84 |
 | Grammar-guided generated properties | 12,000/12,000 |
 | Exact presentation mutations | 400/400 |
-| Scale contract | 125,000 payload nodes; 1,500 documents |
+| Scale contract | 125,000 payload nodes; 1,500 documents; at most 224 MiB RSS |
 
 Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance. CI spans macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and multiple POSIX shells.
 

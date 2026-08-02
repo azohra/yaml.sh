@@ -17,6 +17,8 @@ Version 1.7 makes YAML.sh useful for real configuration composition while keepin
 ### Changed
 
 - The deterministic property gate now covers five families and 12,000 cases; presentation grows to 400 cases; scale grows to 125,000 payload nodes and 1,500 documents.
+- Sparse node metadata, conditional source retention, and single-pass flow detection reduce large-query peak memory by roughly one quarter; the enforced RSS ceiling tightens from 256 MiB to 224 MiB.
+- The shell launcher now has one shared AWK invocation contract, and the repeatable benchmark reports sub-second timing instead of rounding short runs to zero.
 - Versioned site, docs, installer, README, and social artwork now identify v1.7 consistently.
 
 ### Known boundaries

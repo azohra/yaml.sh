@@ -18,6 +18,18 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 
 “Strong” still means the forms covered by the test suite, not every obscure polymorphic combination accepted by yq.
 
+## Where YAML.sh wins
+
+YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
+
+- The executable is readable source: one POSIX shell file with its portable AWK engine embedded.
+- It runs where `/bin/sh` and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.
+- Input bytes, graph nodes, and collection depth are bounded; file-loading and dynamic-code operators do not exist, and environment access can be disabled.
+- `--ast` and `--events` expose the parser directly when a strange document needs explaining.
+- Every release pins semantic YAML outcomes, strict-invalid rejection, differential programs, generated properties, presentation edits, and a time/memory scale contract.
+
+yq remains the better choice for its complete operator surface, many codecs, polished platform packaging, and broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, and a deliberately narrow security model matter more than total surface area.
+
 ## Deliberate boundary
 
 | Not implemented | Why |

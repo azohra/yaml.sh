@@ -579,12 +579,22 @@ function new_node(kind, source_line, value, value_type, tag,    node) {
     node = ++node_count
     node_kind[node] = kind
     node_line[node] = source_line
-    node_value[node] = value
-    node_type[node] = value_type
-    node_tag[node] = tag
-    node_document[node] = document_index - file_document_offset
-    node_file_index[node] = current_input_file_index
-    node_filename[node] = current_input_filename
+    if (value != "") {
+        node_value[node] = value
+    }
+    if (value_type != "") {
+        node_type[node] = value_type
+    }
+    if (tag != "") {
+        node_tag[node] = tag
+    }
+    if (document_index != file_document_offset) {
+        node_document[node] = document_index - file_document_offset
+    }
+    if (combined_files_mode) {
+        node_file_index[node] = current_input_file_index
+        node_filename[node] = current_input_filename
+    }
     return node
 }
 
@@ -1018,6 +1028,7 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
         fail("block sequence entries must begin on their own line " source_line)
     }
     child = parse_value(raw_value, source_line, indent, 1)
+    node_indent[child] = indent
     add_mapping(parent, key, child, source_line, is_merge)
 
     delete list_node[indent]
@@ -1107,6 +1118,7 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
     }
 
     add_sequence(sequence, item, source_line)
+    node_indent[item] = indent
     if (node_kind[item] == "pending" || node_kind[item] == "mapping" ||
         (node_kind[item] == "scalar" && is_plain_scalar_source(original, source_line))) {
         context_node[indent] = item
@@ -1194,6 +1206,7 @@ function add_explicit_value(indent, text, source_line,    parent, child, raw_val
         child = parse_value(raw_value, source_line, indent, 1)
         add_mapping(parent, explicit_key[indent], child, source_line, 0)
     }
+    node_indent[child] = indent
     delete explicit_key[indent]
     delete explicit_key_valid[indent]
     if (node_kind[child] == "pending" || (node_kind[child] == "scalar" && raw_value != "" &&
@@ -1519,7 +1532,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         node_kind[parent] = "scalar"
         node_value[parent] = ""
         node_type[parent] = "string"
-        start_block(parent, trim(text), indentation(raw_input_line[node_line[parent]], source_line), source_line)
+        start_block(parent, trim(text), node_indent[parent], source_line)
         return
     }
     if (parent && node_kind[parent] == "pending" &&
@@ -2497,10 +2510,18 @@ function expression_envsubst(value, options,    result, i, char, closing, name, 
                 result = result substr(value, i, closing + 2)
             } else if (substr(suffix, 1, 2) == ":-") {
                 replacement = substr(suffix, 3)
-                result = result ((!is_set || ENVIRON[name] == "") ? replacement : ENVIRON[name])
+                if (!is_set || ENVIRON[name] == "") {
+                    result = result replacement
+                } else {
+                    result = result ENVIRON[name]
+                }
             } else if (substr(suffix, 1, 1) == "-") {
                 replacement = substr(suffix, 2)
-                result = result (is_set ? ENVIRON[name] : replacement)
+                if (is_set) {
+                    result = result ENVIRON[name]
+                } else {
+                    result = result replacement
+                }
             } else if (suffix != "") {
                 result = result substr(value, i, closing + 2)
             } else {
@@ -3018,9 +3039,18 @@ function expression_clone_node(source,    resolved, clone, i, collection, key, c
     resolved = resolve_alias(source)
     clone = new_node(node_kind[resolved], 0, node_value[resolved], node_type[resolved], node_tag[resolved])
     node_origin[clone] = (resolved in node_origin) ? node_origin[resolved] : resolved
-    node_document[clone] = node_document[resolved]
-    node_file_index[clone] = node_file_index[resolved]
-    node_filename[clone] = node_filename[resolved]
+    delete node_document[clone]
+    delete node_file_index[clone]
+    delete node_filename[clone]
+    if (resolved in node_document) {
+        node_document[clone] = node_document[resolved]
+    }
+    if (resolved in node_file_index) {
+        node_file_index[clone] = node_file_index[resolved]
+    }
+    if (resolved in node_filename) {
+        node_filename[clone] = node_filename[resolved]
+    }
     if (node_kind[resolved] == "sequence") {
         for (i = 1; i <= sequence_count[resolved]; i++) {
             add_sequence(clone, expression_clone_node(sequence_child[resolved, i]), 0)
@@ -3497,11 +3527,13 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = resolve_alias(expression_stream_node[input, i])
             if (kind == "filename") {
-                expression_stream_push(output, expression_scalar(node_filename[node], "string"))
+                key = (node in node_filename) ? node_filename[node] : input_filename
+                expression_stream_push(output, expression_scalar(key, "string"))
             } else if (kind == "fileindex") {
-                expression_stream_push(output, expression_scalar(node_file_index[node] "", "int"))
+                key = (node in node_file_index) ? node_file_index[node] : input_file_index + 0
+                expression_stream_push(output, expression_scalar(key "", "int"))
             } else {
-                expression_stream_push(output, expression_scalar(node_document[node] "", "int"))
+                expression_stream_push(output, expression_scalar((node_document[node] + 0) "", "int"))
             }
         }
         return output
@@ -5360,7 +5392,9 @@ BEGIN {
     if (max_input_bytes > 0 && input_byte_count > max_input_bytes) {
         fail("input size limit exceeded (max " max_input_bytes " bytes)")
     }
-    raw_input_line[NR] = $0
+    if (inplace_mode) {
+        raw_input_line[NR] = $0
+    }
     if (block_active) {
         process_line($0, NR)
         next
@@ -5431,7 +5465,7 @@ BEGIN {
         process_line($0, NR)
         next
     }
-    multiline_scalar_delimiter = multiline_scalar_quote($0)
+    multiline_scalar_delimiter = $0 ~ /["']/ ? multiline_scalar_quote($0) : ""
     if (multiline_scalar_delimiter != "") {
         multiline_scalar_active = 1
         multiline_scalar_line = NR
@@ -5443,19 +5477,6 @@ BEGIN {
         if (multiline_scalar_first ~ /^-[[:space:]]/ || find_mapping_separator(multiline_scalar_first, 1)) {
             multiline_scalar_min_indent++
         }
-        next
-    }
-    multiline_flow_depth = flow_balance($0)
-    if (multiline_flow_depth > 0) {
-        if ($0 ~ /,#[^[:space:]]/) {
-            fail("comments in flow collections require separation on line " NR)
-        }
-        multiline_flow_active = 1
-        multiline_flow_line = NR
-        multiline_flow_text = start_flow_line($0)
-        multiline_flow_min_indent = flow_continuation_indent($0)
-        multiline_flow_root = flow_opening($0)
-        multiline_flow_comment_break = 0
         next
     }
     process_line($0, NR)
@@ -5595,74 +5616,38 @@ ysh_set_output_mode() {
     esac
 }
 
+ysh_invoke_awk() {
+    ysh_awk_program \
+        -v output_mode="$YSH_OUTPUT_MODE" \
+        -v selected_document="$YSH_DOCUMENT" \
+        -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
+        -v eval_all_mode="$YSH_EVAL_ALL" \
+        -v combined_files_mode="$YSH_COMBINED_FILES" \
+        -v null_input_mode="$YSH_NULL_INPUT" \
+        -v inplace_mode="$YSH_INPLACE" \
+        -v exit_status_mode="$YSH_EXIT_STATUS" \
+        -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
+        -v input_filename="$YSH_INPUT_FILENAME" \
+        -v input_file_index="$YSH_FILE_INDEX" \
+        -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
+        -v max_nodes="$YSH_MAX_NODES" \
+        -v max_depth="$YSH_MAX_DEPTH" \
+        "$@"
+}
+
 ysh_run_awk() {
     YSH_QUERY_TEXT=$YSH_QUERY
     export YSH_QUERY_TEXT
+    YSH_COMBINED_FILES=0
     if [ "$YSH_EVAL_ALL" -eq 1 ] && [ "$#" -gt 0 ]; then
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v combined_files_mode=1 \
-            -v eval_all_mode=1 \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            "$@"
+        YSH_COMBINED_FILES=1
+        ysh_invoke_awk "$@"
     elif [ "$YSH_NULL_INPUT" -eq 1 ]; then
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v eval_all_mode="$YSH_EVAL_ALL" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            /dev/null
+        ysh_invoke_awk /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v eval_all_mode="$YSH_EVAL_ALL" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            /dev/fd/3 3<&0
+        ysh_invoke_awk /dev/fd/3 3<&0
     else
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v eval_all_mode="$YSH_EVAL_ALL" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            "$YSH_INPUT_FILE"
+        ysh_invoke_awk "$YSH_INPUT_FILE"
     fi
 }
 

@@ -81,74 +81,38 @@ ysh_set_output_mode() {
     esac
 }
 
+ysh_invoke_awk() {
+    ysh_awk_program \
+        -v output_mode="$YSH_OUTPUT_MODE" \
+        -v selected_document="$YSH_DOCUMENT" \
+        -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
+        -v eval_all_mode="$YSH_EVAL_ALL" \
+        -v combined_files_mode="$YSH_COMBINED_FILES" \
+        -v null_input_mode="$YSH_NULL_INPUT" \
+        -v inplace_mode="$YSH_INPLACE" \
+        -v exit_status_mode="$YSH_EXIT_STATUS" \
+        -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
+        -v input_filename="$YSH_INPUT_FILENAME" \
+        -v input_file_index="$YSH_FILE_INDEX" \
+        -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
+        -v max_nodes="$YSH_MAX_NODES" \
+        -v max_depth="$YSH_MAX_DEPTH" \
+        "$@"
+}
+
 ysh_run_awk() {
     YSH_QUERY_TEXT=$YSH_QUERY
     export YSH_QUERY_TEXT
+    YSH_COMBINED_FILES=0
     if [ "$YSH_EVAL_ALL" -eq 1 ] && [ "$#" -gt 0 ]; then
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v combined_files_mode=1 \
-            -v eval_all_mode=1 \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            "$@"
+        YSH_COMBINED_FILES=1
+        ysh_invoke_awk "$@"
     elif [ "$YSH_NULL_INPUT" -eq 1 ]; then
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v eval_all_mode="$YSH_EVAL_ALL" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            /dev/null
+        ysh_invoke_awk /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v eval_all_mode="$YSH_EVAL_ALL" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            /dev/fd/3 3<&0
+        ysh_invoke_awk /dev/fd/3 3<&0
     else
-        ysh_awk_program \
-            -v output_mode="$YSH_OUTPUT_MODE" \
-            -v selected_document="$YSH_DOCUMENT" \
-            -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
-            -v eval_all_mode="$YSH_EVAL_ALL" \
-            -v null_input_mode="$YSH_NULL_INPUT" \
-            -v inplace_mode="$YSH_INPLACE" \
-            -v exit_status_mode="$YSH_EXIT_STATUS" \
-            -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
-            -v input_filename="$YSH_INPUT_FILENAME" \
-            -v input_file_index="$YSH_FILE_INDEX" \
-            -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
-            -v max_nodes="$YSH_MAX_NODES" \
-            -v max_depth="$YSH_MAX_DEPTH" \
-            "$YSH_INPUT_FILE"
+        ysh_invoke_awk "$YSH_INPUT_FILE"
     fi
 }
 
