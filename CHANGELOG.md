@@ -2,6 +2,24 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [1.6.0] - 2026-08-02
+
+Version 1.6 adds a useful slice of missing yq syntax and makes the evidence substantially harder to fake.
+
+### Added
+
+- End-exclusive sequence slices with omitted and negative bounds.
+- Scalar string interpolation plus POSIX-ERE `test` and global `sub`.
+- A reproducible 1,110-program categorized differential corpus with 1,110/1,110 parity against yq v4.53.3.
+- 10,000 grammar-guided parser/query/mutation properties with seed replay and valid-form shrinking.
+- A 250-case exact presentation mutation matrix.
+- An enforced 100,000-payload-node, 1,000-document time and memory contract.
+
+### Changed
+
+- Query source now reaches AWK losslessly through the POSIX environment, so backslashes are not rewritten before expression lexing.
+- CI gives modern Linux the complete generated and scale gates while retaining cross-version, cross-AWK, and cross-shell coverage.
+
 ## [1.5.0] - 2026-08-02
 
 Version 1.5 closes the pinned parser corpus, triples yq differential coverage, and hardens the one-file runtime.
@@ -209,6 +227,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.6.0]: https://github.com/azohra/yaml.sh/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/azohra/yaml.sh/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/azohra/yaml.sh/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/azohra/yaml.sh/compare/v1.2.0...v1.3.0

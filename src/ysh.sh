@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.5.0
+YSH_VERSION=1.6.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -55,10 +55,10 @@ Other:
   -V, --version           print the version
   -h, --help              print this help
 
-QUERY supports yq-style paths, streams, variables, dynamic indexes, maps,
-entries, reducers, sorting, strings, arithmetic, construction, assignment,
-deletion, and deep merge. Collections emit JSON by default. Safe in-place
-edits preserve comments; other structural edits emit stable YAML.
+QUERY supports yq-style paths, streams, variables, slices, interpolation,
+portable regexes, maps, reducers, sorting, arithmetic, construction,
+assignment, deletion, and deep merge. Collections emit JSON by default.
+Safe in-place edits preserve comments; other edits emit stable YAML.
 EOF
 }
 
@@ -75,9 +75,10 @@ ysh_set_output_mode() {
 }
 
 ysh_run_awk() {
+    YSH_QUERY_TEXT=$YSH_QUERY
+    export YSH_QUERY_TEXT
     if [ "$YSH_NULL_INPUT" -eq 1 ]; then
         ysh_awk_program \
-            -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v null_input_mode="$YSH_NULL_INPUT" \
@@ -88,7 +89,6 @@ ysh_run_awk() {
             /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
         ysh_awk_program \
-            -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v null_input_mode="$YSH_NULL_INPUT" \
@@ -99,7 +99,6 @@ ysh_run_awk() {
             /dev/fd/3 3<&0
     else
         ysh_awk_program \
-            -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v null_input_mode="$YSH_NULL_INPUT" \

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.5.0" "$(./ysh --version)"
+    assertEquals "v1.6.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -225,6 +225,17 @@ testExpressionSequenceAndStringHelpers() {
     assertEquals '"yaml.sh"' "$(./ysh -n --json '["yaml", ".", "sh"] | add')"
 }
 
+testExpressionSlicesInterpolationAndRegex() {
+    assertEquals '["worker","web"]' "$(./ysh --json '.services[1:3] | map(.name)' test/expressions.yml)"
+    assertEquals '["api","worker"]' "$(./ysh --json '.services[:-1] | map(.name)' test/expressions.yml)"
+    assertEquals '"platform/api/3"' "$(./ysh --json '"\(.metadata.owner)/\(.services[0].name)/\(.services | length)"' test/expressions.yml)"
+    assertEquals 'true' "$(./ysh -n --json '"yaml.sh" | test("^[a-z]+\\.sh$")')"
+    assertEquals '"YAML.sh/YAML.sh"' "$(./ysh -n --json '"yaml.sh/yaml.sh" | sub("yaml"; "YAML")')"
+    assertEquals '"&-&"' "$(./ysh -n --json '"a-a" | sub("a"; "&")')"
+    assertEquals '"-a-"' "$(./ysh -n --json '"ab" | sub("b*"; "-")')"
+    assertEquals '"literal \\(text)"' "$(./ysh -n --json '"literal \\(text)"')"
+}
+
 testExpressionProjectedCollectionsAndQuantifiers() {
     assertEquals '[{"name":"api","port":80},{"name":"worker","port":443},{"name":"admin","port":443}]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | sort_by(.port)')"
     assertEquals '[[{"name":"worker","port":443},{"name":"admin","port":443}],[{"name":"api","port":80}]]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | group_by(.port)')"
@@ -392,6 +403,14 @@ testExpressionErrors() {
     result=$(./ysh -n '1 / 0' 2>&1)
     assertNotEquals 0 $?
     assertContains "$result" "division by zero"
+
+    result=$(./ysh -n '"unterminated \(."' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "unterminated interpolation"
+
+    result=$(./ysh -n '[1, 2]["x":]' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "slice start requires an integer"
 }
 
 testScalarAndCollectionTypes() {
@@ -573,20 +592,30 @@ testRunsWithPosixShell() {
     assertEquals "value" "$(/bin/sh ./ysh ".key_value.key" test/test.yml)"
 }
 
+testGeneratedDifferentialCorpusStaysInSync() {
+    generated_corpus=$(mktemp "${TMPDIR:-/tmp}/ysh-corpus.XXXXXX")
+    ./test/generate-yq-corpus.sh > "$generated_corpus"
+    cmp -s test/yq-corpus.tsv "$generated_corpus"
+    assertEquals 0 $?
+    rm -f "$generated_corpus"
+}
+
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.5.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.5.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.5.0/ysh"
-    assertContains "$(cat _static/_www/index.html)" "Install v1.5"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.5.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.5.0"
+    assertContains "$(cat README.md)" "v1.6.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.6.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.6.0/ysh"
+    assertContains "$(cat _static/_www/index.html)" "Install v1.6"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.6.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.6.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
-    assertContains "$(cat README.md)" "og-v1.5.png"
-    assertContains "$(cat _static/_www/index.html)" "og-v1.5.png"
-    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.5.png ]"
+    assertContains "$(cat README.md)" "og-v1.6.png"
+    assertContains "$(cat _static/_www/index.html)" "og-v1.6.png"
+    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.6.png ]"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "282/282"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "91/91"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "330/330"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "1,110/1,110"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "10,000/10,000"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "250/250"
 }
 
 # shellcheck source=/dev/null

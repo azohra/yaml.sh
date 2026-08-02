@@ -760,12 +760,20 @@ footer nav {
   }
 
   .hero-facts {
-    gap: 14px;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .hero-facts li {
-    max-width: 90px;
+    min-width: 0;
+  }
+
+  .hero-facts strong {
+    display: block;
+    margin-right: 0;
+    font-size: clamp(13px, 3.3vw, 16px);
+    white-space: nowrap;
   }
 
   .terminal-body {

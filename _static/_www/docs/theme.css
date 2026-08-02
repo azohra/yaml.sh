@@ -202,6 +202,10 @@ input:focus-visible {
   padding-top: 68px;
 }
 
+.sidebar-toggle {
+  display: none;
+}
+
 .markdown-section {
   max-width: 900px;
   padding: 70px 60px 110px;
@@ -377,8 +381,10 @@ input:focus-visible {
   }
 
   .sidebar-toggle {
+    display: block;
     top: 68px;
     bottom: auto;
+    width: 56px;
     background: var(--acid);
   }
 
@@ -400,7 +406,16 @@ input:focus-visible {
   }
 
   body.close .sidebar {
-    transform: translateX(-280px);
+    transform: translateX(300px);
+  }
+
+  body.close .content {
+    transform: none;
+  }
+
+  body.close .sidebar-toggle {
+    width: 56px;
+    transform: translateX(224px);
   }
 }
 

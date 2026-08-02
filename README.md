@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="_static/_www/og-v1.5.png" alt="YAML.sh v1.5 — yq energy, zero baggage" width="900">
+  <img src="_static/_www/og-v1.6.png" alt="YAML.sh v1.6 — yq energy, zero baggage" width="900">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.5.0" src="https://img.shields.io/badge/release-v1.5.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
+  <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="YAML.sh v1.6.0" src="https://img.shields.io/badge/release-v1.6.0-d8ff45?style=for-the-badge&labelColor=101410"></a>
   <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
   <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
 </p>
@@ -54,7 +54,7 @@ Mappings stay mappings. Empty sequences survive. Aliases retain identity. Keys c
 ## Install one file
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.5.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.6.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -112,7 +112,7 @@ ysh '.missing // "fallback"' config.yml
 
 ## Make it change things
 
-Version 1.5 gives those node references a small programming language. Assign values, build missing paths, update relative to the current value, or delete a node:
+Version 1.6 gives those node references a small programming language. Assign values, build missing paths, update relative to the current value, or delete a node:
 
 ```sh
 ysh -o=yaml '.release.channel = "stable"' config.yml
@@ -150,7 +150,15 @@ ysh '.key as $key | .data[$key]' config.yml
 ysh 'reduce .services[].port as $port (0; . + $port)' config.yml
 ```
 
-There are comma streams, variables, negative and dynamic indexes, maps, entries, sorting/grouping, min/max, quantifiers, strings, reducers, `add`, and recursive merge. It is still deliberately smaller than yq; the exact boundary is documented rather than discovered in production.
+Version 1.6 adds slices, interpolation, and portable regular expressions:
+
+```sh
+ysh '.services[0:2] | map(.name)' config.yml
+ysh '"\(.metadata.owner)/\(.release.channel)"' config.yml
+ysh '.services[] | select(.name | test("^api"))' config.yml
+```
+
+There are comma streams, variables, dynamic indexes, maps, entries, grouping, reducers, scalar interpolation, sequence slices, and POSIX-ERE `test`/`sub`. It is still deliberately smaller than yq; the exact boundary is documented rather than discovered in production.
 
 Pipe YAML in naturally:
 
@@ -177,7 +185,7 @@ ysh '.metadata["build[number]"]' config.yml
 | Partial merge handling | Alias lists, flow mappings, and block merge sequences |
 | Parser internals hidden | `--ast` and `--events` on tap |
 
-Version 1 established the graph and writable evaluator. Version 1.5 completes the pinned parser outcome corpus, expands yq parity, bounds hostile inputs, and preserves rich presentation through compound edits without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
+Version 1 established the graph and writable evaluator. Version 1.6 adds useful yq syntax and turns compatibility, fuzzing, presentation, and scale into categorized release contracts without changing the one-file runtime. The original v1 CLI break remains intentional. See the [migration guide](_static/_www/docs/migration.md) if an old script still speaks `-f ... -Q ...`.
 
 ## Open the hood
 
@@ -227,7 +235,7 @@ ysh --document 1 '.project.name' stream.yml
 
 YAML is enormous. A perfect score on one pinned corpus is evidence, not a universal certificate.
 
-Version 1.5 records 282/282 expected outcomes on the pinned YAML Test Suite, rejects 91/91 strict-invalid fixtures, and matches yq v4.53.3 on 330/330 representative programs. The exact boundary remains in the [support contract](_static/_www/docs/supported_yml.md).
+Version 1.6 records 282/282 expected outcomes on the pinned YAML Test Suite, rejects 91/91 strict-invalid fixtures, and matches yq v4.53.3 on 1,110/1,110 categorized programs. The exact boundary remains in the [support contract](_static/_www/docs/supported_yml.md).
 
 That contract is the promise: supported syntax gets a test; neighboring unsupported syntax gets an explicit error instead of a confident misparse.
 
@@ -241,7 +249,7 @@ YAML.sh follows [Semantic Versioning](VERSIONING.md). Compatible features grow t
 make all
 ```
 
-That rebuilds the standalone `ysh`, runs ShellCheck, and executes 73 behavioral tests. `make fuzz` adds 250 deterministic round-trip properties; `make adversarial` exercises resource guards. Hosted CI covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells.
+That rebuilds the standalone `ysh`, runs ShellCheck, and executes 75 behavioral tests. `make fuzz` runs 10,000 grammar-guided properties with replay and shrinking; `make presentation` checks 250 exact compound edits; `make scale` enforces the 100,000-node contract. Hosted CI spans macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells.
 
 The constraint is the fun part. Come make AWK do something unreasonable.
 

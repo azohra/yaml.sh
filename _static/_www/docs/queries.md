@@ -1,6 +1,6 @@
 # Queries
 
-Version 1.5 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
+Version 1.6 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
 
 ## Paths
 
@@ -145,6 +145,25 @@ ysh -n --json '[[1, 2], [3, [4]]] | flatten'
 ysh -n --json '["yaml", "sh"] | join(".")'
 ```
 
+## Slices, interpolation, and regular expressions
+
+Sequence slices use zero-based, end-exclusive bounds. Either bound may be omitted or negative:
+
+```sh
+ysh '.services[1:3]' config.yml
+ysh '.services[:-1]' config.yml
+```
+
+Double-quoted expressions interpolate the first scalar result from `\(EXPRESSION)`. `test` and global `sub` use the POSIX extended regular expressions supplied by the platform AWK:
+
+```sh
+ysh '"\(.metadata.owner):\(.services | length)"' config.yml
+ysh '.services[] | select(.name | test("^[a-z]+$"))' config.yml
+ysh '.name | sub("-"; "_")' config.yml
+```
+
+This portable regex subset does not promise yq/RE2 flags, named captures, or replacement backreferences.
+
 ## Variables, dynamic indexes, and reduce
 
 Bind a result with `as $name`. The expression after the pipe keeps the original current input and can refer to that value repeatedly:
@@ -201,6 +220,6 @@ Aliases are genuine shared graph references. Updating through an alias or an inh
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 1.5 does not implement interpolation, regular expressions, slices, ireduce, date or file operators, non-YAML codecs, comment/style operators, or yq's complete cross-document and flag surface.
+This is a useful yq-shaped language, not the complete yq language. Version 1.6 does not implement ireduce, date or file operators, non-YAML codecs, regex flags/captures, comment/style operators, or yq's complete cross-document and flag surface. Slices target sequences; interpolation is intentionally scalar-oriented.
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.
