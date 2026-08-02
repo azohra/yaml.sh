@@ -808,7 +808,7 @@ testReleaseArtifactsStayInSync() {
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
     assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.8.0"
-    assertContains "$(cat _static/_www/index.html)" "css/style.css?v=3"
+    assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
     assertNotContains "$(cat _static/_www/index.html)" "A real parser this time"
     assertNotContains "$(cat _static/_www/css/style.css)" "transform: rotate(1.25deg)"
