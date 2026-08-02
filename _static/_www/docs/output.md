@@ -46,9 +46,9 @@ ysh -o=yaml '.release.channel = "stable"' config.yml
 
 Multiple results are separated with `---`, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.
 
-The emitter is semantic, not presentation-preserving. It deliberately uses a stable block layout and quotes string values and ordinary mapping keys. Comments, blank lines, original quote choices, flow-vs-block style, directive spelling, and exact scalar formatting are not retained.
+The emitter is semantic. It deliberately uses a stable block layout and quotes string values and ordinary mapping keys. Comments, blank lines, original quote choices, flow-vs-block style, directive spelling, and exact scalar formatting are not retained when this emitter is selected directly.
 
-`-i` always uses this YAML emitter. It parses and transforms into a sibling temporary file first, copies the successful result over the requested file, and preserves the destination's existing permission bits. Version 1.2 rejects multi-document in-place updates before replacement so an unselected document cannot be lost.
+Version 2 adds a hybrid presentation layer to `-i`. When every change is a safely patchable scalar replacement, YAML.sh rewrites only those scalar tokens in the original source, preserving comments, blank lines, layout, and plain/single/double quote style. Structural changes automatically fall back to the semantic emitter. Every document is transformed, and replacement still occurs through a sibling temporary file while preserving the destination's permission bits.
 
 ## Type
 

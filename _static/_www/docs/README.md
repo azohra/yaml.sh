@@ -2,7 +2,7 @@
 
 YAML.sh is a yq-like query tool delivered as one portable shell script. It runs with the system `/bin/sh` and AWK, making it useful in bootstrap scripts, minimal containers, CI jobs, old machines, and every awkward environment where installing a language runtime feels absurd.
 
-> Version 1 is a ground-up architecture change: YAML is parsed into a node graph, references are resolved, and only then does the expression engine stream results.
+> Version 2 completes the architecture: YAML becomes a writable node graph, the expression engine programs streams of references, and in-place scalar edits can patch the original presentation.
 
 ```sh
 ysh '.server.host' config.yml
@@ -35,7 +35,7 @@ YAML.sh aims for the useful middle: familiar yq-style paths, streams, filters, c
 | Tag syntax mostly discarded | Expanded tags attached to nodes |
 | Inline merge subset | Alias lists, flow mappings, and block merge sequences |
 
-Version 1.1 added iteration, pipes, selection, comparisons, booleans, defaults, and collection helpers above that graph. Version 1.2 makes references writable and adds recursive and optional traversal, arithmetic, construction, assignment, deletion, YAML output, and in-place updates.
+Version 1 made the graph writable. Version 2 adds maps, entries, variables, dynamic indexes, reducers, strings, sorting, deep merge, broader YAML syntax, multi-document mutation, and presentation-preserving scalar edits.
 
 ## Pick a path
 

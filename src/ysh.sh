@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.2.0
+YSH_VERSION=2.0.0
 
 # Replaced by the build with the embedded AWK engine.
 YAML_AWK_PARSER=$(cat src/ysh.awk)
@@ -24,6 +24,7 @@ Examples:
   ysh -o yaml '.release.channel = "stable"' config.yml
   ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
   ysh -n -o yaml '{name: "api", enabled: true}'
+  ysh '.services | map(.name) | unique' config.yml
   ysh ".services | length" config.yml
   ysh ".missing // \"fallback\"" config.yml
   ysh ".[\"key.with.dots\"]" config.yml
@@ -49,10 +50,10 @@ Other:
   -V, --version           print the version
   -h, --help              print this help
 
-QUERY supports yq-style paths, [], .., ?, pipes, select, comparisons,
-boolean operators, // defaults, construction, =, |=, del, length, keys,
-has, kind, and type. Collections are emitted as JSON by default; streams
-emit one result per line. In-place updates are serialized as YAML.
+QUERY supports yq-style paths, streams, variables, dynamic indexes, maps,
+entries, reducers, sorting, strings, arithmetic, construction, assignment,
+deletion, and deep merge. Collections emit JSON by default. In-place scalar
+updates preserve comments and presentation; structural edits emit stable YAML.
 EOF
 }
 
@@ -70,7 +71,7 @@ ysh_set_output_mode() {
 
 ysh_run_awk() {
     if [ "$YSH_NULL_INPUT" -eq 1 ]; then
-        awk \
+        LC_ALL=C awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
@@ -78,14 +79,14 @@ ysh_run_awk() {
             "$YAML_AWK_PARSER" \
             /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
-        awk \
+        LC_ALL=C awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v inplace_mode="$YSH_INPLACE" \
             "$YAML_AWK_PARSER"
     else
-        awk \
+        LC_ALL=C awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \

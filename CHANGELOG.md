@@ -2,6 +2,37 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [2.0.0] - 2026-08-02
+
+Version 2 completes the journey from a path reader to a compact YAML programming tool. It adds collection programming, lexical variables, reducers, broader YAML syntax, multi-document updates, and a hybrid presentation-preserving in-place editor while remaining one portable `/bin/sh` + AWK file.
+
+### Added
+
+- Comma streams plus `map(...)` and `map_values(...)` collection transforms.
+- `to_entries`, `from_entries`, and `with_entries(...)` mapping workflows.
+- `sort`, stable `unique`, `reverse`, and recursive `flatten` sequence helpers.
+- `upcase`, `downcase`, `contains`, `startswith`, `endswith`, `split`, and `join` string helpers.
+- Lexical variables with `as $name`, variable references, and dynamic mapping/sequence indexes.
+- A yq-shaped `reduce SOURCE as $item (INITIAL; UPDATE)` evaluator.
+- Recursive mapping merge with `*`, while retaining numeric multiplication.
+- Unicode `\u` and `\U` escapes, multiline flow collections, and explicit block-scalar indentation indicators.
+- Multi-document in-place transformations evaluated independently against every document.
+- Hybrid presentation preservation: safe scalar replacements retain comments, blank lines, layout, and plain/single/double quote style.
+- Seven new behavioral groups covering the v2 evaluator, parser, multi-document writer, and presentation layer, bringing the suite to 64 tests.
+
+### Changed
+
+- Pipe parsing is right-associative so variable binding receives the correct current input.
+- Structural in-place changes use the deterministic semantic YAML emitter; scalar-only changes patch the original source.
+- `unique` preserves first-occurrence order, matching yq v4.53.3.
+
+### Known boundaries
+
+- Presentation preservation currently applies to scalar replacements. Construction, deletion, deep merge, flow-node edits, and other structural changes intentionally fall back to semantic YAML.
+- Collection-valued mapping keys, recursive aliases, full schema-dependent resolution, every block-folding edge case, and complete YAML specification validation remain outside the parser contract.
+- Regexes, string interpolation, slices, date/time operators, file-loading operators, comment/style mutation operators, and non-YAML codecs remain outside the expression language.
+- In-place mode uses POSIX `cp` and `rm`; all other operation continues to require only `/bin/sh` and AWK.
+
 ## [1.2.0] - 2026-08-01
 
 Version 1.2 turns the expression stream into a writable graph and adds a semantic YAML emitter. YAML.sh can now construct, transform, and safely rewrite documents while keeping its one-file `/bin/sh` + AWK runtime.
@@ -141,6 +172,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[2.0.0]: https://github.com/azohra/yaml.sh/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/azohra/yaml.sh/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/azohra/yaml.sh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/azohra/yaml.sh/compare/v0.4.0...v1.0.0

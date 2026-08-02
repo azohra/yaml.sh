@@ -1,6 +1,6 @@
 # Parser internals
 
-Version 1 is still one shell script, but its model is no longer line-oriented query output.
+Version 2 is still one shell script, with a semantic graph and a source-presentation layer working together.
 
 ```text
 /bin/sh CLI
@@ -15,7 +15,7 @@ expression parser
     ↓
 node-stream evaluator
     ↓
-value / JSON / YAML / type / tag / line / AST / events
+presentation patcher or value / JSON / YAML / metadata / AST / events
 ```
 
 ## The shell layer
@@ -53,11 +53,11 @@ Merge entries remain marked edges in the graph. Lookup checks explicit entries f
 
 ## Expression streams
 
-The expression parser builds a small operator tree with explicit precedence for pipes, assignment, alternatives, booleans, comparisons, arithmetic, and traversal. Evaluation passes numbered streams of node references between operators. `[]` and `..` can expand one node into many references; `select` tests each reference while returning the original node when its predicate succeeds.
+The expression parser builds an operator tree with explicit precedence for streams, lexical binding, pipes, assignment, alternatives, booleans, comparisons, arithmetic, and traversal. Evaluation passes numbered streams of node references between operators. Variables hold node identity; dynamic indexes evaluate computed keys; reducers repeatedly bind an item while feeding an accumulator through the update expression.
 
 Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Assignments replace the selected graph nodes; missing mapping paths use attachable placeholders. Computed booleans, strings, numbers, constructed collections, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
 
-The YAML emitter walks that graph directly. It preserves semantic structure and graph properties where possible, while deliberately normalizing presentation into a stable quoted block style.
+The semantic YAML emitter walks that graph directly and normalizes presentation into a stable quoted block style. Separately, the v2 presentation tracker records safe scalar replacements by source line. In-place mode patches those tokens into the original lines when possible; any structural mutation flips the operation to the semantic emitter for the complete document stream.
 
 ## Diagnostics
 

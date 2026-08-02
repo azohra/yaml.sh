@@ -23,3 +23,11 @@ ysh -d 1 '.environment' stream.yml
 ```
 
 Anchors and tag handles are scoped to their document. Empty explicit documents are represented as null rather than disappearing from the stream.
+
+In-place mode applies the same expression independently to every document:
+
+```sh
+ysh -i '.release.channel = "stable"' stream.yml
+```
+
+The update is committed only after the entire stream parses and every document transforms successfully.

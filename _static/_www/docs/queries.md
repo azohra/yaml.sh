@@ -1,6 +1,6 @@
 # Queries
 
-Version 1.2 evaluates a focused yq-style expression language over streams of writable node references. Paths select exact nodes; iteration and pipes let one input become many results; assignments change the graph those references belong to.
+Version 2 evaluates a focused yq-style programming language over streams of writable node references. Paths select exact nodes; pipes and comma expressions shape streams; assignments change the graph those references belong to.
 
 ## Paths
 
@@ -118,6 +118,49 @@ Filters can begin an expression when they operate on the root:
 ysh 'length' config.yml
 ```
 
+## Collection programming
+
+Comma expressions emit both sides. `map` always produces a sequence; `map_values` preserves a mapping or sequence while transforming its values.
+
+```sh
+ysh '.metadata.owner, .metadata.region' config.yml
+ysh --json '.services | map(.name)' config.yml
+ysh --json '.metadata | map_values(upcase)' config.yml
+```
+
+Mappings and sequences can move through the familiar entry representation:
+
+```sh
+ysh --json '.metadata | to_entries' config.yml
+ysh --json '.metadata | with_entries(.value |= upcase)' config.yml
+ysh --json '.metadata | to_entries | from_entries' config.yml
+```
+
+Sequence helpers include `sort`, stable first-occurrence `unique`, `reverse`, and recursive `flatten`. String helpers include `upcase`, `downcase`, `contains(...)`, `startswith(...)`, `endswith(...)`, `split(...)`, and `join(...)`.
+
+```sh
+ysh -n --json '[3, 1, 2, 1] | unique'
+ysh -n --json '[[1, 2], [3, [4]]] | flatten'
+ysh -n --json '["yaml", "sh"] | join(".")'
+```
+
+## Variables, dynamic indexes, and reduce
+
+Bind a result with `as $name`. The expression after the pipe keeps the original current input and can refer to that value repeatedly:
+
+```sh
+ysh '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' config.yml
+ysh '.key as $key | .data[$key]' config.yml
+```
+
+Dynamic brackets accept a computed string key or integer index. `reduce` folds a stream into one value:
+
+```sh
+ysh 'reduce .services[].port as $port (0; . + $port)' config.yml
+```
+
+The `*` operator recursively merges two mappings; at non-mapping leaves, the right side wins. It remains numeric multiplication for two numbers.
+
 ## Construct values
 
 Array and object literals can collect results from the current input. Unquoted identifier keys are accepted as a friendly extension; quoted keys work too.
@@ -147,7 +190,7 @@ The compound forms `+=`, `-=`, `*=`, `/=`, and `%=` are relative arithmetic upda
 ysh -o=yaml '(.services[] | select(.enabled) | .tier) = "active"' config.yml
 ```
 
-Use `-i` to replace a real single-document input file after a successful transform. In-place mode always emits YAML, cannot be combined with standard input or `-n`, and rejects multi-document streams in v1.2.
+Use `-i` to replace a real input file after every document transforms successfully. It cannot be combined with standard input or `-n`. Scalar-only edits preserve the original presentation; structural edits use stable semantic YAML. Multi-document files are evaluated document by document.
 
 ## Merged and aliased nodes
 
@@ -157,6 +200,6 @@ Aliases are genuine shared graph references. Updating through an alias or an inh
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 1.2 does not implement variables, string interpolation, regular expressions, dynamic object keys, slices, reduce/ireduce, sort/group/unique operators, file operators, date operators, XML/CSV/TOML codecs, style/comment operators, or yq's full deep-merge and cross-document semantics.
+This is a useful yq-shaped language, not the complete yq language. Version 2 does not implement string interpolation, regular expressions, slices, grouping, ireduce, date operators, file-loading operators, XML/CSV/TOML codecs, comment/style mutation operators, or yq's complete cross-document and flag surface.
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.
