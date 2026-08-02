@@ -20,6 +20,7 @@ Version 1.7 makes YAML.sh useful for real configuration composition while keepin
 - Sparse node metadata, conditional source retention, and single-pass flow detection reduce large-query peak memory by roughly one quarter; the enforced RSS ceiling tightens from 256 MiB to 224 MiB.
 - The shell launcher now has one shared AWK invocation contract, and the repeatable benchmark reports sub-second timing instead of rounding short runs to zero.
 - The hosted installer downloads the release artifact and verifies its pinned SHA-256 digest before writing anything to the install directory.
+- Pull requests now run the fast cross-OS, cross-AWK portability matrix; exhaustive conformance, differential, fuzz, presentation, adversarial, and scale evidence runs once after merge instead of on every Linux lane twice.
 - Versioned site, docs, installer, README, and social artwork now identify v1.7 consistently.
 
 ### Known boundaries
