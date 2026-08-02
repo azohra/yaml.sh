@@ -1,11 +1,15 @@
 #!/usr/bin/awk -f
 
-function json_escape(value,    out) {
-    out = value
-    gsub(/\\/, "\\\\", out)
-    gsub(/"/, "\\\"", out)
-    gsub(/\r/, "", out)
-    gsub(/\n/, "\\n", out)
+function json_escape(value,    out, i, char) {
+    out = ""
+    for (i = 1; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        if (char == "\\") out = out "\\\\"
+        else if (char == "\"") out = out "\\\""
+        else if (char == "\r") continue
+        else if (char == "\n") out = out "\\n"
+        else out = out char
+    }
     return out
 }
 
