@@ -32,7 +32,8 @@ web
 
 $ ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 
-$ ysh -i '.image.tag = "stable"' deploy/*.yml
+$ ysh --check '.image.tag = "stable"' deploy/*.yml
+Check: 6 file(s) would change; no files written
 ```
 
 ## Install one file
@@ -84,7 +85,17 @@ Compose files and environment:
 ```sh
 IMAGE_TAG=stable ysh -i '.image.tag = strenv(IMAGE_TAG)' deploy.yml
 ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
+ysh eval-all -i 'select(fileIndex == 0).tag as $tag | select(fileIndex > 0).image.tag = $tag' release.yml services/*.yml
 ```
+
+Check and commit a repository with the same query:
+
+```sh
+ysh --check '.image.tag = "stable"' services/*.yml
+ysh -i '.image.tag = "stable"' services/*.yml
+```
+
+`--check` writes nothing and exits `0` when clean, `1` when files would change, and `2` on an invalid query or input. Multi-file reads compile the query once; multi-file writes preflight once and replace only files whose YAML actually changed.
 
 Inspect the parser:
 
@@ -113,22 +124,19 @@ Mappings remain mappings. Empty collections survive. Tags and source lines stay 
 
 Common in-place replacements, inserts, deletes, and sequence reorders preserve comments, whitespace, quoting, styles, anchors, tags, and directives. Styles, tags, anchors, and aliases are writable graph metadata. Larger structural changes fall back to deterministic semantic YAML.
 
-Multi-file `-i` is one transaction: every candidate is parsed and transformed before the first replacement. A commit failure or interrupt restores preserved originals.
+Multi-file `-i` is one transaction: all inputs parse and transform before the first replacement. A commit failure or interrupt restores preserved originals. Writable `eval-all` can read a value from one file and update another under the same transaction.
 
 ## Useful, measured, bounded
 
 The release contract is evidence, not a universal compliance claim:
 
-| Gate | Current release |
-| --- | ---: |
-| Expected YAML Test Suite outcomes | 282/282 |
-| Strict-invalid inputs rejected | 91/91 |
-| Categorized programs matching yq v4.53.3 | 2,620/2,620 |
-| Real-world workflow programs matching yq | 35/35 |
-| Cross-file programs matching yq | 8/8 |
-| Behavioral tests | 94 |
-| Grammar-guided properties | 12,000/12,000 |
-| Exact presentation mutations | 400/400 |
+| Evidence | What it establishes |
+| --- | --- |
+| Pinned YAML Test Suite | Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases |
+| Pinned yq differential | 2,628 categorized programs plus Kubernetes, Compose, Actions, GitLab CI, overlay, metadata, and cross-file workflows |
+| Grammar/property matrix | Every combination of 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties |
+| Presentation matrix | Exact compound edits across scalar styles and value/comment variants |
+| Repository transactions | Clean, drift, error, no-op, cross-file data flow, rollback, and interruption behavior |
 | Scale contract | 125,000 nodes; 1,500 documents; ≤224 MiB RSS |
 
 Supported behavior has a test. Nearby unsupported behavior gets an explicit error instead of a confident misparse.
@@ -162,6 +170,7 @@ ysh eval-all QUERY FILE...
 | `-o value|raw|json|yaml` | Select output form |
 | `-r`, `--json`, `-y` | Raw scalar, JSON, or YAML shortcuts |
 | `-i` | Transactionally update one or more real files |
+| `--check` | Report whether the same update would change files: clean `0`, drift `1`, error `2` |
 | `-n` | Build output without reading input |
 | `-e` | Fail on empty, null, or false output |
 | `-I N`, `--unwrap-scalar=false` | Control YAML indentation or retain scalar presentation |

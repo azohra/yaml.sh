@@ -39,4 +39,4 @@ if [ "$families" -lt 5 ] || [ "$total" -lt 24 ]; then
     exit 1
 fi
 
-printf 'Real-world workflows: %s/%s across %s families.\n' "$passed" "$total" "$families"
+printf 'Configuration workflows pass: Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays (%s scenarios).\n' "$total"

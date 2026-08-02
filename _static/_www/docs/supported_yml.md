@@ -75,7 +75,9 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Sequence slices, scalar interpolation, grouping, `ireduce`, computed object keys, `setpath`/`delpaths`, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
 - `style` can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. `line_comment` can inspect and set line comments. Head/foot comments and key-node presentation remain outside the graph.
 - `tag`, `anchor`, and `alias` are writable properties. Anchor renames keep referring aliases valid; duplicate anchors, unsafe removal, missing or forward targets, and recursive aliases are rejected.
-- Multi-file `-i` preflights every transformed candidate, rejects symlinks and duplicates, preserves permissions, and rolls back commit failures or interrupts.
+- Multi-file queries compile once. `--check` reports clean, drift, or error without writing. `-i` preflights every changed candidate, skips no-ops, rejects symlinks and duplicates, preserves permissions, and rolls back commit failures or interrupts.
+- Writable `eval-all` can bind data from one input and update every selected source file in the same transaction.
+- Merge modifiers append arrays (`*+`), merge arrays by index (`*d`), update existing fields (`*?`), or add new fields (`*n`).
 - The expression language does not implement file-loading operators, date operators, dynamic evaluation, or yq's non-YAML codecs.
 
 YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond this contract is required.
@@ -84,20 +86,18 @@ YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth 
 
 Pinned release gates:
 
-| Gate | v1.9 |
-| --- | ---: |
-| YAML Test Suite expected outcomes | 282/282 |
-| YAML Test Suite strict-invalid inputs rejected | 91/91 |
-| Categorized programs matching yq v4.53.3 | 2,620/2,620 |
-| Real-world workflow programs matching yq v4.53.3 | 35/35 |
-| Cross-file programs matching yq v4.53.3 | 8/8 |
-| YAML-metadata differential programs | 22/22 |
-| Behavioral tests | 94 |
-| Grammar-guided generated properties | 12,000/12,000 |
-| Exact presentation mutations | 400/400 |
+| Evidence | Coverage |
+| --- | --- |
+| YAML Test Suite | Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases |
+| yq v4.53.3 differential | 2,628 categorized programs plus YAML metadata and cross-file programs |
+| Configuration workflows | Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays |
+| Grammar/property matrix | 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties; four rotating value sweeps before release |
+| Presentation matrix | 3 scalar styles × 3 value/comment variants under one compound edit |
+| Repository transaction suite | Clean, drift, error, no-op, cross-file binding, rollback, interruption, empty files, and JSON audit behavior |
 | Scale contract | 125,000 payload nodes; 1,500 documents; at most 224 MiB RSS |
+| Runtime portability | macOS AWK, mawk, original AWK, POSIX gawk, BusyBox AWK, and multiple POSIX shells |
 
-Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance. CI spans macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and multiple POSIX shells.
+Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance.
 
 ## Fixtures
 

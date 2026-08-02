@@ -8,11 +8,11 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 |---|---|---|
 | Traverse and streams | Strong | paths, dynamic keys, indexes, optional traversal, recursive descent, pipes, unions, slices |
 | Select and logic | Strong | `select`, `filter`, comparisons, `and`, `or`, `not`, `//`, `any`, `all` |
-| Build and mutate | Strong | arrays, computed keys, reducers, `=`, `|=`, compound updates, `setpath`, `delpaths`, `del`, `with`, deep merge |
+| Build and mutate | Strong | arrays, computed keys, reducers, `=`, `|=`, compound updates, `setpath`, `delpaths`, `del`, `with`, deep merge and `*+`/`*d`/`*?`/`*n` policies |
 | Collections | Strong | `map`, `map_values`, entries, sort/group/unique/min/max families, flatten, reverse, add, first, pick, omit, pivot |
 | Context | Strong | `path`, `parent`, `key`, `line`, `tag`, `filename`, `fileIndex`, `documentIndex` |
 | Environment | Strong | `env`, `strenv`, `envsubst`, defaults, `nu`/`ne`/`ff`, security disable switch |
-| Files and documents | Strong | independent or combined evaluation; all-document mode; practical `eval-all`; preflighted multi-file in-place transactions |
+| Files and documents | Strong | one-process multi-file evaluation; all-document mode; writable cross-file `eval-all`; no-write checks; preflighted transactions |
 | Strings | Focused | interpolation, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
 | YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
 | YAML presentation | Focused | comments and styles survive common edits; line comments and scalar/collection styles are writable |
@@ -27,7 +27,9 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 - It runs where `/bin/sh` and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.
 - Input bytes, graph nodes, and collection depth are bounded; file-loading and dynamic-code operators do not exist, and environment access can be disabled.
 - `--ast` and `--events` expose the parser directly when a strange document needs explaining.
-- Multi-file edits preflight the entire set and roll back commit failures; `--explain=json` produces value-free audit records for CI.
+- `--check` uses the real write path and reports clean, drift, or error without touching files.
+- Multi-file queries compile once. Writable `eval-all` can read one file, mutate several others, preflight the complete set, skip no-ops, and roll back commit failures.
+- `--explain=json` produces one value-free audit record per input for CI.
 - Every release pins semantic YAML outcomes, strict-invalid rejection, differential programs, generated properties, presentation edits, and a time/memory scale contract.
 
 yq remains the better choice for its complete operator surface, many codecs, polished platform packaging, and broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, and a deliberately narrow security model matter more than total surface area.
@@ -44,10 +46,10 @@ yq remains the better choice for its complete operator surface, many codecs, pol
 | `shuffle` | Portable deterministic behavior would not match yq's randomized output. |
 | Complete yq CLI flag parity | Format conversion, colors, XML flags, splitting, shell completion, and similar surfaces are out of scope. |
 
-Some areas remain partial: `eval-all` covers slurp, metadata, filtering, construction, and practical merges but is not a general clone of yq's stream engine. Anchor renames deliberately keep existing aliases valid, even where yq leaves their displayed alias name unchanged.
+Some areas remain partial: `eval-all` supports combined reads, bindings, merges, and cross-file transactions but is not a general clone of yq's stream engine. Anchor renames deliberately keep existing aliases valid, even where yq leaves their displayed alias name unchanged.
 
 ## Measured, not hand-waved
 
-The release suite pins mikefarah/yq v4.53.3 and compares canonical JSON across categorized, real-world workflow, and cross-file programs. See the [support contract](supported_yml.md) for current counts and the repository's test corpora for every query.
+The release suite pins mikefarah/yq v4.53.3 and compares canonical JSON across 2,628 categorized programs plus Kubernetes, Compose, GitHub Actions, GitLab CI, deployment-overlay, metadata, and cross-file workflows. See the [support contract](supported_yml.md) and the repository's corpora for every query.
 
 If a form is not in the query guide or tests, treat it as unsupported even when a nearby form works.

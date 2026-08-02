@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="How an old Bash experiment became a serious one-file YAML processor—and changed how I think about building with agents.">
+  <meta name="description" content="How an old Bash experiment became a serious one-file YAML processor—and what building it with Codex made possible.">
   <meta name="theme-color" content="#101410">
   <meta property="og:type" content="article">
   <meta property="og:title" content="The YAML parser that got out of hand · YAML.sh">
-  <meta property="og:description" content="How an old Bash experiment became a serious one-file YAML processor—and changed how I think about building with agents.">
+  <meta property="og:description" content="How an old Bash experiment became a serious one-file YAML processor—and what building it with Codex made possible.">
   <meta property="og:url" content="https://yaml.azohra.com/story/">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <meta property="article:published_time" content="2026-08-02">
@@ -41,13 +41,13 @@
     <header class="story-hero section-shell">
       <p class="eyebrow"><span class="status-dot"></span> Field note · August 2, 2026</p>
       <h1>The YAML parser<br> that got <span>out of hand.</span></h1>
-      <p class="story-dek">How an old Bash experiment became a serious one-file YAML processor—and changed how I think about building with agents.</p>
+      <p class="story-dek">How an old Bash experiment became a serious one-file YAML processor—and what building it with Codex made possible.</p>
       <div class="story-meta">
         <span>Justin Watts</span>
         <span aria-hidden="true">◆</span>
         <span>6 minute read</span>
         <span aria-hidden="true">◆</span>
-        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.9.0">YAML.sh v1.9</a>
+        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.10.0">YAML.sh v1.10</a>
       </div>
     </header>
 
@@ -64,7 +64,7 @@
           <p>The original YAML.sh translated YAML into flattened paths and values. That was a sensible shape for shell scripts: easy to print, easy to grep, and just enough structure to query a configuration file.</p>
           <p>It was also the ceiling. Once a mapping, sequence, alias, tag, or empty collection had been flattened, important relationships were gone. Every new feature had to reconstruct meaning the parser had already thrown away. Editing YAML without mangling it was almost impossible.</p>
           <p>I asked whether there was a better parsing design I had missed. There was. The missing idea was not a smarter regular expression. It was an intermediate representation that respected YAML.</p>
-          <p>Version 1 replaced the flattened stream with a node graph. Mappings remain mappings. Sequences remain ordered. Empty collections survive. Tags and source positions stay attached. Anchors and aliases can share identity. Queries and updates operate on nodes instead of guessing their way back from strings.</p>
+          <p>The answer was a node graph. Mappings remain mappings. Sequences remain ordered. Empty collections survive. Tags and source positions stay attached. Anchors and aliases can share identity. Queries and updates operate on nodes instead of guessing their way back from strings.</p>
           <div class="story-code" aria-label="YAML.sh processing pipeline">
             <span>The new shape</span>
             <pre><code>YAML stream → node graph → expression stream → values / YAML</code></pre>
@@ -82,18 +82,18 @@
           </blockquote>
         </section>
 
-        <section id="estimate-stopped-helping">
-          <h2>The estimate stopped helping</h2>
-          <p>Codex began with estimates that sounded responsible and were consistently wrong. Work described as weeks kept turning into passing tests in minutes. I kept raising the goal. The parser became a query language; the query language gained updates; semantic edits learned to preserve the source around them; then multi-file updates became one preflighted transaction that could roll itself back.</p>
-          <p>Speed created its own temptation. At one point we briefly treated a large capability jump as a new major version. I stopped it. More work is not a breaking change, and velocity is not permission for version-number theatre. We corrected the release line and made the version communicate compatibility again.</p>
-          <p>The releases still moved quickly, but each one earned a bounded contract. The sequence mattered more than the spectacle.</p>
+        <section id="tool-took-shape">
+          <h2>The tool took shape</h2>
+          <p>Once the node graph existed, each capability made the next one possible. Traversal became an expression stream. Expressions became writable transformations. A source layer learned to preserve comments, whitespace, and style. File handling grew into preflighted multi-file transactions with rollback.</p>
+          <p>The releases trace that architecture becoming useful. Each one made a specific part of the premise real while keeping the runtime to one POSIX shell file and AWK.</p>
           <ol class="story-timeline" aria-label="Release milestones">
             <li><strong>v0.3</strong><span>Audit the old tool and make its limits explicit.</span></li>
             <li><strong>v1.0</strong><span>Replace flattened paths with a proper YAML node graph.</span></li>
             <li><strong>v1.2</strong><span>Turn queries into writable transformations.</span></li>
             <li><strong>v1.4</strong><span>Measure compatibility instead of describing it vaguely.</span></li>
             <li><strong>v1.6</strong><span>Add practical language depth without losing the one-file runtime.</span></li>
-            <li><strong>v1.9</strong><span>Make repository-wide edits surgical, explainable, and transactional.</span></li>
+            <li><strong>v1.9</strong><span>Make multi-file edits explainable, rollback-safe, and transactional.</span></li>
+            <li><strong>v1.10</strong><span>Make the repository the unit of work: one query, one process, one preflight.</span></li>
           </ol>
         </section>
 
@@ -101,28 +101,27 @@
           <h2>Make it real</h2>
           <p>The hard part was not producing more code. The hard part was deciding what evidence would let us believe it.</p>
           <p>We compared YAML.sh with the official YAML Test Suite and with yq itself. We added real configuration workflows from Kubernetes, Docker Compose, GitHub Actions, GitLab CI, and deployment overlays. We generated expressions, hostile inputs, large documents, deep collections, and presentation-preserving mutations. A supported behaviour needed a test; nearby unsupported behaviour needed an explicit error instead of a confident misparse.</p>
-          <p>That distinction matters. Matching 2,620 categorized yq programs does not mean YAML.sh contains all of yq. Passing 282 expected YAML Test Suite cases does not mean every corner of the YAML specification is implemented. The numbers describe the tested contract. They do not dissolve the boundary around it.</p>
-          <p>By v1.9, that contract was large enough to be useful and specific enough to be trusted. One command could also prepare changes across a repository, refuse to write if any candidate failed, roll back a broken commit, and leave a JSON audit trail containing paths but not values.</p>
+          <p>That distinction matters. Matching 2,628 categorized yq programs does not mean YAML.sh contains all of yq. Passing 282 expected YAML Test Suite cases does not mean every corner of the YAML specification is implemented. The numbers describe the tested contract. They do not dissolve the boundary around it.</p>
+          <p>By v1.10, that contract was large enough to be useful and specific enough to be trusted. One command can check a repository without writing, bind data across files, prepare every mutation in one process, skip files that are already correct, roll back a broken commit, and leave a JSON audit trail containing paths but not values.</p>
           <dl class="story-evidence">
-            <div><dt>yq programs</dt><dd>2,620 / 2,620</dd><dd>in the categorized v1.9 corpus</dd></div>
+            <div><dt>yq programs</dt><dd>2,628 / 2,628</dd><dd>in the categorized release corpus</dd></div>
             <div><dt>YAML outcomes</dt><dd>282 / 282</dd><dd>expected YAML Test Suite cases</dd></div>
-            <div><dt>generated properties</dt><dd>12,000 / 12,000</dd><dd>grammar-guided checks</dd></div>
+            <div><dt>property coverage</dt><dd>672 cells</dd><dd>layout × size × state × behavior</dd></div>
             <div><dt>extra dependencies</dt><dd>0</dd><dd>the runtime is POSIX sh + AWK</dd></div>
           </dl>
         </section>
 
-        <section id="agent-loop">
-          <h2>What the agent changed</h2>
-          <p>The surprising part was not that an agent could write AWK quickly. It was how quickly we could turn a claim into a gate, use the failure to find the next missing idea, and repeat.</p>
-          <p>I kept responsibility for the premise. I pushed when the evidence made the estimates obsolete. I pulled us back when the versioning became silly, the documentation started talking too much about the old tool, the brand drifted, or CI spent macOS minutes proving that a web page still rendered. Codex carried an enormous implementation surface without getting bored by the ninety-first invalid fixture.</p>
-          <p>Neither role substitutes for the other. Unbounded generation would have produced an impressive pile. Direction without the implementation pace would have left a very good plan. The useful system was the loop between judgment, code, external comparison, and correction.</p>
-          <p>I have spent much of my career building the first path through ambiguous systems. This felt familiar, only compressed. Make the goal concrete. Build something real. Put it against evidence. Change the plan when the evidence changes. Keep the principle steady.</p>
+        <section id="building-with-codex">
+          <h2>Building with Codex</h2>
+          <p>Codex made the feedback loop unusually short. A product question could become an implementation, meet the YAML Test Suite and yq, expose the next missing idea, and return to the design while the context was still fresh.</p>
+          <p>That mattered because YAML.sh is a project made of boundaries: portability against convenience, fidelity against size, and ambition against a runtime people can still read. Moving quickly through code and evidence let us explore those boundaries without making the premise vague.</p>
+          <p>I came away less interested in how much code an agent can produce than in how much more thoroughly a small project can test its ideas. The constraint still shaped the tool. Codex made it possible to ask harder questions of it.</p>
         </section>
 
         <section id="where-it-fits">
           <h2>Where it fits</h2>
           <p>YAML.sh is not yq in disguise. yq remains the right answer when you want its complete language, codecs, ecosystem, and mature performance envelope. YAML.sh deliberately leaves out dynamic evaluation, file-loading operators, dates, many codecs, and other capabilities that would weaken its small and inspectable runtime.</p>
-          <p>It is better at a narrower thing: arriving as one readable text file in an environment that already has a shell and AWK. There is no package manager, language runtime, YAML library, or mystery binary. The security model can also be smaller because several powerful classes of behaviour simply do not exist. Its repository-wide edits preflight every file, can roll back a partial commit, and explain their paths without recording the values they changed.</p>
+          <p>It is better at a narrower thing: arriving as one readable text file in an environment that already has a shell and AWK. There is no package manager, language runtime, YAML library, or mystery binary. The security model can also be smaller because several powerful classes of behaviour simply do not exist. Its repository mode can check without writing, update several files from shared data, skip no-ops, roll back a partial commit, and explain changed paths without recording values.</p>
           <p>That is enough of a difference to be a product, not just a stunt. Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.</p>
         </section>
 
@@ -147,9 +146,9 @@
         <ol>
           <li><a href="#useful-stunt">A useful stunt</a></li>
           <li><a href="#permission-to-break-it">Permission to break it</a></li>
-          <li><a href="#estimate-stopped-helping">The estimate stopped helping</a></li>
+          <li><a href="#tool-took-shape">The tool took shape</a></li>
           <li><a href="#make-it-real">Make it real</a></li>
-          <li><a href="#agent-loop">What the agent changed</a></li>
+          <li><a href="#building-with-codex">Building with Codex</a></li>
           <li><a href="#where-it-fits">Where it fits</a></li>
           <li><a href="#constraint">The constraint is the fun part</a></li>
         </ol>

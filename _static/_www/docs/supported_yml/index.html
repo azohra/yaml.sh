@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.9.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.10.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -99,7 +99,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.9.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.10.0</span></div>
       <article>
           <h1 id="yaml-support">YAML support</h1>
           <p>YAML.sh is a query-oriented YAML implementation with a tested support contract. Supported syntax is represented in the node graph and exercised by the suite; limitations are intentional boundaries rather than silent guesses.</p>
@@ -173,7 +173,9 @@
             <li>Sequence slices, scalar interpolation, grouping, <code>ireduce</code>, computed object keys, <code>setpath</code>/<code>delpaths</code>, and POSIX-ERE <code>test</code>/global <code>sub</code> are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.</li>
             <li><code>style</code> can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. <code>line_comment</code> can inspect and set line comments. Head/foot comments and key-node presentation remain outside the graph.</li>
             <li><code>tag</code>, <code>anchor</code>, and <code>alias</code> are writable properties. Anchor renames keep referring aliases valid; duplicate anchors, unsafe removal, missing or forward targets, and recursive aliases are rejected.</li>
-            <li>Multi-file <code>-i</code> preflights every transformed candidate, rejects symlinks and duplicates, preserves permissions, and rolls back commit failures or interrupts.</li>
+            <li>Multi-file queries compile once. <code>--check</code> reports clean, drift, or error without writing. <code>-i</code> preflights every changed candidate, skips no-ops, rejects symlinks and duplicates, preserves permissions, and rolls back commit failures or interrupts.</li>
+            <li>Writable <code>eval-all</code> can bind data from one input and update every selected source file in the same transaction.</li>
+            <li>Merge modifiers append arrays (<code>*+</code>), merge arrays by index (<code>*d</code>), update existing fields (<code>*?</code>), or add new fields (<code>*n</code>).</li>
             <li>The expression language does not implement file-loading operators, date operators, dynamic evaluation, or yq's non-YAML codecs.</li>
           </ul>
           <p>YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond this contract is required.</p>
@@ -181,53 +183,45 @@
           <p>Pinned release gates:</p>
           <div class="table-wrap"><table>
             <thead><tr>
-              <th>Gate</th>
-              <th>v1.9</th>
+              <th>Evidence</th>
+              <th>Coverage</th>
             </tr></thead>
             <tbody>
               <tr>
-                <td>YAML Test Suite expected outcomes</td>
-                <td>282/282</td>
+                <td>YAML Test Suite</td>
+                <td>Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases</td>
               </tr>
               <tr>
-                <td>YAML Test Suite strict-invalid inputs rejected</td>
-                <td>91/91</td>
+                <td>yq v4.53.3 differential</td>
+                <td>2,628 categorized programs plus YAML metadata and cross-file programs</td>
               </tr>
               <tr>
-                <td>Categorized programs matching yq v4.53.3</td>
-                <td>2,620/2,620</td>
+                <td>Configuration workflows</td>
+                <td>Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays</td>
               </tr>
               <tr>
-                <td>Real-world workflow programs matching yq v4.53.3</td>
-                <td>35/35</td>
+                <td>Grammar/property matrix</td>
+                <td>6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties; four rotating value sweeps before release</td>
               </tr>
               <tr>
-                <td>Cross-file programs matching yq v4.53.3</td>
-                <td>8/8</td>
+                <td>Presentation matrix</td>
+                <td>3 scalar styles × 3 value/comment variants under one compound edit</td>
               </tr>
               <tr>
-                <td>YAML-metadata differential programs</td>
-                <td>22/22</td>
-              </tr>
-              <tr>
-                <td>Behavioral tests</td>
-                <td>94</td>
-              </tr>
-              <tr>
-                <td>Grammar-guided generated properties</td>
-                <td>12,000/12,000</td>
-              </tr>
-              <tr>
-                <td>Exact presentation mutations</td>
-                <td>400/400</td>
+                <td>Repository transaction suite</td>
+                <td>Clean, drift, error, no-op, cross-file binding, rollback, interruption, empty files, and JSON audit behavior</td>
               </tr>
               <tr>
                 <td>Scale contract</td>
                 <td>125,000 payload nodes; 1,500 documents; at most 224 MiB RSS</td>
               </tr>
+              <tr>
+                <td>Runtime portability</td>
+                <td>macOS AWK, mawk, original AWK, POSIX gawk, BusyBox AWK, and multiple POSIX shells</td>
+              </tr>
             </tbody>
           </table></div>
-          <p>Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance. CI spans macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and multiple POSIX shells.</p>
+          <p>Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance.</p>
           <h2 id="fixtures"><a href="#fixtures">Fixtures<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>The focused fixtures cover parser syntax, graph semantics, query behavior, presentation preservation, and rejection boundaries. A separate workflow corpus exercises Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays against yq.</p>
           <p>See <a href="https://github.com/azohra/yaml.sh/blob/main/test/test.sh"><code>test/test.sh</code></a>, <a href="https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh"><code>test/conformance.sh</code></a>, <a href="https://github.com/azohra/yaml.sh/blob/main/test/differential.sh"><code>test/differential.sh</code></a>, <a href="https://github.com/azohra/yaml.sh/blob/main/test/fuzz.sh"><code>test/fuzz.sh</code></a>, and <a href="https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh"><code>bench/scale.sh</code></a>.</p>

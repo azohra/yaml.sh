@@ -327,6 +327,15 @@ advanced.yml	.["explicit key"]
 advanced.yml	.shared_list | length
 advanced.yml	.flow.y | map(upcase)
 advanced.yml	.merged + {"extra": true}
+# Merge policies
+expressions.yml	{"array": [1, 2], "value": "left"} * {"array": [3, 4], "value": "right"}
+expressions.yml	{"array": [1, 2], "value": "left"} *+ {"array": [3, 4], "value": "right"}
+expressions.yml	{"thing": "one", "cat": "frog"} *? {"missing": "two", "thing": "two"}
+expressions.yml	{"thing": "one", "cat": "frog"} *n {"missing": "two", "thing": "two"}
+expressions.yml	{"a": {"x": 1}} *n {"a": {"y": 2}}
+expressions.yml	[{"name": "fred", "age": 12}, {"name": "bob", "age": 32}] *d [{"name": "fred", "age": 34}]
+expressions.yml	[{"x": 1}] *dn [{"y": 2}]
+expressions.yml	{"thing": [1, 2]} *?+ {"thing": [3, 4], "another": [1]}
 # Legacy fixture shapes
 test.yml	.key_value
 test.yml	.loose_query.level1.top_key

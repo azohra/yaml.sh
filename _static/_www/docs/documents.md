@@ -35,7 +35,18 @@ The update is committed only after the entire stream parses and every document t
 Several files form one in-place transaction:
 
 ```sh
+ysh --check '.release.channel = "stable"' services/*.yml
 ysh -i '.release.channel = "stable"' services/*.yml
 ```
 
-Every file is parsed and transformed into a sibling candidate first. Only then are originals replaced; a commit failure or interrupt rolls back files already changed.
+The query is compiled once and every file is parsed in one AWK process. Check mode writes nothing and returns clean `0`, drift `1`, or error `2`. In-place mode prepares every changed candidate before replacing an original; no-op files are untouched, and a commit failure or interrupt rolls back files already changed.
+
+Use `eval-all` when files need to share data. The combined stream keeps `filename`, `fileIndex`, and `documentIndex` on every root:
+
+```sh
+query='select(fileIndex == 0).version as $version | select(fileIndex > 0).release.version = $version'
+ysh eval-all --check "$query" release.yml services/*.yml
+ysh eval-all -i "$query" release.yml services/*.yml
+```
+
+Every mutated source file participates in the same preflight and commit. A read-only source file that does not change is not replaced.

@@ -247,7 +247,7 @@ arithmetic	expressions.yml	.services[1].port / 10
 arithmetic	expressions.yml	.services[0].port % 100
 arithmetic	expressions.yml	[.services[].port] + [443]
 arithmetic	expressions.yml	.metadata + {"channel": "stable", "owner": "core"}
-arithmetic	expressions.yml	{"a": {"x": 1}} * {"a": {"y": 2}}
+merge	expressions.yml	{"a": {"x": 1}} * {"a": {"y": 2}}
 arithmetic	expressions.yml	{"a": 1} + {"b": 2}
 construction	expressions.yml	{"names": [.services[].name]}
 collections	expressions.yml	{"ports": [.services[].port], "total": (.services | length)}
@@ -319,6 +319,14 @@ paths	advanced.yml	.["explicit key"]
 collections	advanced.yml	.shared_list | length
 collections	advanced.yml	.flow.y | map(upcase)
 arithmetic	advanced.yml	.merged + {"extra": true}
+merge	expressions.yml	{"array": [1, 2], "value": "left"} * {"array": [3, 4], "value": "right"}
+merge	expressions.yml	{"array": [1, 2], "value": "left"} *+ {"array": [3, 4], "value": "right"}
+merge	expressions.yml	{"thing": "one", "cat": "frog"} *? {"missing": "two", "thing": "two"}
+merge	expressions.yml	{"thing": "one", "cat": "frog"} *n {"missing": "two", "thing": "two"}
+merge	expressions.yml	{"a": {"x": 1}} *n {"a": {"y": 2}}
+merge	expressions.yml	[{"name": "fred", "age": 12}, {"name": "bob", "age": 32}] *d [{"name": "fred", "age": 34}]
+merge	expressions.yml	[{"x": 1}] *dn [{"y": 2}]
+merge	expressions.yml	{"thing": [1, 2]} *?+ {"thing": [3, 4], "another": [1]}
 paths	test.yml	.key_value
 paths	test.yml	.loose_query.level1.top_key
 paths	test.yml	.subtree.lower1

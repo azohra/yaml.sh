@@ -84,7 +84,13 @@ Transform and emit YAML:
 ysh -o=yaml '.release.channel = "stable"' config.yml
 ```
 
-Once the result looks right, update the file in place:
+Ask whether the update would change anything:
+
+```sh
+ysh --check '.release.channel = "stable"' config.yml
+```
+
+Check mode writes nothing. It exits `0` when clean, `1` when the query would change a file, and `2` when the query or input is invalid. Once the check looks right, update in place:
 
 ```sh
 ysh -i '.release.channel = "stable"' config.yml
@@ -92,9 +98,10 @@ ysh -i '.release.channel = "stable"' config.yml
 
 In-place output is atomic and preserves file permissions. Common replacements, inserts, deletes, and sequence reorders retain comments, blank lines, directives, properties, block/flow layout, and quote style. Unsupported presentation edits fall back to stable semantic YAML—review the diff like the tiny chaos engineer you are.
 
-The same expression can update several files as one preflighted transaction:
+The same expression can check or update several files as one preflighted transaction:
 
 ```sh
+ysh --check '.release.channel = "stable"' services/*.yml
 ysh -i '.release.channel = "stable"' services/*.yml
 ```
 
@@ -134,6 +141,7 @@ Evaluate files independently by listing them, or evaluate one expression across 
 ```sh
 ysh '[filename, .name]' one.yml two.yml
 ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
+ysh eval-all -i 'select(fileIndex == 0).version as $version | select(fileIndex > 0).release.version = $version' release.yml services/*.yml
 ```
 
 ## Next steps

@@ -50,9 +50,9 @@ Set YAML indentation from one through nine spaces with `-I N` or `--indent=N`. U
 
 The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/collection styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.
 
-Version 1.9 keeps the rich `-i` presentation layer. Common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders patch the original source. Other structural changes use the semantic emitter.
+The `-i` presentation layer patches the original source for common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders. Other structural changes use the semantic emitter.
 
-With several inputs, every candidate is built before the first replacement. Preserved siblings allow rollback if a later commit fails or the process is interrupted. Permission bits survive, and symlinks are refused.
+With several inputs, every changed candidate is built before the first replacement. No-op files are not replaced. Preserved siblings allow rollback if a later commit fails or the process is interrupted. Permission bits survive, and symlinks are refused.
 
 ## Type
 
@@ -120,6 +120,8 @@ ysh --explain -i '.image.tag = "stable"' deploy.yml
 
 The report includes parsed/generated node counts, result and mutation counts, changed paths, and whether presentation was preserved or regenerated. Values are intentionally omitted.
 
+For `eval-all`, `parsed_nodes`, results, and mutations belong to each input; `generated_nodes` is transaction-wide because the query is evaluated once across the combined stream.
+
 Use `--explain=json` for JSON Lines, with one value-free audit record per input:
 
 ```sh
@@ -127,3 +129,5 @@ ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 
 Transaction reports are released only after every file commits. An aborted or rolled-back transaction emits an error and no audit records.
+
+Add `--check` to run the same transformation without writing. JSON explain mode remains pure JSON Lines; exit status reports clean `0`, drift `1`, or error `2`.

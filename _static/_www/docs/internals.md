@@ -1,6 +1,6 @@
 # Parser internals
 
-Version 1.9 is still one shell script, with a semantic graph, source-presentation layer, and repository transaction working together.
+The release remains one shell script, with a semantic graph, source-presentation layer, and repository transaction working together.
 
 ```text
 /bin/sh CLI

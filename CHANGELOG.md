@@ -4,6 +4,28 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.10.0] - 2026-08-02
+
+Version 1.10 makes the repository the unit of work: one compiled query, one AWK process, and one preflighted transaction.
+
+### Added
+
+- `--check` runs the real write path without writing and returns clean `0`, drift `1`, or error `2`.
+- Writable `eval-all` can bind data from one file, update several others, and commit every mutation together.
+- Merge policies for appended arrays (`*+`), arrays merged by index (`*d`), existing fields only (`*?`), and new fields only (`*n`).
+
+### Changed
+
+- Ordinary multi-file reads and repository transactions parse and compile once instead of launching AWK for every file.
+- No-op assignments produce no mutation record, candidate, rollback copy, or file replacement.
+- Empty inputs retain correct file indexes inside combined operations.
+- Generated evidence now covers an explicit 672-cell grammar/property matrix and a 9-cell presentation matrix. Scheduled runs rotate four value sweeps instead of repeating thousands of equivalent shapes.
+
+### Boundaries
+
+- Writable `eval-all` covers cross-file selection, binding, merging, and updates; it is not yq's complete stream engine.
+- Merge tag clobbering (`*c`) remains outside the focused merge-policy set.
+
 ## [1.9.0] - 2026-08-02
 
 Version 1.9 makes YAML.sh safe at repository scale: one transaction can update several files, YAML graph metadata is writable, and CI can retain machine-readable change evidence without retaining values.

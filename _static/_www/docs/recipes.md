@@ -29,13 +29,13 @@ ysh -e '.services[] | select(.name == "api")' config.yml >/dev/null
 
 ## Change a file safely
 
-Preview the result first:
+Check the exact write path first:
 
 ```sh
-ysh -o=yaml '.image.tag = "stable"' deploy.yml
+ysh --check '.image.tag = "stable"' deploy.yml
 ```
 
-Then make the same update atomically:
+Exit status is `0` for clean, `1` for drift, and `2` for an invalid query or input. Then make the same update atomically:
 
 ```sh
 ysh -i '.image.tag = "stable"' deploy.yml
@@ -46,6 +46,7 @@ ysh -i '.image.tag = "stable"' deploy.yml
 Update a repository as one transaction:
 
 ```sh
+ysh --check '.image.tag = "stable"' services/*.yml
 ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 
@@ -73,6 +74,28 @@ ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml prod
 ```
 
 The right mapping wins at scalar leaves. This focused `eval-all` workflow covers configuration layering; it is not yq's entire stream engine.
+
+Choose how arrays and keys merge:
+
+```sh
+ysh -n --json '{ports: [80]} *+ {ports: [443]}'       # append arrays
+ysh -n --json '{api: {port: 80}} *? {api: {port: 81}, web: {port: 80}}' # existing keys only
+ysh -n --json '{api: {port: 80}} *n {api: {port: 81}, web: {port: 80}}' # new keys only
+```
+
+Use `*d` to merge array entries by index.
+
+## Share data across files
+
+Writable `eval-all` evaluates once over every input, so one file can supply a value used to update the others:
+
+```sh
+query='select(fileIndex == 0).version as $version | select(fileIndex > 0).release.version = $version'
+ysh eval-all --check "$query" release.yml services/*.yml
+ysh eval-all -i "$query" release.yml services/*.yml
+```
+
+All mutated files preflight and commit together. Unchanged files are not replaced.
 
 ## Work across every document
 

@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.9.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.10.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -99,7 +99,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.9.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.10.0</span></div>
       <article>
           <h1 id="output-metadata">Output &amp; metadata</h1>
           <p>The same query can return a value, JSON, YAML, a node type, its expanded tag, or its source line.</p>
@@ -144,8 +144,8 @@
           <p>Multiple results are separated with <code>---</code>, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.</p>
           <p>Set YAML indentation from one through nine spaces with <code>-I N</code> or <code>--indent=N</code>. Use <code>--unwrap-scalar=false</code> when default value output should retain a scalar's YAML quoting, tag, and line comment.</p>
           <p>The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/collection styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.</p>
-          <p>Version 1.9 keeps the rich <code>-i</code> presentation layer. Common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders patch the original source. Other structural changes use the semantic emitter.</p>
-          <p>With several inputs, every candidate is built before the first replacement. Preserved siblings allow rollback if a later commit fails or the process is interrupted. Permission bits survive, and symlinks are refused.</p>
+          <p>The <code>-i</code> presentation layer patches the original source for common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders. Other structural changes use the semantic emitter.</p>
+          <p>With several inputs, every changed candidate is built before the first replacement. No-op files are not replaced. Preserved siblings allow rollback if a later commit fails or the process is interrupted. Permission bits survive, and symlinks are refused.</p>
           <h2 id="type"><a href="#type">Type<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -212,6 +212,7 @@
 </code></pre>
           </div>
           <p>The report includes parsed/generated node counts, result and mutation counts, changed paths, and whether presentation was preserved or regenerated. Values are intentionally omitted.</p>
+          <p>For <code>eval-all</code>, <code>parsed_nodes</code>, results, and mutations belong to each input; <code>generated_nodes</code> is transaction-wide because the query is evaluated once across the combined stream.</p>
           <p>Use <code>--explain=json</code> for JSON Lines, with one value-free audit record per input:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -219,6 +220,7 @@
 </code></pre>
           </div>
           <p>Transaction reports are released only after every file commits. An aborted or rolled-back transaction emits an error and no audit records.</p>
+          <p>Add <code>--check</code> to run the same transformation without writing. JSON explain mode remains pure JSON Lines; exit status reports clean <code>0</code>, drift <code>1</code>, or error <code>2</code>.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Read the contract</span><strong>See exactly what works →</strong></a></nav>
     </main>
