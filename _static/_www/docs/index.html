@@ -52,12 +52,6 @@
               <li><a href="/docs/development/">Development</a></li>
             </ul>
           </section>
-          <section class="nav-group">
-            <p class="nav-title">Project</p>
-            <ul>
-              <li><a href="/docs/versioning/">Versioning</a></li>
-            </ul>
-          </section>
   </nav></details>
   <div class="docs-shell">
     <aside class="docs-nav" aria-label="Documentation">
@@ -87,12 +81,6 @@
               <li><a href="/docs/security/">Security & limits</a></li>
               <li><a href="/docs/internals/">How it works</a></li>
               <li><a href="/docs/development/">Development</a></li>
-            </ul>
-          </section>
-          <section class="nav-group">
-            <p class="nav-title">Project</p>
-            <ul>
-              <li><a href="/docs/versioning/">Versioning</a></li>
             </ul>
           </section>
       </nav>
@@ -144,12 +132,12 @@ value / JSON / YAML / metadata
 </code></pre>
           </div>
           <p>The graph is why empty collections survive, punctuated keys behave, aliases retain identity, and in-place changes can preserve source presentation.</p>
-          <h2 id="honest-boundaries"><a href="#honest-boundaries">Honest boundaries<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h2 id="where-it-fits"><a href="#where-it-fits">Where it fits<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>The useful overlap with yq is large, but deliberate. YAML.sh does not implement non-YAML codecs, dates, file-loading operators, dynamic evaluation, system execution, or yq's complete operator and flag surface.</p>
-          <p>The project publishes two contracts instead of a compatibility percentage:</p>
+          <p>Two references make that boundary easy to inspect:</p>
           <ul>
-            <li><a href="/docs/supported_yml/">YAML support</a> records parser behavior and measured evidence.</li>
-            <li><a href="/docs/yq-compatibility/">yq compatibility</a> records the useful overlap and intentional omissions.</li>
+            <li><a href="/docs/supported_yml/">YAML support</a> lists parser behavior, limits, and test coverage.</li>
+            <li><a href="/docs/yq-compatibility/">yq compatibility</a> maps the useful overlap and intentional omissions.</li>
           </ul>
           <p>Unsupported neighboring syntax should fail explicitly, not produce a plausible lie.</p>
           <h2 id="trust-it-appropriately"><a href="#trust-it-appropriately">Trust it appropriately<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
@@ -164,10 +152,10 @@ ysh --check '.image.tag = &quot;stable&quot;' services/*.yml
 ysh --explain=json -i '.image.tag = &quot;stable&quot;' services/*.yml 2&gt;changes.jsonl
 </code></pre>
           </div>
-          <p>The <a href="/docs/internals/">internals guide</a> follows a document through the parser. The <a href="/docs/development/">development guide</a> explains how each new promise earns fixtures, differential cases, rejection tests, and portability evidence.</p>
-          <p>YAML.sh is built for fun. The support contract is serious.</p>
+          <p>The <a href="/docs/internals/">internals guide</a> follows a document through the parser. The <a href="/docs/development/">development guide</a> explains the fixtures, differential cases, rejection tests, and portability checks behind it.</p>
+          <p>YAML.sh is built for fun. The tests are serious.</p>
       </article>
-      <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Read the contract</span><strong>See exactly what works →</strong></a></nav>
+      <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
@@ -175,7 +163,7 @@ ysh --explain=json -i '.image.tag = &quot;stable&quot;' services/*.yml 2&gt;chan
         <li class="level-2"><a href="#start-with-the-task">Start with the task</a></li>
         <li class="level-2"><a href="#the-tiny-idea">The tiny idea</a></li>
         <li class="level-2"><a href="#real-structure">Real structure</a></li>
-        <li class="level-2"><a href="#honest-boundaries">Honest boundaries</a></li>
+        <li class="level-2"><a href="#where-it-fits">Where it fits</a></li>
         <li class="level-2"><a href="#trust-it-appropriately">Trust it appropriately</a></li>
         <li class="level-2"><a href="#open-the-hood">Open the hood</a></li>
       </ol>
@@ -185,6 +173,6 @@ ysh --explain=json -i '.image.tag = &quot;stable&quot;' services/*.yml 2&gt;chan
   <dialog class="search-dialog" data-search-dialog>
     <form method="dialog" class="search-box"><label for="docs-search">Search the docs</label><button value="close" aria-label="Close search">×</button><input id="docs-search" type="search" autocomplete="off" placeholder="Try “merge files” or “envsubst”"><div class="search-results" aria-live="polite"></div><p><kbd>↑</kbd><kbd>↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close</p></form>
   </dialog>
-  <footer class="site-footer"><p>YAML.sh · yq energy, zero baggage.</p><p><a href="https://github.com/azohra/yaml.sh">Source</a> · <a href="/docs/development/">Contribute</a> · <a href="/docs/versioning/">Versioning</a></p></footer>
+  <footer class="site-footer"><p>YAML.sh · yq energy, zero baggage.</p><p><a href="https://github.com/azohra/yaml.sh">Source</a> · <a href="/docs/development/">Contribute</a></p></footer>
 </body>
 </html>

@@ -45,14 +45,14 @@ value / JSON / YAML / metadata
 
 The graph is why empty collections survive, punctuated keys behave, aliases retain identity, and in-place changes can preserve source presentation.
 
-## Honest boundaries
+## Where it fits
 
 The useful overlap with yq is large, but deliberate. YAML.sh does not implement non-YAML codecs, dates, file-loading operators, dynamic evaluation, system execution, or yq's complete operator and flag surface.
 
-The project publishes two contracts instead of a compatibility percentage:
+Two references make that boundary easy to inspect:
 
-- [YAML support](supported_yml.md) records parser behavior and measured evidence.
-- [yq compatibility](yq-compatibility.md) records the useful overlap and intentional omissions.
+- [YAML support](supported_yml.md) lists parser behavior, limits, and test coverage.
+- [yq compatibility](yq-compatibility.md) maps the useful overlap and intentional omissions.
 
 Unsupported neighboring syntax should fail explicitly, not produce a plausible lie.
 
@@ -71,6 +71,6 @@ ysh --check '.image.tag = "stable"' services/*.yml
 ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 
-The [internals guide](internals.md) follows a document through the parser. The [development guide](development.md) explains how each new promise earns fixtures, differential cases, rejection tests, and portability evidence.
+The [internals guide](internals.md) follows a document through the parser. The [development guide](development.md) explains the fixtures, differential cases, rejection tests, and portability checks behind it.
 
-YAML.sh is built for fun. The support contract is serious.
+YAML.sh is built for fun. The tests are serious.

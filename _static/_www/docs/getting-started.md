@@ -148,7 +148,7 @@ ysh eval-all -i 'select(fileIndex == 0).version as $version | select(fileIndex >
 
 - [Learn paths, streams, construction, and updates](queries.md)
 - [Choose value, JSON, YAML, type, tag, or line output](output.md)
-- [Read the YAML support contract](supported_yml.md)
+- [Explore supported YAML syntax and limits](supported_yml.md)
 - [Compare the focused surface with yq](yq-compatibility.md)
 
 Maintaining a script written for the original command interface? Use the focused [legacy migration guide](migration.md).

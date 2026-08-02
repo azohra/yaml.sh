@@ -28,7 +28,7 @@ ysh \
 | `--max-nodes` | Documents or expressions that create too many graph nodes |
 | `--max-depth` | Excessively nested collections and recursive traversal |
 
-The release scale gate parses 125,000 payload nodes and 1,500 documents under a 224 MiB RSS ceiling. That is evidence for the tested workload, not a universal resource guarantee.
+Scale tests parse 125,000 payload nodes and 1,500 documents under a 224 MiB RSS ceiling. Set lower limits for smaller workloads or tighter environments.
 
 ## Disable environment access
 

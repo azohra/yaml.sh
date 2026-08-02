@@ -1,6 +1,6 @@
 # YAML support
 
-YAML.sh is a query-oriented YAML implementation with a tested support contract. Supported syntax is represented in the node graph and exercised by the suite; limitations are intentional boundaries rather than silent guesses.
+YAML.sh parses the syntax below into a real node graph and exercises it in the test suite. The limitations section names the nearby forms it does not support.
 
 ## Collections
 
@@ -80,11 +80,11 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Merge modifiers append arrays (`*+`), merge arrays by index (`*d`), update existing fields (`*?`), or add new fields (`*n`).
 - The expression language does not implement file-loading operators, date operators, dynamic evaluation, or yq's non-YAML codecs.
 
-YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond this contract is required.
+YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond these tested behaviors is required.
 
-## Measured boundary
+## Test coverage
 
-Pinned release gates:
+The current suite checks:
 
 | Evidence | Coverage |
 | --- | --- |
@@ -94,12 +94,12 @@ Pinned release gates:
 | Grammar/property matrix | 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties; four rotating value sweeps before release |
 | Presentation matrix | 3 scalar styles × 3 value/comment variants under one compound edit |
 | Repository transaction suite | Clean, drift, error, no-op, cross-file binding, rollback, interruption, empty files, and JSON audit behavior |
-| Scale contract | 125,000 payload nodes; 1,500 documents; at most 224 MiB RSS |
+| Scale | 125,000 payload nodes; 1,500 documents; at most 224 MiB RSS |
 | Runtime portability | macOS AWK, mawk, original AWK, POSIX gawk, BusyBox AWK, and multiple POSIX shells |
 
-Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance.
+Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh counts their rejection rather than imitating a partial AST.
 
-## Fixtures
+## How it is tested
 
 The focused fixtures cover parser syntax, graph semantics, query behavior, presentation preservation, and rejection boundaries. A separate workflow corpus exercises Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays against yq.
 

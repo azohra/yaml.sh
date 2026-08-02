@@ -157,8 +157,6 @@ Version 1.4 is a measured compatibility release: more YAML, more yq-shaped progr
 
 Version 1.3 completes the journey from a path reader to a compact YAML programming tool. It adds collection programming, lexical variables, reducers, broader YAML syntax, multi-document updates, and a hybrid presentation-preserving in-place editor while remaining one portable `/bin/sh` + AWK file.
 
-This compatible feature release was briefly tagged `v2.0.0`. The tag and release were withdrawn before wider adoption because the public v1 contract did not break; the preserved code history is identical, and `v1.3.0` is the canonical release.
-
 ### Added
 
 - Comma streams plus `map(...)` and `map_values(...)` collection transforms.
