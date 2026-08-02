@@ -5,7 +5,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
-FUZZ_CASES=${YSH_FUZZ_CASES:-12000}
+FUZZ_MATRICES=${YSH_FUZZ_MATRICES:-1}
 FUZZ_SEED=${YSH_FUZZ_SEED:-1}
 FUZZ_REPLAY=${YSH_FUZZ_REPLAY:-}
 FAILURE_ROOT=${YSH_FUZZ_FAILURE_DIR:-${TMPDIR:-/tmp}}
@@ -29,14 +29,15 @@ generate_case() {
     shrink_level=$2
     generated_input=$3
     generated_oracle=$4
-    awk -v seed="$generated_case" -v shrink="$shrink_level" -v oracle="$generated_oracle" '
+    generated_mode=$5
+    generated_count=$6
+    generated_enabled=$7
+    awk -v seed="$generated_case" -v shrink="$shrink_level" -v oracle="$generated_oracle" \
+        -v mode="$generated_mode" -v count="$generated_count" -v enabled="$generated_enabled" '
     function truth(value) { return value ? "true" : "false" }
     BEGIN {
-        mode = seed % 6
-        count = (seed % 7) + 1
         if (shrink >= 1 && count > 3) count = 3
         if (shrink >= 2) { count = 1; mode = 0 }
-        enabled = seed % 2
         label = "case " seed
 
         if (mode == 3) {
@@ -104,7 +105,7 @@ generate_case() {
 }
 
 property_for_case() {
-    property_mode=$((($1 + FUZZ_SEED) % 5))
+    property_mode=$1
     case "$property_mode" in
     0)
         PROPERTY=roundtrip
@@ -112,22 +113,29 @@ property_for_case() {
         ;;
     1)
         PROPERTY=query
-        case $(((($1 + FUZZ_SEED) / 3) % 4)) in
-        0) QUERY='.items[1:3] | map(.name)' ;;
-        1) QUERY='.items | map(select(.active) | .score) | add' ;;
-        2) QUERY='"\(.meta.label):\(.items | length)"' ;;
-        3) QUERY='.items | map(select(.name | test("^item-")) | .name) | length' ;;
-        esac
+        QUERY='.items[1:3] | map(.name)'
         ;;
     2)
-        PROPERTY=mutation
-        QUERY='.meta.checked = true | .items |= map(.score += 1)'
+        PROPERTY=query
+        QUERY='.items | map(select(.active) | .score) | add'
         ;;
     3)
         PROPERTY=query
-        QUERY='.items | sort_by(.score) | reverse | map(.name) | .[0:3]'
+        QUERY='"\(.meta.label):\(.items | length)"'
         ;;
     4)
+        PROPERTY=query
+        QUERY='.items | map(select(.name | test("^item-")) | .name) | length'
+        ;;
+    5)
+        PROPERTY=mutation
+        QUERY='.meta.checked = true | .items |= map(.score += 1)'
+        ;;
+    6)
+        PROPERTY=query
+        QUERY='.items | sort_by(.score) | reverse | map(.name) | .[0:3]'
+        ;;
+    7)
         PROPERTY=query
         QUERY='.items | map(.score) | unique | sort | min'
         ;;
@@ -164,7 +172,7 @@ preserve_failure() {
     cp "$ORACLE" "$failure_dir/oracle.json"
     level=1
     while [ "$level" -le 2 ]; do
-        generate_case "$failed_case" "$level" "$CANDIDATE" "$CANDIDATE_ORACLE"
+        generate_case "$failed_case" "$level" "$CANDIDATE" "$CANDIDATE_ORACLE" "$CASE_MODE" "$CASE_COUNT" "$CASE_ENABLED"
         if ! run_property "$CANDIDATE" "$CANDIDATE_ORACLE"; then
             cp "$CANDIDATE" "$failure_dir/input.yml"
             cp "$CANDIDATE_ORACLE" "$failure_dir/oracle.json"
@@ -183,15 +191,31 @@ if [ -n "$FUZZ_REPLAY" ]; then
     first_case=$FUZZ_REPLAY
     last_case=$FUZZ_REPLAY
 else
+    case "$FUZZ_MATRICES" in
+    *[!0-9]*|' '|''|0) printf '%s\n' 'YSH_FUZZ_MATRICES must be a positive integer.' >&2; exit 2 ;;
+    esac
     first_case=$FUZZ_SEED
-    last_case=$((FUZZ_SEED + FUZZ_CASES - 1))
+    last_case=$((FUZZ_SEED + FUZZ_MATRICES * 672 - 1))
 fi
 
 case_id=$first_case
 passed=0
 while [ "$case_id" -le "$last_case" ]; do
-    generate_case "$case_id" 0 "$INPUT" "$ORACLE"
-    property_for_case "$case_id"
+    case_offset=$((case_id - FUZZ_SEED))
+    if [ "$case_offset" -lt 0 ]; then
+        printf '%s\n' 'YSH_FUZZ_REPLAY must not be lower than YSH_FUZZ_SEED.' >&2
+        exit 2
+    fi
+    matrix_case=$((case_offset % 672))
+    CASE_MODE=$((matrix_case % 6))
+    matrix_case=$((matrix_case / 6))
+    CASE_COUNT=$((matrix_case % 7 + 1))
+    matrix_case=$((matrix_case / 7))
+    CASE_ENABLED=$((matrix_case % 2))
+    matrix_case=$((matrix_case / 2))
+    CASE_PROPERTY=$((matrix_case % 8))
+    generate_case "$case_id" 0 "$INPUT" "$ORACLE" "$CASE_MODE" "$CASE_COUNT" "$CASE_ENABLED"
+    property_for_case "$CASE_PROPERTY"
     if ! run_property "$INPUT" "$ORACLE"; then
         preserve_failure "$case_id"
         exit 1
@@ -200,4 +224,5 @@ while [ "$case_id" -le "$last_case" ]; do
     case_id=$((case_id + 1))
 done
 
-printf 'Grammar-guided YAML properties: %s/%s pass (seed %s)\n' "$passed" "$passed" "$FUZZ_SEED"
+printf 'Grammar/property matrix: %s cases pass — 6 layouts × 7 sizes × 2 states × 8 properties; %s matrix pass(es), seed %s\n' \
+    "$passed" "$FUZZ_MATRICES" "$FUZZ_SEED"

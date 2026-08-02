@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.9.0" "$(./ysh --version)"
+    assertEquals "v1.10.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -269,6 +269,18 @@ testExpressionReduceAndDeepMerge() {
     assertEquals '{"a":{"x":1,"y":3,"z":4},"b":1,"c":2}' "$(./ysh -n --json '{a: {x: 1, y: 2}, b: 1} * {a: {y: 3, z: 4}, c: 2}')"
 }
 
+testExpressionMergeModifiers() {
+    assertEquals '{"array":[3,4],"value":"right"}' "$(./ysh -n --json '{array: [1, 2], value: "left"} * {array: [3, 4], value: "right"}')"
+    assertEquals '{"array":[1,2,3,4],"value":"right"}' "$(./ysh -n --json '{array: [1, 2], value: "left"} *+ {array: [3, 4], value: "right"}')"
+    assertEquals '{"thing":"two","cat":"frog"}' "$(./ysh -n --json '{thing: "one", cat: "frog"} *? {missing: "two", thing: "two"}')"
+    assertEquals '{"thing":"one","cat":"frog","missing":"two"}' "$(./ysh -n --json '{thing: "one", cat: "frog"} *n {missing: "two", thing: "two"}')"
+    assertEquals '{"a":{"x":1,"y":2}}' "$(./ysh -n --json '{a: {x: 1}} *n {a: {y: 2}}')"
+    assertEquals '[{"name":"fred","age":34},{"name":"bob","age":32}]' "$(./ysh -n --json '[{name: "fred", age: 12}, {name: "bob", age: 32}] *d [{name: "fred", age: 34}]')"
+    assertEquals '[{"x":1,"y":2}]' "$(./ysh -n --json '[{x: 1}] *dn [{y: 2}]')"
+    assertEquals '[1,3]' "$(./ysh -n --json '[1] *dn [2, 3]')"
+    assertEquals '{"thing":[1,2,3,4]}' "$(./ysh -n --json '{thing: [1, 2]} *?+ {thing: [3, 4], another: [1]}')"
+}
+
 testExpressionPathBasedUpdates() {
     assertEquals '{"a":{"b":1,"c":2}}' "$(printf '%s\n' 'a: {b: 1}' | ./ysh --json 'setpath(["a", "c"]; 2)')"
     assertEquals '{"a":{"items":[null,null,{"name":"third"}]}}' "$(printf '%s\n' 'a: {}' | ./ysh --json 'setpath(["a", "items", 2, "name"]; "third")')"
@@ -346,9 +358,21 @@ testMultipleInputEvaluationAndMetadata() {
     assertEquals 0 $?
     assertEquals 3 "$(./ysh '.answer' "$first")"
     assertEquals 3 "$(./ysh '.answer' "$second")"
-    ./ysh ea -i '.answer = 3' "$first" >/dev/null 2>&1
-    assertEquals 2 $?
+    ./ysh ea -i '.answer = 4' "$first" "$second" >/dev/null 2>&1
+    assertEquals 0 $?
+    assertEquals 4 "$(./ysh '.answer' "$first")"
+    assertEquals 4 "$(./ysh '.answer' "$second")"
     rm -f "$first" "$second"
+}
+
+testMultipleInputEvaluationSkipsEmptyFilesWithoutLosingMetadata() {
+    empty=$(mktemp "${TMPDIR:-/tmp}/ysh-empty.XXXXXX")
+    populated=$(mktemp "${TMPDIR:-/tmp}/ysh-populated.XXXXXX")
+    : > "$empty"
+    printf '%s\n' 'answer: 2' > "$populated"
+    expected=$(printf '["%s",1,0,2]' "$populated")
+    assertEquals "$expected" "$(./ysh eval --json '[filename, fileIndex, documentIndex, .answer]' "$empty" "$populated")"
+    rm -f "$populated" "$empty"
 }
 
 testAllDocumentEvaluation() {
@@ -367,6 +391,28 @@ testEvalAllAcrossFiles() {
     assertEquals '[{"a":1},{"b":2},{"c":3}]' "$(./ysh ea --json '[.]' "$first" "$second")"
     assertEquals "$(printf '%s\n' '{"a":1,"b":2}' '{"a":1,"c":3}')" "$(./ysh ea --json 'select(fileIndex == 0) * select(fileIndex == 1)' "$first" "$second")"
     rm -f "$first" "$second"
+}
+
+testWritableEvalAllSharesDataAcrossFiles() {
+    source_file=test/.tmp-eval-all-source-$$.yml
+    target_file=test/.tmp-eval-all-target-$$.yml
+    report_file=test/.tmp-eval-all-report-$$.jsonl
+    printf '%s\n' 'release: stable' > "$source_file"
+    printf '%s\n' 'channel: edge # managed here' > "$target_file"
+    query='select(fileIndex == 0).release as $release | select(fileIndex == 1).channel = $release'
+
+    ./ysh ea --check --explain=json "$query" "$source_file" "$target_file" >/dev/null 2> "$report_file"
+    assertEquals 1 $?
+    assertEquals 'channel: edge # managed here' "$(cat "$target_file")"
+    assertContains "$(sed -n '1p' "$report_file")" '"mutations":0'
+    assertContains "$(sed -n '2p' "$report_file")" '"path":".channel"'
+
+    ./ysh ea -i "$query" "$source_file" "$target_file"
+    assertEquals 0 $?
+    assertEquals 'release: stable' "$(cat "$source_file")"
+    assertEquals 'channel: stable # managed here' "$(cat "$target_file")"
+
+    rm -f "$report_file" "$target_file" "$source_file"
 }
 
 testExitStatusAndEmptyStreams() {
@@ -472,6 +518,61 @@ testInplaceTransactionAcrossFiles() {
     assertFalse "transaction files must be removed" "[ -e \"$1\" ]"
     assertFalse "transaction files must be removed" "[ -e \"$2\" ]"
     rm -f "$explain_file" "$invalid_file" "$spaced_file" "$second_file" "$first_file"
+}
+
+testInplaceTransactionHandlesEmptyFilesAndSkipsNoOps() {
+    empty_file=test/.tmp-inplace-empty-$$.yml
+    unchanged_file=test/.tmp-inplace-unchanged-$$.yml
+    state_file=test/.tmp-inplace-noop-state-$$
+    : > "$empty_file"
+    printf '%s\n' 'name: ready' > "$unchanged_file"
+    real_mv=$(command -v mv)
+
+    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_MV=$real_mv YSH_FAIL_MV_AT=1 YSH_MV_STATE=$state_file \
+        ./ysh -i '.name = "ready"' "$empty_file" "$unchanged_file" >/dev/null 2>&1
+    assertEquals 0 $?
+    assertFalse "no-op transaction must not replace a file" "[ -e \"$state_file\" ]"
+    assertEquals 0 "$(wc -c < "$empty_file" | tr -d ' ')"
+    assertEquals 'name: ready' "$(cat "$unchanged_file")"
+
+    rm -f "$state_file" "$unchanged_file" "$empty_file"
+}
+
+testCheckPreflightsRepositoryChanges() {
+    first_file=test/.tmp-check-first-$$.yml
+    second_file=test/.tmp-check-second-$$.yml
+    invalid_file=test/.tmp-check-invalid-$$.yml
+    report_file=test/.tmp-check-report-$$.jsonl
+    printf '%s\n' 'name: ready' > "$first_file"
+    printf '%s\n' 'name: waiting' > "$second_file"
+    printf '%s\n' 'broken: [one' > "$invalid_file"
+
+    result=$(./ysh --check '.name = "ready"' "$first_file" 2>&1)
+    assertEquals 0 $?
+    assertContains "$result" 'Check: no changes'
+
+    result=$(./ysh --check '.name = "ready"' "$first_file" "$second_file" 2>&1)
+    assertEquals 1 $?
+    assertContains "$result" "Check: would change $second_file"
+    assertContains "$result" '1 file(s) would change; no files written'
+    assertEquals 'name: ready' "$(cat "$first_file")"
+    assertEquals 'name: waiting' "$(cat "$second_file")"
+
+    ./ysh --check --explain=json '.name = "ready"' "$first_file" "$second_file" >/dev/null 2> "$report_file"
+    assertEquals 1 $?
+    assertEquals 2 "$(wc -l < "$report_file" | tr -d ' ')"
+    assertNotContains "$(cat "$report_file")" 'Check:'
+    assertContains "$(sed -n '2p' "$report_file")" '"path":".name"'
+
+    ./ysh --check '.name = "ready"' "$first_file" "$invalid_file" >/dev/null 2> "$report_file"
+    assertEquals 2 $?
+    assertContains "$(cat "$report_file")" 'transaction aborted before writing any files'
+    assertEquals 'name: ready' "$(cat "$first_file")"
+
+    ./ysh --check '.[' "$first_file" >/dev/null 2> "$report_file"
+    assertEquals 2 $?
+
+    rm -f "$report_file" "$invalid_file" "$second_file" "$first_file"
 }
 
 testInplaceTransactionRollsBackCommitFailure() {
@@ -919,11 +1020,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.9.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.10.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.9.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.9"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.10.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.10"
     assertNotContains "$(cat _static/_www/story/index.html)" "v1.8"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
@@ -937,12 +1038,14 @@ testReleaseArtifactsStayInSync() {
     assertNotContains "$(cat README.md)" "og-v1.8.png"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
     assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "282/282"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "91/91"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,620/2,620"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "12,000/12,000"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "400/400"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "35/35"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "282 accepted cases"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "91 strict-invalid cases"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,628 categorized programs"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "6 layouts × 7 collection sizes × 2 states × 8"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "Repository transaction suite"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "Kubernetes, Compose, GitHub Actions, GitLab CI"
+    assertNotContains "$(cat _static/_www/index.html)" "35/35"
+    assertNotContains "$(cat README.md)" "35/35"
 }
 
 # shellcheck source=/dev/null

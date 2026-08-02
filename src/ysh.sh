@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.9.0
+YSH_VERSION=1.10.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -24,6 +24,8 @@ Examples:
   ysh ".services[] | select(.enabled) | .name" config.yml
   ysh -o yaml '.release.channel = "stable"' config.yml
   ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
+  ysh --check '.image.tag = "stable"' services/*.yml
+  ysh eval-all -i 'select(fileIndex == 0).tag as \$tag | select(fileIndex > 0).image.tag = \$tag' release.yml services/*.yml
   ysh -n -o yaml '{name: "api", enabled: true}'
   ysh '.services | map(.name) | unique' config.yml
   ysh ".services | length" config.yml
@@ -50,6 +52,7 @@ Documents:
       --all-documents     evaluate every document in a stream
   -n, --null-input        build output without reading input
   -i, --inplace           transactionally update YAML files in place
+      --check             preflight changes without writing (0 clean, 1 drift, 2 error)
 
 Evaluation:
   -e, --exit-status       fail on no result, null, or false
@@ -69,7 +72,7 @@ Other:
 
 QUERY supports yq-style paths, streams, variables, slices, interpolation,
 portable regexes, maps, reducers, sorting, arithmetic, construction,
-assignment, deletion, and deep merge. Collections emit JSON by default.
+assignment, deletion, and deep merge policies. Collections emit JSON by default.
 Safe in-place edits preserve comments; other edits emit stable YAML.
 EOF
 }
@@ -92,6 +95,8 @@ ysh_invoke_awk() {
         -v selected_document="$YSH_DOCUMENT" \
         -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
         -v eval_all_mode="$YSH_EVAL_ALL" \
+        -v batch_files_mode="$YSH_BATCH_FILES" \
+        -v transaction_batch_mode="$YSH_TRANSACTION_BATCH" \
         -v combined_files_mode="$YSH_COMBINED_FILES" \
         -v null_input_mode="$YSH_NULL_INPUT" \
         -v inplace_mode="$YSH_INPLACE" \
@@ -112,7 +117,7 @@ ysh_run_awk() {
     YSH_QUERY_TEXT=$YSH_QUERY
     export YSH_QUERY_TEXT
     YSH_COMBINED_FILES=0
-    if [ "$YSH_EVAL_ALL" -eq 1 ] && [ "$#" -gt 0 ]; then
+    if { [ "$YSH_EVAL_ALL" -eq 1 ] || [ "$YSH_BATCH_FILES" -eq 1 ]; } && [ "$#" -gt 0 ]; then
         YSH_COMBINED_FILES=1
         ysh_invoke_awk "$@"
     elif [ "$YSH_NULL_INPUT" -eq 1 ]; then
@@ -147,6 +152,11 @@ ysh_run_files() {
         ysh_run_awk "$@"
         return $?
     fi
+    if [ "$YSH_EXPLAIN" -eq 0 ]; then
+        YSH_BATCH_FILES=1
+        ysh_run_awk "$@"
+        return $?
+    fi
     for YSH_INPUT_FILE do
         if [ "$YSH_INPUT_FILE" != "-" ] && [ ! -f "$YSH_INPUT_FILE" ]; then
             ysh_error "input file does not exist: $YSH_INPUT_FILE"
@@ -176,7 +186,8 @@ ysh_cleanup_transaction() {
         fi
     done
     for YSH_CLEANUP_LIST in "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST" \
-        "$YSH_TRANSACTION_REPORT" "$YSH_TRANSACTION_CALL_LOG"; do
+        "$YSH_TRANSACTION_REPORT" "$YSH_TRANSACTION_CALL_LOG" "$YSH_TRANSACTION_OUTPUT" "$YSH_TRANSACTION_CHANGE_LIST" \
+        "$YSH_TRANSACTION_COMMITTED_INPUT_LIST" "$YSH_TRANSACTION_COMMITTED_OLD_LIST"; do
         [ -z "$YSH_CLEANUP_LIST" ] || rm -f "$YSH_CLEANUP_LIST"
     done
 }
@@ -193,6 +204,89 @@ ysh_emit_transaction_log() {
     done < "$1"
 }
 
+ysh_emit_transaction_errors() {
+    while IFS= read -r YSH_LOG_LINE; do
+        case "$YSH_LOG_LINE" in
+        Explain:*|'{'*) ;;
+        *) printf '%s\n' "$YSH_LOG_LINE" >&2 ;;
+        esac
+    done < "$1"
+}
+
+ysh_split_transaction_output() {
+    YSH_FRAME_PREFIX="$(printf '\036')YSHFILE "
+    YSH_FRAME_COUNT=0
+    YSH_FRAME_TARGET=
+    YSH_FRAME_WRITE=0
+    YSH_FRAME_SEEN=0
+    while IFS= read -r YSH_FRAME_LINE; do
+        case "$YSH_FRAME_LINE" in
+        "$YSH_FRAME_PREFIX"*)
+            YSH_FRAME_DATA=${YSH_FRAME_LINE#"$YSH_FRAME_PREFIX"}
+            YSH_FRAME_INDEX=${YSH_FRAME_DATA%% *}
+            YSH_FRAME_CHANGED=${YSH_FRAME_DATA#* }
+            if [ "$YSH_FRAME_INDEX" -ne "$YSH_FRAME_COUNT" ] 2>/dev/null ||
+                { [ "$YSH_FRAME_CHANGED" != 0 ] && [ "$YSH_FRAME_CHANGED" != 1 ]; }; then
+                ysh_error "invalid transaction output frame"
+                return 1
+            fi
+            if ! IFS= read -r YSH_FRAME_INPUT <&4; then
+                ysh_error "transaction output has too many inputs"
+                return 1
+            fi
+            YSH_FRAME_WRITE=$YSH_FRAME_CHANGED
+            YSH_FRAME_SEEN=1
+            if [ "$YSH_FRAME_WRITE" -eq 1 ]; then
+                case "$YSH_FRAME_INPUT" in
+                */*)
+                    YSH_FRAME_DIR=${YSH_FRAME_INPUT%/*}
+                    YSH_FRAME_NAME=${YSH_FRAME_INPUT##*/}
+                    ;;
+                *)
+                    YSH_FRAME_DIR=.
+                    YSH_FRAME_NAME=$YSH_FRAME_INPUT
+                    ;;
+                esac
+                if ! YSH_FRAME_TARGET=$(umask 077 && mktemp "${YSH_FRAME_DIR}/.${YSH_FRAME_NAME}.ysh-new.XXXXXX") 2>/dev/null; then
+                    ysh_error "could not create candidate beside: $YSH_FRAME_INPUT"
+                    return 1
+                fi
+                printf '%s\n' "$YSH_FRAME_TARGET" >> "$YSH_TRANSACTION_NEW_LIST"
+                if ! YSH_FRAME_OLD=$(umask 077 && mktemp "${YSH_FRAME_DIR}/.${YSH_FRAME_NAME}.ysh-old.XXXXXX") 2>/dev/null; then
+                    ysh_error "could not create rollback copy beside: $YSH_FRAME_INPUT"
+                    return 1
+                fi
+                printf '%s\n' "$YSH_FRAME_OLD" >> "$YSH_TRANSACTION_OLD_LIST"
+                if ! cp -p "$YSH_FRAME_INPUT" "$YSH_FRAME_TARGET"; then
+                    ysh_error "could not preserve input metadata: $YSH_FRAME_INPUT"
+                    return 1
+                fi
+                : > "$YSH_FRAME_TARGET"
+            else
+                YSH_FRAME_TARGET=
+                printf '\n' >> "$YSH_TRANSACTION_NEW_LIST"
+                printf '\n' >> "$YSH_TRANSACTION_OLD_LIST"
+            fi
+            printf '%s\n' "$YSH_FRAME_CHANGED" >> "$YSH_TRANSACTION_CHANGE_LIST"
+            YSH_FRAME_COUNT=$((YSH_FRAME_COUNT + 1))
+            ;;
+        *)
+            if [ "$YSH_FRAME_SEEN" -eq 0 ]; then
+                ysh_error "transaction output is missing a file frame"
+                return 1
+            fi
+            if [ "$YSH_FRAME_WRITE" -eq 1 ]; then
+                printf '%s\n' "$YSH_FRAME_LINE" >> "$YSH_FRAME_TARGET"
+            fi
+            ;;
+        esac
+    done < "$YSH_TRANSACTION_OUTPUT" 4< "$YSH_TRANSACTION_INPUT_LIST"
+    if [ "$YSH_FRAME_COUNT" -ne "$YSH_TRANSACTION_FILE_COUNT" ]; then
+        ysh_error "transaction output is missing files"
+        return 1
+    fi
+}
+
 ysh_rollback_transaction() {
     YSH_ROLLBACK_STATUS=0
     while IFS= read -r YSH_ROLLBACK_INPUT && IFS= read -r YSH_ROLLBACK_OLD <&4; do
@@ -202,7 +296,7 @@ ysh_rollback_transaction() {
                 YSH_ROLLBACK_STATUS=1
             fi
         fi
-    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_OLD_LIST"
+    done < "$YSH_TRANSACTION_COMMITTED_INPUT_LIST" 4< "$YSH_TRANSACTION_COMMITTED_OLD_LIST"
     return "$YSH_ROLLBACK_STATUS"
 }
 
@@ -213,26 +307,62 @@ ysh_interrupt_transaction() {
     exit 1
 }
 
+ysh_close_transaction() {
+    ysh_cleanup_transaction
+    YSH_TRANSACTION_INPUT_LIST=
+    YSH_TRANSACTION_NEW_LIST=
+    YSH_TRANSACTION_OLD_LIST=
+    YSH_TRANSACTION_REPORT=
+    YSH_TRANSACTION_CALL_LOG=
+    YSH_TRANSACTION_OUTPUT=
+    YSH_TRANSACTION_CHANGE_LIST=
+    YSH_TRANSACTION_COMMITTED_INPUT_LIST=
+    YSH_TRANSACTION_COMMITTED_OLD_LIST=
+    trap - 0 1 2 3 15
+}
+
+ysh_report_check() {
+    YSH_CHECK_CHANGED_COUNT=0
+    while IFS= read -r YSH_CHECK_INPUT && IFS= read -r YSH_CHECK_CHANGED <&4; do
+        if [ "$YSH_CHECK_CHANGED" -eq 1 ]; then
+            YSH_CHECK_CHANGED_COUNT=$((YSH_CHECK_CHANGED_COUNT + 1))
+            if [ "$YSH_EXPLAIN" -ne 2 ]; then
+                printf 'Check: would change %s\n' "$YSH_CHECK_INPUT" >&2
+            fi
+        fi
+    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_CHANGE_LIST"
+    if [ "$YSH_EXPLAIN" -ne 2 ]; then
+        if [ "$YSH_CHECK_CHANGED_COUNT" -eq 0 ]; then
+            printf '%s\n' 'Check: no changes' >&2
+        else
+            printf 'Check: %d file(s) would change; no files written\n' "$YSH_CHECK_CHANGED_COUNT" >&2
+        fi
+    fi
+    ysh_emit_transaction_log "$YSH_TRANSACTION_REPORT"
+    [ "$YSH_CHECK_CHANGED_COUNT" -eq 0 ]
+}
+
 ysh_run_inplace_transaction() {
-    YSH_TRANSACTION_INPUT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-inputs.XXXXXX") || return 1
-    YSH_TRANSACTION_NEW_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-new.XXXXXX") || {
-        rm -f "$YSH_TRANSACTION_INPUT_LIST"
-        return 1
-    }
-    YSH_TRANSACTION_OLD_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-old.XXXXXX") || {
-        rm -f "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST"
-        return 1
-    }
-    YSH_TRANSACTION_REPORT=$(mktemp "${TMPDIR:-/tmp}/ysh-report.XXXXXX") || {
-        rm -f "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST"
-        return 1
-    }
-    YSH_TRANSACTION_CALL_LOG=$(mktemp "${TMPDIR:-/tmp}/ysh-call-log.XXXXXX") || {
-        rm -f "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST" "$YSH_TRANSACTION_REPORT"
-        return 1
-    }
+    YSH_TRANSACTION_INPUT_LIST=
+    YSH_TRANSACTION_NEW_LIST=
+    YSH_TRANSACTION_OLD_LIST=
+    YSH_TRANSACTION_REPORT=
+    YSH_TRANSACTION_CALL_LOG=
+    YSH_TRANSACTION_OUTPUT=
+    YSH_TRANSACTION_CHANGE_LIST=
+    YSH_TRANSACTION_COMMITTED_INPUT_LIST=
+    YSH_TRANSACTION_COMMITTED_OLD_LIST=
     trap 'ysh_cleanup_transaction' 0
     trap 'ysh_interrupt_transaction' 1 2 3 15
+    YSH_TRANSACTION_INPUT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-inputs.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_NEW_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-new.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_OLD_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-old.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_REPORT=$(mktemp "${TMPDIR:-/tmp}/ysh-report.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_CALL_LOG=$(mktemp "${TMPDIR:-/tmp}/ysh-call-log.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-output.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_CHANGE_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-changes.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_COMMITTED_INPUT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-committed-inputs.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_COMMITTED_OLD_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-committed-old.XXXXXX") || { ysh_close_transaction; return 1; }
 
     YSH_SAVED_IFS=$IFS
     IFS='
@@ -245,6 +375,8 @@ ysh_run_inplace_transaction() {
     IFS=$YSH_SAVED_IFS
 
     YSH_FILE_INDEX=0
+    YSH_TRANSACTION_FILE_COUNT=0
+    YSH_NORMALIZED_INPUT_FILES=
     YSH_OUTPUT_MODE=yaml
     for YSH_TRANSACTION_INPUT do
         if [ "$YSH_TRANSACTION_INPUT" = "-" ]; then
@@ -260,15 +392,8 @@ ysh_run_inplace_transaction() {
             return 1
         fi
         case "$YSH_TRANSACTION_INPUT" in
-        */*)
-            YSH_INPUT_DIR=${YSH_TRANSACTION_INPUT%/*}
-            YSH_INPUT_NAME=${YSH_TRANSACTION_INPUT##*/}
-            ;;
-        *)
-            YSH_INPUT_DIR=.
-            YSH_INPUT_NAME=$YSH_TRANSACTION_INPUT
-            YSH_TRANSACTION_INPUT=./$YSH_TRANSACTION_INPUT
-            ;;
+        */*) ;;
+        *) YSH_TRANSACTION_INPUT=./$YSH_TRANSACTION_INPUT ;;
         esac
         while IFS= read -r YSH_TRANSACTION_EXISTING; do
             if [ "$YSH_TRANSACTION_EXISTING" = "$YSH_TRANSACTION_INPUT" ]; then
@@ -276,44 +401,73 @@ ysh_run_inplace_transaction() {
                 return 2
             fi
         done < "$YSH_TRANSACTION_INPUT_LIST"
-        if ! YSH_TRANSACTION_NEW=$(umask 077 && mktemp "${YSH_INPUT_DIR}/.${YSH_INPUT_NAME}.ysh-new.XXXXXX") 2>/dev/null; then
-            ysh_error "could not create candidate beside: $YSH_TRANSACTION_INPUT"
-            return 1
-        fi
-        if ! YSH_TRANSACTION_OLD=$(umask 077 && mktemp "${YSH_INPUT_DIR}/.${YSH_INPUT_NAME}.ysh-old.XXXXXX") 2>/dev/null; then
-            rm -f "$YSH_TRANSACTION_NEW"
-            ysh_error "could not create rollback copy beside: $YSH_TRANSACTION_INPUT"
-            return 1
-        fi
         printf '%s\n' "$YSH_TRANSACTION_INPUT" >> "$YSH_TRANSACTION_INPUT_LIST"
-        printf '%s\n' "$YSH_TRANSACTION_NEW" >> "$YSH_TRANSACTION_NEW_LIST"
-        printf '%s\n' "$YSH_TRANSACTION_OLD" >> "$YSH_TRANSACTION_OLD_LIST"
-        if ! cp -p "$YSH_TRANSACTION_INPUT" "$YSH_TRANSACTION_NEW" ||
-            ! cp -p "$YSH_TRANSACTION_INPUT" "$YSH_TRANSACTION_OLD"; then
-            ysh_error "could not preserve input metadata: $YSH_TRANSACTION_INPUT"
-            return 1
+        if [ -z "$YSH_NORMALIZED_INPUT_FILES" ]; then
+            YSH_NORMALIZED_INPUT_FILES=$YSH_TRANSACTION_INPUT
+        else
+            YSH_NORMALIZED_INPUT_FILES="${YSH_NORMALIZED_INPUT_FILES}
+${YSH_TRANSACTION_INPUT}"
         fi
-        YSH_INPUT_FILE=$YSH_TRANSACTION_INPUT
-        YSH_INPUT_FILENAME=$YSH_TRANSACTION_INPUT
-        : > "$YSH_TRANSACTION_CALL_LOG"
-        if ! ysh_run_awk > "$YSH_TRANSACTION_NEW" 2> "$YSH_TRANSACTION_CALL_LOG"; then
-            ysh_emit_transaction_log "$YSH_TRANSACTION_CALL_LOG"
-            ysh_error "transaction aborted before writing any files"
-            return 1
-        fi
-        ysh_append_transaction_log
-        YSH_FILE_INDEX=$((YSH_FILE_INDEX + 1))
+        YSH_TRANSACTION_FILE_COUNT=$((YSH_TRANSACTION_FILE_COUNT + 1))
     done
+
+    YSH_SAVED_IFS=$IFS
+    IFS='
+'
+    set -f
+    # shellcheck disable=SC2086
+    set -- $YSH_NORMALIZED_INPUT_FILES
+    set +f
+    IFS=$YSH_SAVED_IFS
+    YSH_FILE_INDEX=0
+    YSH_BATCH_FILES=1
+    YSH_TRANSACTION_BATCH=1
+    : > "$YSH_TRANSACTION_CALL_LOG"
+    if ! ysh_run_awk "$@" > "$YSH_TRANSACTION_OUTPUT" 2> "$YSH_TRANSACTION_CALL_LOG"; then
+        ysh_emit_transaction_errors "$YSH_TRANSACTION_CALL_LOG"
+        ysh_error "transaction aborted before writing any files"
+        if [ "$YSH_CHECK" -eq 1 ]; then
+            return 2
+        fi
+        return 1
+    fi
+    if ! ysh_split_transaction_output; then
+        ysh_error "transaction aborted before writing any files"
+        if [ "$YSH_CHECK" -eq 1 ]; then
+            return 2
+        fi
+        return 1
+    fi
+    ysh_append_transaction_log
+
+    if [ "$YSH_CHECK" -eq 1 ]; then
+        YSH_CHECK_STATUS=0
+        ysh_report_check || YSH_CHECK_STATUS=1
+        ysh_close_transaction
+        return "$YSH_CHECK_STATUS"
+    fi
 
     YSH_TRANSACTION_STATUS=0
     YSH_TRANSACTION_COMMITTING=1
-    while IFS= read -r YSH_TRANSACTION_INPUT && IFS= read -r YSH_TRANSACTION_NEW <&4; do
+    while IFS= read -r YSH_TRANSACTION_INPUT && IFS= read -r YSH_TRANSACTION_NEW <&4 &&
+        IFS= read -r YSH_TRANSACTION_CHANGED <&5 && IFS= read -r YSH_TRANSACTION_OLD <&6; do
+        if [ "$YSH_TRANSACTION_CHANGED" -eq 0 ]; then
+            continue
+        fi
+        if ! cp -p "$YSH_TRANSACTION_INPUT" "$YSH_TRANSACTION_OLD"; then
+            ysh_error "could not preserve rollback copy: $YSH_TRANSACTION_INPUT"
+            YSH_TRANSACTION_STATUS=1
+            break
+        fi
+        printf '%s\n' "$YSH_TRANSACTION_INPUT" >> "$YSH_TRANSACTION_COMMITTED_INPUT_LIST"
+        printf '%s\n' "$YSH_TRANSACTION_OLD" >> "$YSH_TRANSACTION_COMMITTED_OLD_LIST"
         if ! mv -f "$YSH_TRANSACTION_NEW" "$YSH_TRANSACTION_INPUT"; then
             ysh_error "could not replace input file: $YSH_TRANSACTION_INPUT"
             YSH_TRANSACTION_STATUS=1
             break
         fi
-    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_NEW_LIST"
+    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_NEW_LIST" 5< "$YSH_TRANSACTION_CHANGE_LIST" \
+        6< "$YSH_TRANSACTION_OLD_LIST"
     if [ "$YSH_TRANSACTION_STATUS" -ne 0 ]; then
         ysh_rollback_transaction || :
         YSH_TRANSACTION_COMMITTING=0
@@ -322,13 +476,7 @@ ysh_run_inplace_transaction() {
 
     YSH_TRANSACTION_COMMITTING=0
     ysh_emit_transaction_log "$YSH_TRANSACTION_REPORT"
-    ysh_cleanup_transaction
-    YSH_TRANSACTION_INPUT_LIST=
-    YSH_TRANSACTION_NEW_LIST=
-    YSH_TRANSACTION_OLD_LIST=
-    YSH_TRANSACTION_REPORT=
-    YSH_TRANSACTION_CALL_LOG=
-    trap - 0 1 2 3 15
+    ysh_close_transaction
 }
 
 ysh_main() {
@@ -336,10 +484,13 @@ ysh_main() {
     YSH_DOCUMENT=0
     YSH_ALL_DOCUMENTS=0
     YSH_EVAL_ALL=0
+    YSH_BATCH_FILES=0
+    YSH_TRANSACTION_BATCH=0
     YSH_QUERY=.
     YSH_INPUT_FILE=
     YSH_NULL_INPUT=0
     YSH_INPLACE=0
+    YSH_CHECK=0
     YSH_EXIT_STATUS=0
     YSH_EXPLAIN=0
     YSH_INDENT=2
@@ -453,6 +604,10 @@ ysh_main() {
             ;;
         -i|--inplace|--in-place)
             YSH_INPLACE=1
+            shift
+            ;;
+        --check)
+            YSH_CHECK=1
             shift
             ;;
         -e|--exit-status)
@@ -615,11 +770,18 @@ $1"
 ${YSH_POSITIONAL_REST}"
     fi
 
+    if [ "$YSH_CHECK" -eq 1 ] && [ "$YSH_INPLACE" -eq 1 ]; then
+        ysh_error "--check cannot be combined with --inplace"
+        return 2
+    fi
+    if [ "$YSH_CHECK" -eq 1 ] && [ "$YSH_EXIT_STATUS" -eq 1 ]; then
+        ysh_error "--check cannot be combined with --exit-status"
+        return 2
+    fi
+    if [ "$YSH_CHECK" -eq 1 ]; then
+        YSH_INPLACE=1
+    fi
     if [ "$YSH_INPLACE" -eq 1 ]; then
-        if [ "$YSH_EVAL_ALL" -eq 1 ]; then
-            ysh_error "--inplace cannot be combined with eval-all"
-            return 2
-        fi
         if [ "$YSH_NULL_INPUT" -eq 1 ]; then
             ysh_error "--inplace cannot be combined with --null-input"
             return 2
@@ -632,7 +794,11 @@ ${YSH_POSITIONAL_REST}"
             YSH_INPUT_FILES=$YSH_INPUT_FILE
         fi
         ysh_run_inplace_transaction
-        return $?
+        YSH_TRANSACTION_RESULT=$?
+        if [ "$YSH_CHECK" -eq 1 ] && [ "$YSH_TRANSACTION_RESULT" -ne 0 ] && [ "$YSH_TRANSACTION_RESULT" -ne 1 ]; then
+            return 2
+        fi
+        return "$YSH_TRANSACTION_RESULT"
     fi
 
     if [ -n "$YSH_INPUT_FILES" ]; then

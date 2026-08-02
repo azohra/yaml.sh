@@ -1,6 +1,6 @@
 # Queries
 
-Version 1.9 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
+YAML.sh evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
 
 ## Paths
 
@@ -195,7 +195,16 @@ ysh 'reduce .services[].port as $port (0; . + $port)' config.yml
 ysh -n '[1, 2, 3][] as $item ireduce (0; . + $item)'
 ```
 
-The `*` operator recursively merges two mappings; at non-mapping leaves, the right side wins. It remains numeric multiplication for two numbers.
+The `*` operator recursively merges two mappings; at non-mapping leaves, the right side wins. It remains numeric multiplication for two numbers. Merge modifiers cover the configuration cases where one policy is not enough:
+
+| Operator | Merge policy |
+| --- | --- |
+| `*+` | Append arrays |
+| `*d` | Merge arrays by index |
+| `*?` | Update existing fields only |
+| `*n` | Add new fields only |
+
+Modifiers combine, as in `*?+` for existing fields with appended arrays.
 
 ## Context and environment
 
@@ -225,6 +234,14 @@ ysh '[filename, .name]' one.yml two.yml
 ysh --all-documents '[documentIndex, .name]' stream.yml
 ysh ea '[.]' one.yml two.yml
 ysh ea 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
+```
+
+It can also update every mutated source file as one transaction. This query reads the version from the first file and writes it into the rest:
+
+```sh
+query='select(fileIndex == 0).version as $version | select(fileIndex > 0).release.version = $version'
+ysh ea --check "$query" release.yml services/*.yml
+ysh ea -i "$query" release.yml services/*.yml
 ```
 
 `eval-all` is intentionally focused; it is not a complete clone of yq's general stream algebra.
@@ -265,9 +282,10 @@ ysh -o=yaml 'setpath(["spec", "replicas"]; 4)' deploy.yml
 ysh -o=yaml 'delpaths([["metadata", "annotations"], ["metadata", "managedFields"]])' deploy.yml
 ```
 
-Use `-i` to transactionally replace one or more real, non-symlink inputs. Every candidate is complete before the first replacement; a commit failure restores the originals.
+Use `--check` to run the same preflight without writing. It returns `0` when clean, `1` for drift, and `2` for an invalid query or input. Use `-i` to transactionally replace one or more real, non-symlink inputs. Every changed candidate is complete before the first replacement; no-op files are not replaced, and a commit failure restores the originals.
 
 ```sh
+ysh --check '.image.tag = "stable"' services/*.yml
 ysh -i '.image.tag = "stable"' services/*.yml
 ```
 
@@ -303,6 +321,6 @@ Scalar styles can be reset or set to plain, single, double, literal, or folded. 
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 1.9 does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
+This is a useful yq-shaped language, not the complete yq language. It does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.

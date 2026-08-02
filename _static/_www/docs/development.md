@@ -53,7 +53,7 @@ For every supported feature:
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 
-Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover generated grammar, exact source retention, hostile shapes, and bounded scale.
+Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available. `make fuzz` crosses 6 layouts, 7 collection sizes, 2 states, and 8 parser/query/mutation properties; set `YSH_FUZZ_MATRICES` and `YSH_FUZZ_SEED` for rotating value sweeps. `make presentation`, `make adversarial`, and `make scale` cover exact source retention, hostile shapes, and bounded scale.
 
 ## Add expression behavior
 

@@ -13,6 +13,7 @@ function classify(query) {
     if (query ~ /(env\(|strenv\(|envsubst)/) return "environment"
     if (query ~ /(path|parent|fileIndex|documentIndex|filename)/) return "context"
     if (query ~ /(sort_keys|to_number|with\(|filter\(|first|pick\(|omit\(|pivot)/) return "practical"
+    if ((substr(query, 1, 1) == "{" || substr(query, 1, 1) == "[") && query ~ / \*[+d?n]* /) return "merge"
     if (query ~ /\[[^]]*:[^]]*\]/) return "slices"
     if (query ~ /(group_by|sort_by|unique_by|min_by|max_by)/) return "grouping"
     if (query ~ /(^|[ |])(del\(|[^=!<>][+*|]?=)/) return "mutation"

@@ -619,6 +619,8 @@ function ensure_root(kind, source_line,    root) {
     if (!(document_index in document_root)) {
         root = new_node(kind, source_line, "", "", "")
         document_root[document_index] = root
+        document_file_index[document_index] = current_input_file_index
+        document_filename[document_index] = current_input_filename
         document_has_content[document_index] = 1
         return root
     }
@@ -632,6 +634,8 @@ function create_empty_document(source_line,    root) {
     }
     root = new_node("scalar", source_line, "", "null", "")
     document_root[document_index] = root
+    document_file_index[document_index] = current_input_file_index
+    document_filename[document_index] = current_input_filename
     document_has_content[document_index] = 1
     return root
 }
@@ -1620,6 +1624,8 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     }
     root = parse_value(text, source_line, indent, 1)
     document_root[document_index] = root
+    document_file_index[document_index] = current_input_file_index
+    document_filename[document_index] = current_input_filename
     document_has_content[document_index] = 1
     if (block_active && block_node == root && indent == 0) {
         block_base_indent = -1
@@ -2026,7 +2032,17 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         expression_token_value = substr(expression_source, start, expression_position - start)
         return
     }
-    if (char == "+" || char == "-" || char == "*" || char == "/" || char == "%") {
+    if (char == "*") {
+        start = expression_position
+        expression_position++
+        while (expression_position <= length(expression_source) && substr(expression_source, expression_position, 1) ~ /^[+d?n]$/) {
+            expression_position++
+        }
+        expression_token_type = "arithmetic"
+        expression_token_value = substr(expression_source, start, expression_position - start)
+        return
+    }
+    if (char == "+" || char == "-" || char == "/" || char == "%") {
         expression_token_type = "arithmetic"
         expression_token_value = char
         expression_position++
@@ -2575,8 +2591,10 @@ function explain_path(node,    depth, current, parent, edge, i, result, key) {
     return result == "" ? "." : result
 }
 
-function explain_record_mutation(kind, path) {
+function explain_record_mutation(kind, path, node,    file) {
     explain_mutation_count++
+    file = expression_input_file(node)
+    explain_mutation_file[explain_mutation_count] = file
     if (kind == "insert") {
         explain_insertion_count++
     } else if (kind == "delete") {
@@ -2607,6 +2625,26 @@ function explain_input_target(node,    current, document) {
         }
     }
     return 0
+}
+
+function expression_input_file(node,    current) {
+    current = node
+    while (current) {
+        if ((current in expression_missing_parent) && !expression_placeholder_attached[current]) {
+            current = expression_missing_parent[current]
+        } else if (current in node_parent) {
+            current = node_parent[current]
+        } else {
+            break
+        }
+    }
+    return (current in node_file_index) ? node_file_index[current] : input_file_index + 0
+}
+
+function expression_mark_changed(node,    file) {
+    expression_any_change = 1
+    file = expression_input_file(node)
+    expression_file_changed[file] = 1
 }
 
 function expression_envsubst(value, options,    result, i, char, closing, name, start, body, suffix, replacement, is_set) {
@@ -2851,7 +2889,7 @@ function expression_parse_unary(    operand) {
 
 function expression_parse_product(    left, operator, right) {
     left = expression_parse_unary()
-    while (expression_token_type == "arithmetic" && (expression_token_value == "*" || expression_token_value == "/" || expression_token_value == "%")) {
+    while (expression_token_type == "arithmetic" && (substr(expression_token_value, 1, 1) == "*" || expression_token_value == "/" || expression_token_value == "%")) {
         operator = expression_token_value
         expression_lex_next()
         right = expression_parse_unary()
@@ -3264,9 +3302,44 @@ function expression_attach_missing(node,    parent, key) {
     expression_placeholder_attached[node] = 1
 }
 
+function expression_node_state_equal(left, right,    i) {
+    if (node_kind[left] != node_kind[right] || node_type[left] != node_type[right] ||
+        node_value[left] != node_value[right] || node_tag[left] != node_tag[right] ||
+        node_anchor[left] != node_anchor[right]) {
+        return 0
+    }
+    if (node_kind[left] == "alias") {
+        return node_value[left] == node_value[right]
+    }
+    if (node_kind[left] == "sequence") {
+        if (sequence_count[left] != sequence_count[right]) {
+            return 0
+        }
+        for (i = 1; i <= sequence_count[left]; i++) {
+            if (!expression_node_state_equal(sequence_child[left, i], sequence_child[right, i])) {
+                return 0
+            }
+        }
+    } else if (node_kind[left] == "mapping") {
+        if (mapping_count[left] != mapping_count[right]) {
+            return 0
+        }
+        for (i = 1; i <= mapping_count[left]; i++) {
+            if (mapping_key[left, i] != mapping_key[right, i] || mapping_merge[left, i] != mapping_merge[right, i] ||
+                !expression_node_state_equal(mapping_child[left, i], mapping_child[right, i])) {
+                return 0
+            }
+        }
+    }
+    return 1
+}
+
 function expression_replace_node(target, source,    clone, saved_parent, saved_edge, saved_line, saved_document, i, key, child) {
     expression_last_replace_changed = 0
     if (resolve_alias(target) == resolve_alias(source) && !(target in expression_missing_parent)) {
+        return target
+    }
+    if (!(target in expression_missing_parent) && expression_node_state_equal(target, resolve_alias(source))) {
         return target
     }
     clone = expression_clone_node(source)
@@ -3666,11 +3739,40 @@ function expression_arithmetic_number(value, value_type, operator,    rendered) 
     return expression_scalar(rendered, value_type)
 }
 
-function expression_deep_merge(left, right,    left_node, right_node, result, collection, i, key, child, existing, merged) {
+function expression_deep_merge(left, right, flags,    left_node, right_node, result, collection, i, key, child, existing, merged, only_existing, only_new, append_arrays, deep_arrays) {
     left_node = resolve_alias(left)
     right_node = resolve_alias(right)
+    only_existing = index(flags, "?") > 0
+    only_new = index(flags, "n") > 0
+    append_arrays = index(flags, "+") > 0
+    deep_arrays = index(flags, "d") > 0
+    if (node_kind[left_node] == "sequence" && node_kind[right_node] == "sequence") {
+        result = expression_clone_node(left_node)
+        if (append_arrays) {
+            if (only_new) {
+                return result
+            }
+            for (i = 1; i <= sequence_count[right_node]; i++) {
+                add_sequence(result, expression_clone_node(sequence_child[right_node, i]), 0)
+            }
+            return result
+        }
+        if (deep_arrays) {
+            for (i = 1; i <= sequence_count[right_node]; i++) {
+                child = sequence_child[right_node, i]
+                if (i <= sequence_count[result]) {
+                    merged = expression_deep_merge(sequence_child[result, i], child, flags)
+                    expression_replace_node(sequence_child[result, i], merged)
+                } else if (!only_existing) {
+                    add_sequence(result, expression_clone_node(child), 0)
+                }
+            }
+            return result
+        }
+        return only_new ? result : expression_clone_node(right_node)
+    }
     if (node_kind[left_node] != "mapping" || node_kind[right_node] != "mapping") {
-        return expression_clone_node(right_node)
+        return only_new ? expression_clone_node(left_node) : expression_clone_node(right_node)
     }
     result = expression_clone_node(left_node)
     collection = ++collection_serial
@@ -3680,10 +3782,18 @@ function expression_deep_merge(left, right,    left_node, right_node, result, co
         child = mapping_lookup(right_node, key)
         existing = mapping_lookup(result, key)
         if (!existing) {
-            add_mapping(result, key, expression_clone_node(child), 0, 0)
+            if (!only_existing) {
+                add_mapping(result, key, expression_clone_node(child), 0, 0)
+            }
         } else if (node_kind[resolve_alias(existing)] == "mapping" && node_kind[resolve_alias(child)] == "mapping") {
-            merged = expression_deep_merge(existing, child)
+            merged = expression_deep_merge(existing, child, flags)
             expression_replace_node(existing, merged)
+        } else if (node_kind[resolve_alias(existing)] == "sequence" && node_kind[resolve_alias(child)] == "sequence" &&
+            (deep_arrays || (append_arrays && !only_new))) {
+            merged = expression_deep_merge(existing, child, flags)
+            expression_replace_node(existing, merged)
+        } else if (only_new) {
+            continue
         } else {
             expression_replace_node(existing, child)
         }
@@ -3752,8 +3862,10 @@ function expression_arithmetic(left, right, operator,    left_node, right_node, 
         }
         return result
     }
-    if (operator == "*" && node_kind[left_node] == "mapping" && node_kind[right_node] == "mapping") {
-        return expression_deep_merge(left_node, right_node)
+    if (substr(operator, 1, 1) == "*" &&
+        ((node_kind[left_node] == "mapping" && node_kind[right_node] == "mapping") ||
+         (node_kind[left_node] == "sequence" && node_kind[right_node] == "sequence"))) {
+        return expression_deep_merge(left_node, right_node, substr(operator, 2))
     }
     fail("operator " operator " does not support " expression_type_name(left_node) " and " expression_type_name(right_node))
 }
@@ -4188,13 +4300,22 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         variable = expression_value[expression]
         had = variable in expression_variable_node
         previous = expression_variable_node[variable]
-        for (i = 1; i <= expression_stream_count[input]; i++) {
-            single = expression_stream_single(expression_stream_node[input, i])
-            left_stream = expression_evaluate(expression_left[expression], single)
+        if (eval_all_mode && expression == eval_all_top_expression) {
+            left_stream = expression_evaluate(expression_left[expression], input)
             for (j = 1; j <= expression_stream_count[left_stream]; j++) {
                 expression_variable_node[variable] = expression_stream_node[left_stream, j]
-                right_stream = expression_evaluate(expression_right[expression], single)
+                right_stream = expression_evaluate(expression_right[expression], input)
                 expression_stream_append(output, right_stream)
+            }
+        } else {
+            for (i = 1; i <= expression_stream_count[input]; i++) {
+                single = expression_stream_single(expression_stream_node[input, i])
+                left_stream = expression_evaluate(expression_left[expression], single)
+                for (j = 1; j <= expression_stream_count[left_stream]; j++) {
+                    expression_variable_node[variable] = expression_stream_node[left_stream, j]
+                    right_stream = expression_evaluate(expression_right[expression], single)
+                    expression_stream_append(output, right_stream)
+                }
             }
         }
         if (had) {
@@ -4510,8 +4631,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     mutation_path = explain_path(child) " " property
                 }
                 expression_set_node_property(child, property, argument)
+                if (expression_last_property_changed) {
+                    expression_mark_changed(child)
+                }
                 if (explain_mode && input_target && expression_last_property_changed) {
-                    explain_record_mutation("replace", mutation_path)
+                    explain_record_mutation("replace", mutation_path, child)
                 }
             }
             expression_stream_push(output, node)
@@ -4535,8 +4659,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 mutation_path = explain_path(result_node)
             }
             expression_replace_node(result_node, child)
+            if (expression_last_replace_changed) {
+                expression_mark_changed(result_node)
+            }
             if (explain_mode && input_target && expression_last_replace_changed) {
-                explain_record_mutation(was_missing ? "insert" : "replace", mutation_path)
+                explain_record_mutation(was_missing ? "insert" : "replace", mutation_path, result_node)
             }
             expression_stream_push(output, node)
         }
@@ -4570,8 +4697,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     mutation_path = explain_path(child)
                 }
                 expression_delete_node(child)
+                if (expression_last_delete_changed) {
+                    expression_mark_changed(child)
+                }
                 if (explain_mode && input_target && expression_last_delete_changed) {
-                    explain_record_mutation("delete", mutation_path)
+                    explain_record_mutation("delete", mutation_path, child)
                 }
                 delete expression_path_target[path_serial, j]
             }
@@ -4595,8 +4725,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     was_missing = (node in expression_missing_parent) && !expression_placeholder_attached[node]
                 }
                 expression_replace_node(node, expression_stream_node[right_stream, j])
+                if (expression_last_replace_changed) {
+                    expression_mark_changed(node)
+                }
                 if (explain_mode && input_target && expression_last_replace_changed) {
-                    explain_record_mutation(was_missing ? "insert" : "replace", mutation_path)
+                    explain_record_mutation(was_missing ? "insert" : "replace", mutation_path, node)
                 }
             }
         } else {
@@ -4611,8 +4744,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     was_missing = (node in expression_missing_parent) && !expression_placeholder_attached[node]
                 }
                 expression_replace_node(node, child)
+                if (expression_last_replace_changed) {
+                    expression_mark_changed(node)
+                }
                 if (explain_mode && input_target && expression_last_replace_changed) {
-                    explain_record_mutation(was_missing ? "insert" : "replace", mutation_path)
+                    explain_record_mutation(was_missing ? "insert" : "replace", mutation_path, node)
                 }
             }
         }
@@ -4628,8 +4764,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 mutation_path = explain_path(node)
             }
             expression_delete_node(node)
+            if (expression_last_delete_changed) {
+                expression_mark_changed(node)
+            }
             if (explain_mode && input_target && expression_last_delete_changed) {
-                explain_record_mutation("delete", mutation_path)
+                explain_record_mutation("delete", mutation_path, node)
             }
         }
         expression_stream_append(output, input)
@@ -5845,8 +5984,14 @@ function emit_presented_reorder(line,    item, source_line, start, end) {
     }
 }
 
-function emit_preserved_input(    line, i) {
-    for (line = 1; line <= NR; line++) {
+function emit_preserved_input(start_line, end_line,    line, i) {
+    if (!start_line) {
+        start_line = 1
+    }
+    if (!end_line) {
+        end_line = NR
+    }
+    for (line = start_line; line <= end_line; line++) {
         if (line in presentation_deleted_line) {
         } else if (line in presentation_line_node) {
             emit_presented_line(line, presentation_line_node[line])
@@ -5862,29 +6007,103 @@ function emit_preserved_input(    line, i) {
     }
 }
 
-function transform_all_documents(query,    document, root, expression, input, results) {
+function transform_all_documents(query, file_filter,    document, root, expression, input, results) {
+    if (!compiled_expression) {
+        compiled_expression = expression_parse(query)
+    }
+    expression = compiled_expression
     for (document = 0; document <= document_index; document++) {
-        if (!(document in document_root)) {
+        if (!(document in document_root) || (file_filter != "" && document_file_index[document] != file_filter)) {
             continue
         }
         root = document_root[document]
-        expression = expression_parse(query)
         input = expression_stream_single(root)
         results = expression_evaluate(expression, input)
         explain_result_count += expression_stream_count[results]
     }
 }
 
-function emit_all_yaml_documents(    document, emitted) {
+function transform_eval_all_documents(query,    document, expression, input, results, i, file) {
+    if (!compiled_expression) {
+        compiled_expression = expression_parse(query)
+    }
+    expression = compiled_expression
+    eval_all_top_expression = expression
+    input = expression_stream_new()
+    for (document = 0; document <= document_index; document++) {
+        if (document in document_root) {
+            expression_stream_push(input, document_root[document])
+        }
+    }
+    results = expression_evaluate(expression, input)
+    explain_result_count += expression_stream_count[results]
+    for (i = 1; i <= expression_stream_count[results]; i++) {
+        file = expression_input_file(expression_stream_node[results, i])
+        explain_file_result_count[file]++
+    }
+}
+
+function emit_all_yaml_documents(file_filter,    document, emitted) {
     emitted = 0
     for (document = 0; document <= document_index; document++) {
-        if (!(document in document_root)) {
+        if (!(document in document_root) || (file_filter != "" && document_file_index[document] != file_filter)) {
             continue
         }
         if (emitted++) {
             print "---"
         }
         emit_yaml(document_root[document])
+    }
+}
+
+function clear_explain_state(    i) {
+    for (i = 1; i <= explain_mutation_count; i++) {
+        delete explain_mutation_kind[i]
+        delete explain_mutation_path[i]
+        delete explain_mutation_file[i]
+    }
+    explain_result_count = 0
+    explain_mutation_count = 0
+    explain_replacement_count = 0
+    explain_insertion_count = 0
+    explain_deletion_count = 0
+    final_result_count = 0
+    final_result_truthy = 0
+}
+
+function output_transaction_files(query,    file, last_file, start_nodes, marker, transaction_start_nodes) {
+    last_file = declared_input_file_count ? declared_last_input_file_index : current_input_file_index
+    marker = sprintf("%c", 30) "YSHFILE "
+    if (eval_all_mode) {
+        presentation_possible = 1
+        clear_explain_state()
+        transaction_start_nodes = node_count
+        transform_eval_all_documents(query)
+    }
+    for (file = input_file_index + 0; file <= last_file; file++) {
+        current_input_file_index = file
+        current_input_filename = input_file_name[file]
+        if (!eval_all_mode) {
+            presentation_possible = 1
+            clear_explain_state()
+            start_nodes = node_count
+            transform_all_documents(query, file)
+        } else {
+            start_nodes = transaction_start_nodes
+        }
+        print marker file " " (expression_file_changed[file] ? 1 : 0)
+        if (presentation_possible && input_file_has_lines[file]) {
+            emit_preserved_input(input_file_start_line[file], input_file_end_line[file])
+        } else if (!presentation_possible) {
+            emit_all_yaml_documents(file)
+        }
+        if (explain_mode) {
+            explain_file_mode = 1
+            explain_file_index = file
+            explain_file_generated_nodes = node_count - start_nodes
+            output_explain()
+            explain_file_mode = 0
+        }
     }
 }
 
@@ -6007,15 +6226,47 @@ function output_expression_results(results, output_mode,    i) {
     }
 }
 
-function output_explain(    documents, document, generated, presentation, shown, i, source) {
+function output_explain(    documents, document, generated, presentation, shown, i, source, results, mutations, replacements, insertions, deletions, emitted_changes, parsed) {
     documents = 0
     for (document = 0; document <= document_index; document++) {
-        if (document in document_root) {
+        if ((document in document_root) && (!explain_file_mode || document_file_index[document] == explain_file_index)) {
             documents++
         }
     }
-    generated = node_count - parsed_node_count
-    source = combined_files_mode ? "multiple files" : input_filename
+    parsed = parsed_node_count
+    generated = explain_file_mode ? explain_file_generated_nodes : node_count - parsed_node_count
+    results = explain_result_count + 0
+    mutations = explain_mutation_count + 0
+    replacements = explain_replacement_count + 0
+    insertions = explain_insertion_count + 0
+    deletions = explain_deletion_count + 0
+    if (explain_file_mode && eval_all_mode) {
+        parsed = 0
+        results = explain_file_result_count[explain_file_index] + 0
+        mutations = 0
+        replacements = 0
+        insertions = 0
+        deletions = 0
+        for (i = 1; i <= parsed_node_count; i++) {
+            if (node_file_index[i] == explain_file_index) {
+                parsed++
+            }
+        }
+        for (i = 1; i <= explain_mutation_count; i++) {
+            if (explain_mutation_file[i] != explain_file_index) {
+                continue
+            }
+            mutations++
+            if (explain_mutation_kind[i] == "insert") {
+                insertions++
+            } else if (explain_mutation_kind[i] == "delete") {
+                deletions++
+            } else {
+                replacements++
+            }
+        }
+    }
+    source = explain_file_mode ? input_file_name[explain_file_index] : (combined_files_mode ? "multiple files" : input_filename)
     if (source == "") {
         source = "-"
     }
@@ -6027,11 +6278,15 @@ function output_explain(    documents, document, generated, presentation, shown,
         presentation = "regenerated"
     }
     if (explain_mode == 2) {
-        printf "{\"input\":%s,\"documents\":%d,\"parsed_nodes\":%d,\"generated_nodes\":%d,", json_quote(source), documents, parsed_node_count, generated > "/dev/stderr"
-        printf "\"results\":%d,\"mutations\":%d,\"replacements\":%d,\"insertions\":%d,\"deletions\":%d,", explain_result_count + 0, explain_mutation_count + 0, explain_replacement_count + 0, explain_insertion_count + 0, explain_deletion_count + 0 > "/dev/stderr"
+        printf "{\"input\":%s,\"documents\":%d,\"parsed_nodes\":%d,\"generated_nodes\":%d,", json_quote(source), documents, parsed, generated > "/dev/stderr"
+        printf "\"results\":%d,\"mutations\":%d,\"replacements\":%d,\"insertions\":%d,\"deletions\":%d,", results, mutations, replacements, insertions, deletions > "/dev/stderr"
         printf "\"presentation\":%s,\"changes\":[", json_quote(presentation) > "/dev/stderr"
+        emitted_changes = 0
         for (i = 1; i <= explain_mutation_count; i++) {
-            if (i > 1) {
+            if (explain_file_mode && eval_all_mode && explain_mutation_file[i] != explain_file_index) {
+                continue
+            }
+            if (emitted_changes++) {
                 printf "," > "/dev/stderr"
             }
             printf "{\"kind\":%s,\"path\":%s}", json_quote(explain_mutation_kind[i]), json_quote(explain_mutation_path[i]) > "/dev/stderr"
@@ -6039,16 +6294,20 @@ function output_explain(    documents, document, generated, presentation, shown,
         print "]}" > "/dev/stderr"
         return
     }
-    print "Explain: input=" json_quote(source) " documents=" documents " parsed_nodes=" parsed_node_count " generated_nodes=" generated > "/dev/stderr"
-    print "Explain: results=" (explain_result_count + 0) " mutations=" (explain_mutation_count + 0) \
-        " replacements=" (explain_replacement_count + 0) " insertions=" (explain_insertion_count + 0) \
-        " deletions=" (explain_deletion_count + 0) " presentation=" presentation > "/dev/stderr"
-    shown = explain_mutation_count < 20 ? explain_mutation_count : 20
-    for (i = 1; i <= shown; i++) {
+    print "Explain: input=" json_quote(source) " documents=" documents " parsed_nodes=" parsed " generated_nodes=" generated > "/dev/stderr"
+    print "Explain: results=" results " mutations=" mutations \
+        " replacements=" replacements " insertions=" insertions \
+        " deletions=" deletions " presentation=" presentation > "/dev/stderr"
+    shown = 0
+    for (i = 1; i <= explain_mutation_count && shown < 20; i++) {
+        if (explain_file_mode && eval_all_mode && explain_mutation_file[i] != explain_file_index) {
+            continue
+        }
         print "Explain: " explain_mutation_kind[i] " " explain_mutation_path[i] > "/dev/stderr"
+        shown++
     }
-    if (explain_mutation_count > shown) {
-        print "Explain: ... " (explain_mutation_count - shown) " more mutations" > "/dev/stderr"
+    if (mutations > shown) {
+        print "Explain: ... " (mutations - shown) " more mutations" > "/dev/stderr"
     }
 }
 
@@ -6092,6 +6351,45 @@ function output_eval_all(query, output_mode,    expression, input, results, i) {
     output_expression_results(results, output_mode)
 }
 
+function output_batch_files(query, output_mode,    file, last_file, document, found, file_truthy, file_has_document) {
+    if (!compiled_expression && output_mode != "ast" && output_mode != "events") {
+        compiled_expression = expression_parse(query)
+    }
+    last_file = declared_input_file_count ? declared_last_input_file_index : current_input_file_index
+    for (file = input_file_index + 0; file <= last_file; file++) {
+        found = 0
+        file_has_document = 0
+        file_truthy = 0
+        current_input_file_index = file
+        current_input_filename = input_file_name[file]
+        for (document = 0; document <= document_index; document++) {
+            if (!(document in document_root) || document_file_index[document] != file) {
+                continue
+            }
+            file_has_document = 1
+            current_input_filename = document_filename[document]
+            if (!all_documents_mode && (node_document[document_root[document]] + 0) != selected_document + 0) {
+                continue
+            }
+            found = 1
+            output_result(document, query, output_mode)
+            file_truthy = final_result_count && final_result_truthy
+            if (!all_documents_mode) {
+                break
+            }
+        }
+        if (!found) {
+            if (!file_has_document) {
+                continue
+            }
+            fail("document index not found: " (selected_document + 0) " in " current_input_filename)
+        }
+        if (exit_status_mode && !file_truthy) {
+            batch_files_exit_status = 1
+        }
+    }
+}
+
 BEGIN {
     document_index = 0
     query = ENVIRON["YSH_QUERY_TEXT"]
@@ -6114,13 +6412,36 @@ BEGIN {
     current_input_file_index = input_file_index + 0
     current_input_filename = input_filename
     file_document_offset = 0
+    if (combined_files_mode) {
+        for (argument_index = 1; argument_index < ARGC; argument_index++) {
+            if (ARGV[argument_index] == "") {
+                continue
+            }
+            declared_file_index = input_file_index + declared_input_file_count
+            input_file_name[declared_file_index] = ARGV[argument_index]
+            declared_input_file_count++
+        }
+        declared_last_input_file_index = input_file_index + declared_input_file_count - 1
+    }
 }
 
 {
     if (combined_files_mode && FNR == 1) {
-        if (NR == 1) {
+        next_input_file_index = combined_seen_file ? current_input_file_index + 1 : input_file_index + 0
+        while (next_input_file_index <= declared_last_input_file_index && input_file_name[next_input_file_index] != FILENAME) {
+            next_input_file_index++
+        }
+        if (next_input_file_index > declared_last_input_file_index) {
+            fail("could not map combined input file: " FILENAME)
+        }
+        if (!combined_seen_file) {
+            current_input_file_index = next_input_file_index
             current_input_filename = FILENAME
+            input_file_start_line[current_input_file_index] = NR
+            input_file_has_lines[current_input_file_index] = 1
+            combined_seen_file = 1
         } else {
+            input_file_end_line[current_input_file_index] = NR - 1
             if (multiline_scalar_active || multiline_flow_active) {
                 fail("a YAML scalar or flow collection cannot span input files")
             }
@@ -6136,8 +6457,10 @@ BEGIN {
             }
             document_ended = 0
             clear_structure()
-            current_input_file_index++
+            current_input_file_index = next_input_file_index
             current_input_filename = FILENAME
+            input_file_start_line[current_input_file_index] = NR
+            input_file_has_lines[current_input_file_index] = 1
             file_document_offset = document_index
         }
     }
@@ -6245,6 +6568,9 @@ END {
         exit_status = 1
     }
     if (!exit_status) {
+        if (combined_files_mode && combined_seen_file) {
+            input_file_end_line[current_input_file_index] = NR
+        }
         flush_block()
         for (pending_indent = 0; pending_indent <= max_indent; pending_indent++) {
             if (explicit_key_valid[pending_indent]) {
@@ -6267,15 +6593,19 @@ END {
         validate_aliases()
         validate_merges()
         parsed_node_count = node_count
-        if (inplace_mode) {
-            transform_all_documents(query)
+        if (inplace_mode && transaction_batch_mode) {
+            output_transaction_files(query)
+        } else if (inplace_mode) {
+            transform_all_documents(query, "")
             if (presentation_possible) {
-                emit_preserved_input()
+                emit_preserved_input(1, NR)
             } else {
-                emit_all_yaml_documents()
+                emit_all_yaml_documents("")
             }
         } else if (eval_all_mode) {
             output_eval_all(query, output_mode)
+        } else if (batch_files_mode) {
+            output_batch_files(query, output_mode)
         } else if (all_documents_mode) {
             for (selected_document_cursor = 0; selected_document_cursor <= document_index; selected_document_cursor++) {
                 if (selected_document_cursor in document_root) {
@@ -6285,10 +6615,10 @@ END {
         } else {
             output_result(selected_document + 0, query, output_mode)
         }
-        if (explain_mode) {
+        if (explain_mode && !transaction_batch_mode) {
             output_explain()
         }
-        if (exit_status_mode && (!final_result_count || !final_result_truthy)) {
+        if (exit_status_mode && (batch_files_mode ? batch_files_exit_status : (!final_result_count || !final_result_truthy))) {
             exit_status = 1
         }
     }

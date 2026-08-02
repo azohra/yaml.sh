@@ -5,7 +5,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
-PRESENTATION_CASES=${YSH_PRESENTATION_CASES:-400}
+PRESENTATION_PASSES=${YSH_PRESENTATION_PASSES:-1}
 PRESENTATION_REPLAY=${YSH_PRESENTATION_REPLAY:-}
 FAILURE_ROOT=${YSH_PRESENTATION_FAILURE_DIR:-${TMPDIR:-/tmp}}
 
@@ -15,15 +15,16 @@ trap 'rm -f "$INPUT" "$EXPECTED"' 0 1 2 3 15
 
 generate_case() {
     generated_case=$1
-    awk -v seed="$generated_case" -v expected="$EXPECTED" '
+    generated_mode=$2
+    generated_variant=$3
+    awk -v seed="$generated_case" -v mode="$generated_mode" -v variant="$generated_variant" -v expected="$EXPECTED" '
     function scalar(value, mode) {
         if (mode == 0) return "\"" value "\""
         if (mode == 1) return sprintf("%c%s%c", 39, value, 39)
         return value
     }
     BEGIN {
-        mode = seed % 3
-        retries = (seed % 9) + 1
+        retries = variant == 0 ? 1 : (variant == 1 ? 5 : 9)
         owner = "team " seed
         first = "one-" seed
         second = "two-" seed
@@ -81,14 +82,20 @@ if [ -n "$PRESENTATION_REPLAY" ]; then
     first_case=$PRESENTATION_REPLAY
     last_case=$PRESENTATION_REPLAY
 else
+    case "$PRESENTATION_PASSES" in
+    *[!0-9]*|''|0) printf '%s\n' 'YSH_PRESENTATION_PASSES must be a positive integer.' >&2; exit 2 ;;
+    esac
     first_case=1
-    last_case=$PRESENTATION_CASES
+    last_case=$((PRESENTATION_PASSES * 9))
 fi
 
 case_id=$first_case
 passed=0
 while [ "$case_id" -le "$last_case" ]; do
-    generate_case "$case_id"
+    matrix_case=$(((case_id - 1) % 9))
+    case_mode=$((matrix_case % 3))
+    case_variant=$((matrix_case / 3))
+    generate_case "$case_id" "$case_mode" "$case_variant"
     if ! "$YSH_BINARY" -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .service.region = "west"' "$INPUT" >/dev/null 2>&1 ||
         ! cmp -s "$INPUT" "$EXPECTED"; then
         failure_dir=$FAILURE_ROOT/ysh-presentation-failure-$case_id
@@ -104,4 +111,4 @@ while [ "$case_id" -le "$last_case" ]; do
     case_id=$((case_id + 1))
 done
 
-printf 'Presentation mutation matrix: %s/%s pass\n' "$passed" "$passed"
+printf 'Presentation mutation matrix: %s cases pass — 3 scalar styles × 3 value/comment variants\n' "$passed"
