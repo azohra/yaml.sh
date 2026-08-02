@@ -3977,7 +3977,10 @@ function presentation_scalar_text(node, original,    quote, value, properties, r
             break
         }
         token = substr(remainder, 1, space - 1)
-        properties = properties (properties == "" ? "" : " ") token
+        if (properties != "") {
+            properties = properties " "
+        }
+        properties = properties token
         remainder = trim(substr(remainder, space + 1))
     }
     original = remainder
