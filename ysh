@@ -326,6 +326,19 @@ function expand_tag(token,    inner, rest, position, handle, suffix, key) {
     return token
 }
 
+function valid_anchor_name(name,    i, char) {
+    if (name == "" || name ~ /[[:space:]]/) {
+        return 0
+    }
+    for (i = 1; i <= length(name); i++) {
+        char = substr(name, i, 1)
+        if (index("[]{},", char)) {
+            return 0
+        }
+    }
+    return 1
+}
+
 function parse_properties(value, source_line,    separator, token) {
     parsed_anchor = ""
     parsed_tag = ""
@@ -346,7 +359,7 @@ function parse_properties(value, source_line,    separator, token) {
                 fail("multiple anchors on one node on line " source_line)
             }
             parsed_anchor = substr(token, 2)
-            if (parsed_anchor !~ /^[A-Za-z0-9_-]+$/) {
+            if (!valid_anchor_name(parsed_anchor)) {
                 fail("invalid anchor name on line " source_line)
             }
         } else {
@@ -449,7 +462,7 @@ function alias_node(name, source_line,    key, node) {
 }
 
 function parse_core(value, source_line, tag, anchor,    node, inner, count, i, separator, raw_key, key, child, alias_name) {
-    if (value ~ /^\*[A-Za-z0-9_-]+$/) {
+    if (substr(value, 1, 1) == "*" && valid_anchor_name(substr(value, 2))) {
         if (tag != "" || anchor != "") {
             fail("aliases cannot carry a tag or anchor on line " source_line)
         }
@@ -463,7 +476,28 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
         inner = substr(value, 2, length(value) - 2)
         count = split_flow(inner, flow_piece)
         for (i = 1; i <= count; i++) {
-            child = parse_value(flow_piece[i], source_line, -1, 0)
+            if (i == count && flow_piece[i] == "") {
+                delete flow_piece[i]
+                continue
+            }
+            separator = find_top_level_colon(flow_piece[i], 1)
+            if (!separator && (substr(flow_piece[i], 1, 1) == "\"" || substr(flow_piece[i], 1, 1) == sprintf("%c", 39))) {
+                separator = find_top_level_colon(flow_piece[i], 0)
+            }
+            if (separator) {
+                raw_key = trim(substr(flow_piece[i], 1, separator - 1))
+                if (raw_key ~ /^\?[[:space:]]/) {
+                    raw_key = trim(substr(raw_key, 2))
+                }
+                if (raw_key == "" || substr(raw_key, 1, 1) == "[" || substr(raw_key, 1, 1) == "{") {
+                    fail("collection-valued mapping keys are not supported on line " source_line)
+                }
+                child = new_node("mapping", source_line, "", "", "")
+                key = scalar_value(raw_key)
+                add_mapping(child, key, parse_value(substr(flow_piece[i], separator + 1), source_line, -1, 0), source_line, raw_key == "<<")
+            } else {
+                child = parse_value(flow_piece[i], source_line, -1, 0)
+            }
             add_sequence(node, child, source_line)
             delete flow_piece[i]
         }
@@ -476,11 +510,18 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
         inner = substr(value, 2, length(value) - 2)
         count = split_flow(inner, flow_piece)
         for (i = 1; i <= count; i++) {
+            if (i == count && flow_piece[i] == "") {
+                delete flow_piece[i]
+                continue
+            }
             separator = find_top_level_colon(flow_piece[i], 0)
             if (!separator) {
                 fail("invalid flow mapping on line " source_line)
             }
             raw_key = trim(substr(flow_piece[i], 1, separator - 1))
+            if (raw_key ~ /^\?[[:space:]]/) {
+                raw_key = trim(substr(raw_key, 2))
+            }
             if (raw_key == "" || substr(raw_key, 1, 1) == "[" || substr(raw_key, 1, 1) == "{") {
                 fail("collection-valued mapping keys are not supported on line " source_line)
             }
@@ -625,7 +666,7 @@ function flush_block(    value, i, separator) {
     block_count = 0
 }
 
-function parse_mapping_into(value, parent, indent, source_line,    separator, raw_key, key, child) {
+function parse_mapping_into(value, parent, indent, source_line,    separator, raw_key, key, child, raw_value) {
     separator = find_top_level_colon(value, 1)
     if (!separator) {
         fail("invalid mapping syntax on line " source_line)
@@ -636,7 +677,8 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
         fail("collection-valued mapping keys are not supported on line " source_line)
     }
     key = scalar_value(raw_key)
-    child = parse_value(substr(value, separator + 1), source_line, indent, 1)
+    raw_value = trim(substr(value, separator + 1))
+    child = parse_value(raw_value, source_line, indent, 1)
     add_mapping(parent, key, child, source_line, raw_key == "<<")
 
     delete list_node[indent]
@@ -644,6 +686,12 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     if (node_kind[child] == "pending") {
         context_node[indent] = child
         context_valid[indent] = 1
+    } else if (node_kind[child] == "scalar" && raw_value != "" && substr(raw_value, 1, 1) != "\"" &&
+        substr(raw_value, 1, 1) != sprintf("%c", 39) && substr(raw_value, 1, 1) !~ /^[\[{!&*|>]$/) {
+        context_node[indent] = child
+        context_valid[indent] = 1
+        node_plain_continuable[child] = 1
+        node_last_content_line[child] = source_line
     } else {
         delete context_node[indent]
         delete context_valid[indent]
@@ -662,6 +710,9 @@ function parse_mapping_line(value, indent, source_line,    parent) {
 }
 
 function parse_sequence_line(value, indent, source_line,    sequence, parent, original, remainder, tag, anchor, item, separator, raw_key, key, child) {
+    if (indent > max_indent) {
+        max_indent = indent
+    }
     if (list_valid[indent]) {
         sequence = list_node[indent]
     } else if (context_valid[indent]) {
@@ -683,6 +734,13 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
 
     if (original == "") {
         item = new_node("pending", source_line, "", "", "")
+    } else if (original == "-" || original ~ /^-[[:space:]]/) {
+        item = new_node("sequence", source_line, "", "", "")
+        add_sequence(sequence, item, source_line)
+        context_node[indent] = item
+        context_valid[indent] = 1
+        parse_sequence_line(original, indent + 2, source_line)
+        return
     } else {
         remainder = parse_properties(strip_inline_comment(original), source_line)
         tag = parsed_tag
@@ -761,7 +819,38 @@ function add_explicit_value(indent, text, source_line,    parent, child) {
     }
 }
 
-function process_line(raw, source_line,    indent, text, clean, key_text, separator, root) {
+function fill_pending_scalar(node, text, source_line,    cleaned, remainder, tag, anchor) {
+    cleaned = strip_inline_comment(trim(text))
+    remainder = parse_properties(cleaned, source_line)
+    tag = parsed_tag
+    anchor = parsed_anchor
+    if (remainder == "" || substr(remainder, 1, 1) == "[" || substr(remainder, 1, 1) == "{" || remainder ~ /^[|>]/) {
+        return 0
+    }
+    node_kind[node] = "scalar"
+    node_value[node] = scalar_value(remainder)
+    node_type[node] = scalar_type(remainder, tag, node_value[node])
+    node_tag[node] = tag
+    bind_anchor(anchor, node, source_line)
+    if (substr(remainder, 1, 1) != "\"" && substr(remainder, 1, 1) != sprintf("%c", 39)) {
+        node_plain_continuable[node] = 1
+        node_last_content_line[node] = source_line
+    }
+    return 1
+}
+
+function append_plain_scalar(node, text, source_line,    cleaned, separator) {
+    cleaned = strip_inline_comment(trim(text))
+    if (cleaned == "") {
+        return 0
+    }
+    separator = source_line > node_last_content_line[node] + 1 ? "\n" : " "
+    node_value[node] = node_value[node] separator scalar_value(cleaned)
+    node_last_content_line[node] = source_line
+    return 1
+}
+
+function process_line(raw, source_line,    indent, text, clean, key_text, separator, root, marker_content, parent) {
     sub(/\r$/, "", raw)
 
     if (block_active) {
@@ -799,7 +888,8 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         return
     }
 
-    if (clean == "---") {
+    if (clean == "---" || clean ~ /^---[[:space:]]/) {
+        marker_content = trim(substr(clean, 4))
         fail_pending_explicit_keys(source_line)
         if (document_has_content[document_index] || document_explicit[document_index]) {
             if (!document_has_content[document_index]) {
@@ -810,6 +900,9 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         document_explicit[document_index] = 1
         document_ended = 0
         clear_structure()
+        if (marker_content != "") {
+            process_line(marker_content, source_line)
+        }
         return
     }
     if (clean == "...") {
@@ -826,6 +919,20 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     }
 
     clear_deeper(indent)
+    parent = find_parent(indent)
+    if (parent && node_kind[parent] == "scalar" && node_plain_continuable[parent]) {
+        append_plain_scalar(parent, text, source_line)
+        return
+    }
+    if (parent && node_kind[parent] == "pending" &&
+        text != "-" && text !~ /^-[[:space:]]/ &&
+        text != "?" && text !~ /^\?[[:space:]]/ &&
+        text != ":" && text !~ /^:[[:space:]]/ &&
+        !find_top_level_colon(text, 1)) {
+        if (fill_pending_scalar(parent, text, source_line)) {
+            return
+        }
+    }
     if (text == "?" || text ~ /^\?[[:space:]]/) {
         key_text = trim(substr(text, 2))
         if (key_text == "" || substr(key_text, 1, 1) == "[" || substr(key_text, 1, 1) == "{" || find_top_level_colon(key_text, 1)) {
@@ -1360,13 +1467,15 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             expression = expression_new("reduce", source, initial, variable)
             expression_child[expression, 1] = update
         } else if (name == "select" || name == "has" || name == "del" || name == "map" || name == "map_values" || name == "with_entries" ||
-            name == "contains" || name == "startswith" || name == "endswith" || name == "split" || name == "join") {
+            name == "contains" || name == "startswith" || name == "endswith" || name == "split" || name == "join" ||
+            name == "sort_by" || name == "group_by" || name == "unique_by" || name == "any_c" || name == "all_c") {
             expression_expect("left_parenthesis")
             argument = expression_parse_stream()
             expression_expect("right_parenthesis")
             expression = expression_new(name, argument, 0, "")
         } else if (name == "length" || name == "keys" || name == "kind" || name == "type" || name == "to_entries" || name == "from_entries" ||
-            name == "sort" || name == "unique" || name == "flatten" || name == "reverse" || name == "upcase" || name == "downcase") {
+            name == "sort" || name == "unique" || name == "flatten" || name == "reverse" || name == "upcase" || name == "downcase" ||
+            name == "min" || name == "max" || name == "any" || name == "all") {
             if (expression_token_type == "left_parenthesis") {
                 expression_lex_next()
                 expression_expect("right_parenthesis")
@@ -1856,7 +1965,7 @@ function expression_delete_node(target,    parent, i, j, key, child) {
         return
     }
     if (inplace_mode) {
-        presentation_possible = 0
+        presentation_track_delete(target)
     }
     parent = node_parent[target]
     if (!parent) {
@@ -2600,6 +2709,105 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
+    if (kind == "sort_by" || kind == "group_by" || kind == "unique_by") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            node = resolve_alias(expression_stream_node[input, i])
+            if (node_kind[node] != "sequence") {
+                fail(kind " requires a sequence")
+            }
+            result_node = new_node("sequence", 0, "", "", "")
+            middle = ++expression_sort_serial
+            matched = 0
+            for (j = 1; j <= sequence_count[node]; j++) {
+                child = sequence_child[node, j]
+                single = expression_stream_single(child)
+                argument_stream = expression_evaluate(expression_left[expression], single)
+                argument = expression_stream_count[argument_stream] ? expression_stream_node[argument_stream, 1] : expression_null()
+                if (kind == "unique_by") {
+                    key = middle SUBSEP expression_fingerprint(argument)
+                    if (!(key in expression_unique_seen)) {
+                        expression_unique_seen[key] = 1
+                        add_sequence(result_node, expression_clone_node(child), 0)
+                    }
+                } else if (kind == "group_by") {
+                    key = middle SUBSEP expression_fingerprint(argument)
+                    collection = expression_group_index[key]
+                    if (!collection) {
+                        collection = ++matched
+                        expression_group_index[key] = collection
+                        expression_sort_node[middle, collection] = new_node("sequence", 0, "", "", "")
+                        add_sequence(result_node, expression_sort_node[middle, collection], 0)
+                    }
+                    add_sequence(expression_sort_node[middle, collection], expression_clone_node(child), 0)
+                } else {
+                    collection = ++matched
+                    while (collection > 1 && expression_sort_less(argument, expression_sort_key[middle, collection - 1])) {
+                        expression_sort_key[middle, collection] = expression_sort_key[middle, collection - 1]
+                        expression_sort_node[middle, collection] = expression_sort_node[middle, collection - 1]
+                        collection--
+                    }
+                    expression_sort_key[middle, collection] = argument
+                    expression_sort_node[middle, collection] = child
+                }
+            }
+            if (kind == "sort_by") {
+                for (j = 1; j <= matched; j++) {
+                    add_sequence(result_node, expression_clone_node(expression_sort_node[middle, j]), 0)
+                }
+            }
+            expression_stream_push(output, result_node)
+        }
+        return output
+    }
+    if (kind == "min" || kind == "max" || kind == "any" || kind == "all" || kind == "any_c" || kind == "all_c") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            node = resolve_alias(expression_stream_node[input, i])
+            if (node_kind[node] != "sequence") {
+                fail(kind " requires a sequence")
+            }
+            if (kind == "min" || kind == "max") {
+                if (!sequence_count[node]) {
+                    continue
+                }
+                child = sequence_child[node, 1]
+                for (j = 2; j <= sequence_count[node]; j++) {
+                    argument = sequence_child[node, j]
+                    if ((kind == "min" && expression_sort_less(argument, child)) ||
+                        (kind == "max" && expression_sort_less(child, argument))) {
+                        child = argument
+                    }
+                }
+                expression_stream_push(output, expression_clone_node(child))
+                continue
+            }
+            matched = kind == "all" || kind == "all_c"
+            for (j = 1; j <= sequence_count[node]; j++) {
+                child = sequence_child[node, j]
+                if (kind == "any_c" || kind == "all_c") {
+                    single = expression_stream_single(child)
+                    argument_stream = expression_evaluate(expression_left[expression], single)
+                    predicate = 0
+                    for (collection = 1; collection <= expression_stream_count[argument_stream]; collection++) {
+                        if (expression_truthy(expression_stream_node[argument_stream, collection])) {
+                            predicate = 1
+                        }
+                    }
+                } else {
+                    predicate = expression_truthy(child)
+                }
+                if ((kind == "any" || kind == "any_c") && predicate) {
+                    matched = 1
+                    break
+                }
+                if ((kind == "all" || kind == "all_c") && !predicate) {
+                    matched = 0
+                    break
+                }
+            }
+            expression_stream_push(output, expression_boolean(matched))
+        }
+        return output
+    }
     if (kind == "upcase" || kind == "downcase") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = resolve_alias(expression_stream_node[input, i])
@@ -3027,9 +3235,13 @@ function presentation_track_replace(target, source,    line, raw, resolved_sourc
         return
     }
     resolved_source = resolve_alias(source)
+    if ((target in expression_missing_parent) && !expression_placeholder_attached[target]) {
+        presentation_track_insert(target)
+        return
+    }
     line = node_line[target]
     raw = raw_input_line[line]
-    if ((target in expression_missing_parent) || line < 1 || node_kind[target] != "scalar" || node_kind[resolved_source] != "scalar" ||
+    if (line < 1 || node_kind[target] != "scalar" || node_kind[resolved_source] != "scalar" ||
         raw ~ /(^|:[[:space:]]*)[|>][+-]?[[:space:]]*(#|$)/ || raw ~ /[\[{].*[\]}]/ || raw ~ /:[[:space:]]*[!&]/) {
         presentation_possible = 0
         return
@@ -3039,6 +3251,109 @@ function presentation_track_replace(target, source,    line, raw, resolved_sourc
         return
     }
     presentation_line_node[line] = target
+}
+
+function presentation_track_insert(target,    parent, key, i, child, first_line, after, end, indent, raw) {
+    parent = expression_missing_parent[target]
+    key = expression_missing_key[target]
+    if (!parent || (parent in expression_missing_parent) || node_kind[parent] != "mapping" || mapping_count[parent] == 0) {
+        presentation_possible = 0
+        return
+    }
+    first_line = 0
+    after = 0
+    for (i = 1; i <= mapping_count[parent]; i++) {
+        child = mapping_child[parent, i]
+        if (node_line[child] < 1) {
+            continue
+        }
+        if (!first_line) {
+            first_line = node_line[child]
+        }
+        end = presentation_span_end(child)
+        if (end > after) {
+            after = end
+        }
+    }
+    if (!first_line || !after) {
+        presentation_possible = 0
+        return
+    }
+    raw = raw_input_line[first_line]
+    if (raw ~ /[\[{].*[\]}]/) {
+        presentation_possible = 0
+        return
+    }
+    indent = indentation(raw, first_line)
+    i = ++presentation_insert_count[after]
+    presentation_insert_node[after, i] = target
+    presentation_insert_key[after, i] = key
+    presentation_insert_indent[after, i] = indent
+}
+
+function presentation_span_end(target,    start, start_indent, line, raw, raw_indent, end) {
+    start = node_line[target]
+    start_indent = indentation(raw_input_line[start], start)
+    end = start
+    for (line = start + 1; line <= NR; line++) {
+        raw = raw_input_line[line]
+        sub(/\r$/, "", raw)
+        if (trim(raw) == "") {
+            continue
+        }
+        raw_indent = indentation(raw, line)
+        if (trim(raw) ~ /^#/ && raw_indent <= start_indent) {
+            break
+        }
+        if (raw_indent <= start_indent || trim(raw) == "---" || trim(raw) == "...") {
+            break
+        }
+        end = line
+    }
+    return end
+}
+
+function presentation_track_delete(target,    parent, line, end, raw, indent, text, i, sibling) {
+    if (!inplace_mode || !presentation_possible) {
+        return
+    }
+    parent = node_parent[target]
+    line = node_line[target]
+    if (!parent || line < 1 || line in presentation_line_node) {
+        presentation_possible = 0
+        return
+    }
+    raw = raw_input_line[line]
+    indent = indentation(raw, line)
+    text = substr(raw, indent + 1)
+    if ((text ~ /^-[[:space:]]+/ && find_top_level_colon(text, 1)) || text ~ /[\[{].*[\]}]/) {
+        presentation_possible = 0
+        return
+    }
+    if (node_kind[parent] == "mapping") {
+        for (i = 1; i <= mapping_count[parent]; i++) {
+            sibling = mapping_child[parent, i]
+            if (sibling != target && node_line[sibling] == line) {
+                presentation_possible = 0
+                return
+            }
+        }
+    } else if (node_kind[parent] == "sequence") {
+        for (i = 1; i <= sequence_count[parent]; i++) {
+            sibling = sequence_child[parent, i]
+            if (sibling != target && node_line[sibling] == line) {
+                presentation_possible = 0
+                return
+            }
+        }
+    } else {
+        presentation_possible = 0
+        return
+    }
+    end = presentation_span_end(target)
+    for (i = line; i <= end; i++) {
+        presentation_deleted_line[i] = 1
+    }
 }
 
 function emit_presented_line(line, node,    raw, indent, text, separator, rest, prefix, leading, comment_at, token, suffix, body, trailing) {
@@ -3076,12 +3391,31 @@ function emit_presented_line(line, node,    raw, indent, text, separator, rest, 
     print prefix leading presentation_scalar_text(node, token) suffix
 }
 
-function emit_preserved_input(    line) {
+function emit_presented_insert(key, node, indent,    inline, properties) {
+    printf "%s%s:", yaml_spaces(indent), presentation_plain_safe(key) ? key : json_quote(key)
+    inline = yaml_inline_node(node)
+    if (inline != "") {
+        printf " %s\n", inline
+        return
+    }
+    properties = yaml_properties(node)
+    if (properties != "") {
+        printf " %s", properties
+    }
+    printf "\n"
+    emit_yaml_collection(node, indent + 2)
+}
+
+function emit_preserved_input(    line, i) {
     for (line = 1; line <= NR; line++) {
-        if (line in presentation_line_node) {
+        if (line in presentation_deleted_line) {
+        } else if (line in presentation_line_node) {
             emit_presented_line(line, presentation_line_node[line])
         } else {
             print raw_input_line[line]
+        }
+        for (i = 1; i <= presentation_insert_count[line]; i++) {
+            emit_presented_insert(presentation_insert_key[line, i], presentation_insert_node[line, i], presentation_insert_indent[line, i])
         }
     }
 }

@@ -57,6 +57,7 @@ testFlowCollections() {
     assertEquals "request" "$(./ysh ".complex.details.type" test/issues.yml)"
     assertEquals "three, four" "$(./ysh ".inline[2]" test/issues.yml)"
     assertEquals "item" "$(./ysh ".inline[3].name" test/issues.yml)"
+    assertEquals '[{"name":"api"},{"name":"worker"}]' "$(printf '%s\n' 'items: [name: api, "name": worker,]' | ./ysh --json '.items')"
 }
 
 testBlockScalars() {
@@ -68,6 +69,7 @@ testBlockAndIndentlessSequences() {
     assertEquals '["item1","item2"]' "$(./ysh ".indented" test/issues.yml)"
     assertEquals '["item1","item2"]' "$(./ysh ".indentless" test/issues.yml)"
     assertEquals "ten" "$(./ysh ".long_list[10]" test/issues.yml)"
+    assertEquals '[["one","two"],[["three"]]]' "$(printf '%s\n' '- - one' '  - two' '- - - three' | ./ysh --json '.')"
 }
 
 testScalarAndCollectionAliases() {
@@ -76,6 +78,8 @@ testScalarAndCollectionAliases() {
     assertEquals '["first","second"]' "$(./ysh ".list_alias" test/advanced.yml)"
     assertEquals "b" "$(./ysh ".flow_alias.y[1]" test/advanced.yml)"
     assertEquals "1" "$(./ysh ".sequence_aliases[1].x" test/advanced.yml)"
+    assertEquals '"unicode anchor"' "$(printf '%s\n' '- &😁 unicode anchor' | ./ysh --json '.[0]')"
+    assertEquals '"value"' "$(printf '%s\n' 'key: &an:chor value' 'copy: *an:chor' | ./ysh --json '.copy')"
 }
 
 testMergeKeysAndPrecedence() {
@@ -218,6 +222,18 @@ testExpressionSequenceAndStringHelpers() {
     assertEquals 'true' "$(./ysh -n --json '"yaml.sh" | startswith("yaml") and endswith(".sh")')"
 }
 
+testExpressionProjectedCollectionsAndQuantifiers() {
+    assertEquals '[{"name":"api","port":80},{"name":"worker","port":443},{"name":"admin","port":443}]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | sort_by(.port)')"
+    assertEquals '[[{"name":"worker","port":443},{"name":"admin","port":443}],[{"name":"api","port":80}]]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | group_by(.port)')"
+    assertEquals '[{"name":"worker","port":443},{"name":"api","port":80}]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | unique_by(.port)')"
+    assertEquals '1' "$(./ysh -n --json '[3, 1, 2] | min')"
+    assertEquals '3' "$(./ysh -n --json '[3, 1, 2] | max')"
+    assertEquals 'true' "$(./ysh -n --json '[false, true] | any')"
+    assertEquals 'false' "$(./ysh -n --json '[true, false] | all')"
+    assertEquals 'true' "$(./ysh -n --json '[1, 2, 3] | any_c(. == 2)')"
+    assertEquals 'true' "$(./ysh -n --json '[1, 2, 3] | all_c(. > 0)')"
+}
+
 testExpressionVariablesAndDynamicIndexes() {
     assertEquals '"platform"' "$(./ysh -n --json '{key: "owner", data: {owner: "platform"}} | .key as $key | .data[$key]')"
     assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' test/expressions.yml)"
@@ -282,6 +298,24 @@ testInplacePreservesScalarPresentation() {
     rm -f "$inplace_file"
 }
 
+testInplacePreservesStructuralPresentation() {
+    inplace_file=test/.tmp-inplace-structure-$$.yml
+    printf '%s\n' '# deployment settings' 'service:' '  name: api      # public name' '  port: 8080     # remove this' '' '# worker stays documented' 'workers:' '  - first' '  - second' 'footer: kept    # untouched' > "$inplace_file"
+    ./ysh -i 'del(.service.port) | del(.workers[0]) | .service.protocol = "http" | .region = "west"' "$inplace_file"
+    assertEquals 0 $?
+    result=$(cat "$inplace_file")
+    assertContains "$result" '# deployment settings'
+    assertContains "$result" 'name: api      # public name'
+    assertNotContains "$result" 'port: 8080'
+    assertContains "$result" '# worker stays documented'
+    assertNotContains "$result" '  - first'
+    assertContains "$result" '  - second'
+    assertContains "$result" '  protocol: "http"'
+    assertContains "$result" 'footer: kept    # untouched'
+    assertContains "$result" 'region: "west"'
+    rm -f "$inplace_file"
+}
+
 testExpressionErrors() {
     result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
     assertNotEquals 0 $?
@@ -327,6 +361,7 @@ testMultipleDocuments() {
     assertEquals "block_2_value" "$(./ysh -d 1 ".key" test/test.yml)"
     assertEquals "block_3_value" "$(./ysh --document 2 ".key" test/test.yml)"
     assertEquals "second" "$(./ysh -d 1 ".fresh_alias" test/advanced.yml)"
+    assertEquals '"inline"' "$(printf '%s\n' '%YAML 1.2' '--- inline' | ./ysh --json '.')"
 }
 
 testExplicitScalarKeys() {
@@ -375,6 +410,12 @@ testCommentsQuotesAndCrLf() {
     assertEquals "it is fine" "$(printf "%s\n" "message: it is fine" | ./ysh ".message")"
     assertEquals "value" "$(printf "key: value\r\n" | ./ysh ".key")"
     assertEquals "https://yaml.sh" "$(./ysh ".urls[0]" test/issues.yml)"
+}
+
+testMultilinePlainScalars() {
+    assertEquals '"a b\nc"' "$(printf '%s\n' 'plain: a' ' b' '' ' c' | ./ysh --json '.plain')"
+    assertEquals '"flow in block"' "$(printf '%s\n' '-' '  "flow in block"' | ./ysh --json '.[0]')"
+    assertEquals '"value"' "$(printf '%s\n' 'key: # comment' '  value' | ./ysh --json '.key')"
 }
 
 testDuplicateKeysAreRejected() {
