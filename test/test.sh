@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.7.0" "$(./ysh --version)"
+    assertEquals "v1.8.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -9,6 +9,7 @@ testHelp() {
     assertEquals 0 $?
     assertContains "$result" "yq-style paths"
     assertContains "$result" "events"
+    assertContains "$result" "explain"
 }
 
 testYqStyleFileQuery() {
@@ -258,7 +259,19 @@ testExpressionVariablesAndDynamicIndexes() {
 
 testExpressionReduceAndDeepMerge() {
     assertEquals '20170' "$(./ysh --json 'reduce .services[].port as $port (0; . + $port)' test/expressions.yml)"
+    assertEquals '6' "$(./ysh -n --json '[1, 2, 3][] as $item ireduce (0; . + $item)')"
+    assertEquals '{"api":8080,"worker":9090,"web":3000}' "$(./ysh --json '.services[] as $service ireduce ({}; . * {($service.name): $service.port})' test/expressions.yml)"
     assertEquals '{"a":{"x":1,"y":3,"z":4},"b":1,"c":2}' "$(./ysh -n --json '{a: {x: 1, y: 2}, b: 1} * {a: {y: 3, z: 4}, c: 2}')"
+}
+
+testExpressionPathBasedUpdates() {
+    assertEquals '{"a":{"b":1,"c":2}}' "$(printf '%s\n' 'a: {b: 1}' | ./ysh --json 'setpath(["a", "c"]; 2)')"
+    assertEquals '{"a":{"items":[null,null,{"name":"third"}]}}' "$(printf '%s\n' 'a: {}' | ./ysh --json 'setpath(["a", "items", 2, "name"]; "third")')"
+    assertEquals '{"a":{"c":2},"items":["zero","two"]}' "$(printf '%s\n' 'a: {b: 1, c: 2}' 'items: [zero, one, two]' | ./ysh --json 'delpaths([["a", "b"], ["items", 1]])')"
+
+    result=$(printf '%s\n' 'a: 1' | ./ysh 'setpath(["a", "b"]; 2)' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "cannot traverse"
 }
 
 testExpressionEnvironmentComposition() {
@@ -438,6 +451,19 @@ testInplacePreservesScalarPresentation() {
     rm -f "$inplace_file"
 }
 
+testInplaceEditsPresentationMetadata() {
+    inplace_file=test/.tmp-inplace-metadata-$$.yml
+    printf '%s\n' 'service:' '  name: api # old comment' '  labels:' '    tier: web' > "$inplace_file"
+    ./ysh -i '.service.name line_comment = "release managed" | .service.name style = "double"' "$inplace_file"
+    assertEquals 0 $?
+    assertContains "$(cat "$inplace_file")" 'name: "api" # release managed'
+
+    ./ysh -i '.service.labels style = "flow"' "$inplace_file"
+    assertEquals 0 $?
+    assertContains "$(cat "$inplace_file")" '"labels": {"tier": "web"}'
+    rm -f "$inplace_file"
+}
+
 testInplacePreservesStructuralPresentation() {
     inplace_file=test/.tmp-inplace-structure-$$.yml
     printf '%s\n' '# deployment settings' 'service:' '  name: api      # public name' '  port: 8080     # remove this' '' '# worker stays documented' 'workers:' '  - first' '  - second' 'footer: kept    # untouched' > "$inplace_file"
@@ -532,6 +558,78 @@ testExpandedTags() {
 testSourceLines() {
     assertEquals "2" "$(./ysh ".complex.details.type" test/issues.yml --line)"
     assertEquals "10" "$(./ysh ".literal" test/issues.yml --line)"
+}
+
+testExpressionYamlGraphOperators() {
+    assertEquals "defaults" "$(./ysh '.defaults | anchor' test/workflows/deployment.yml)"
+    assertEquals "defaults" "$(./ysh '.shared | alias' test/workflows/deployment.yml)"
+    assertEquals "" "$(./ysh '.shared | anchor' test/workflows/deployment.yml)"
+    assertEquals "" "$(./ysh '.defaults | alias' test/workflows/deployment.yml)"
+    assertEquals '["us-west-2","us-west-2"]' "$(./ysh --json 'explode(.) | [.shared.region, .production.region]' test/workflows/deployment.yml)"
+    assertEquals "" "$(./ysh 'explode(.) | .shared | alias' test/workflows/deployment.yml)"
+}
+
+testExpressionPresentationMetadata() {
+    assertEquals "promoted by CI" "$(./ysh '.spec.template.spec.containers[0].image | line_comment' test/workflows/kubernetes.yml)"
+    assertEquals "double" "$(./ysh '.metadata.annotations["deployment.kubernetes.io/revision"] | style' test/workflows/kubernetes.yml)"
+    assertEquals "flow" "$(./ysh '.on.push.branches | style' test/workflows/github-actions.yml)"
+    assertEquals "" "$(./ysh '.spec.replicas | style' test/workflows/kubernetes.yml)"
+    styles=$(printf '%s\n' "single: 'one'" 'double: "two"' 'literal: |-' '  three' 'folded: >' '  four' | \
+        ./ysh '.single | style, .double | style, .literal | style, .folded | style')
+    assertEquals "$(printf '%s\n' single double literal folded)" "$styles"
+    assertEquals '"new note"' "$(printf '%s\n' 'name: api # old' | ./ysh --json '.name line_comment = "new note" | .name | line_comment')"
+    assertEquals '"single"' "$(printf '%s\n' 'name: api' | ./ysh --json '.name style = "single" | .name | style')"
+    assertEquals '"items": ["one", "two"]' "$(printf '%s\n' 'items: [one, two]' | ./ysh -o yaml '.items style = "flow"')"
+}
+
+testExplainSelectionsAndMutations() {
+    explain_out=test/.tmp-explain-out-$$
+    explain_err=test/.tmp-explain-err-$$
+
+    ./ysh --explain '.metadata.name' test/workflows/kubernetes.yml > "$explain_out" 2> "$explain_err"
+    assertEquals 0 $?
+    assertEquals "storefront" "$(cat "$explain_out")"
+    result=$(cat "$explain_err")
+    assertContains "$result" 'documents=1 parsed_nodes='
+    assertContains "$result" 'results=1 mutations=0 replacements=0 insertions=0 deletions=0 presentation=not-requested'
+
+    ./ysh --explain '.metadata.channel = "stable" | del(.metadata.annotations["deployment.kubernetes.io/revision"])' \
+        test/workflows/kubernetes.yml > "$explain_out" 2> "$explain_err"
+    assertEquals 0 $?
+    result=$(cat "$explain_err")
+    assertContains "$result" 'mutations=2 replacements=0 insertions=1 deletions=1'
+    assertContains "$result" 'Explain: insert .metadata.channel'
+    assertContains "$result" 'Explain: delete .metadata.annotations["deployment.kubernetes.io/revision"]'
+    assertNotContains "$result" 'stable'
+
+    ./ysh --explain '.metadata.name style = ""' test/workflows/kubernetes.yml > "$explain_out" 2> "$explain_err"
+    assertEquals 0 $?
+    assertContains "$(cat "$explain_err")" 'mutations=0 replacements=0 insertions=0 deletions=0'
+
+    rm -f "$explain_out" "$explain_err"
+}
+
+testExplainPresentationDecision() {
+    explain_file=test/.tmp-explain-inplace-$$.yml
+    explain_err=test/.tmp-explain-inplace-$$.err
+    cp test/workflows/kubernetes.yml "$explain_file"
+
+    ./ysh -i --explain '(.spec.template.spec.containers[] | select(.name == "api") | .image) = "ghcr.io/example/api:1.5.0"' \
+        "$explain_file" 2> "$explain_err"
+    assertEquals 0 $?
+    result=$(cat "$explain_err")
+    assertContains "$result" 'presentation=preserved'
+    assertContains "$result" 'Explain: replace .spec.template.spec.containers[0].image'
+    assertContains "$(cat "$explain_file")" '# promoted by CI'
+
+    ./ysh -i --explain '(.spec.template.spec.containers[] | select(.name == "metrics") | .env) += [{"name":"FEATURE_FLAG","value":"true"}]' \
+        "$explain_file" 2> "$explain_err"
+    assertEquals 0 $?
+    result=$(cat "$explain_err")
+    assertContains "$result" 'presentation=regenerated'
+    assertContains "$result" 'Explain: replace .spec.template.spec.containers[1].env'
+
+    rm -f "$explain_file" "$explain_err"
 }
 
 testMultipleDocuments() {
@@ -706,10 +804,10 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.7.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.8.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.7.0"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.8.0"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=3"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
     assertNotContains "$(cat _static/_www/index.html)" "A real parser this time"
@@ -719,7 +817,7 @@ testReleaseArtifactsStayInSync() {
     assertNotContains "$(cat _static/_www/docs/index.html)" "docsify"
     assertContains "$(cat README.md)" "brand/hero.svg"
     assertContains "$(cat _static/_www/index.html)" "og.png"
-    assertNotContains "$(cat README.md)" "og-v1.7.png"
+    assertNotContains "$(cat README.md)" "og-v1.8.png"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
     assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "282/282"
@@ -727,6 +825,7 @@ testReleaseArtifactsStayInSync() {
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,610/2,610"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "12,000/12,000"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "400/400"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "35/35"
 }
 
 # shellcheck source=/dev/null

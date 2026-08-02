@@ -12,11 +12,12 @@ ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/adversarial.sh bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/adversarial.sh bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
 	@./test/test.sh
+	@./test/workflows.sh
 
 docs-check: ysh
 	@echo "📚 Checking static documentation"
@@ -63,9 +64,10 @@ uninstall:
 docs: ysh
 	@echo "📚 Updating docs"
 	$(eval VERSION := $(shell sed -n 's/^YSH_VERSION=//p' ysh | head -n 1))
+	$(eval RELEASE_SHA256 := $(shell if command -v sha256sum >/dev/null 2>&1; then sha256sum ysh | sed 's/ .*//'; else shasum -a 256 ysh | sed 's/ .*//'; fi))
 	@awk -v version=$(VERSION) -f build/docbuilder.awk README.md > .tmp_README.md
 	@mv .tmp_README.md README.md
-	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/install > .tmp_install
+	@awk -v version=$(VERSION) -v sha256=$(RELEASE_SHA256) -f build/docbuilder.awk _static/_www/install > .tmp_install
 	@mv .tmp_install _static/_www/install
 	@chmod 755 _static/_www/install
 	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/index.html > .tmp_index.html

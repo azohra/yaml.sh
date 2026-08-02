@@ -65,6 +65,7 @@ Read [security and limits](security.md) before handling untrusted documents or e
 ```sh
 ysh --events config.yml
 ysh --ast config.yml
+ysh --explain -i '.image.tag = "stable"' config.yml
 ```
 
 The [internals guide](internals.md) follows a document through the parser. The [development guide](development.md) explains how each new promise earns fixtures, differential cases, rejection tests, and portability evidence.

@@ -73,6 +73,7 @@ Build and update:
 ysh -n -o=yaml '{name: "api", enabled: true, ports: [8080, 8443]}'
 ysh -o=yaml '.replicas += 1 | del(.metadata.internal)' deploy.yml
 ysh -i '.image.tag = "stable"' deploy.yml
+ysh -i 'setpath(["jobs", "deploy", "runs-on"]; "ubuntu-latest")' workflow.yml
 ```
 
 Compose files and environment:
@@ -89,7 +90,10 @@ ysh --type '.release.created' config.yml
 ysh --line '.services[0].port' config.yml
 ysh --events config.yml
 ysh --ast config.yml
+ysh --explain -i '.image.tag = "stable"' deploy.yml
 ```
+
+`--explain` writes mutation paths and the presentation decision to stderr, without echoing values.
 
 The [recipe book](https://yaml.azohra.com/docs/recipes/) starts with tasks. The [query guide](https://yaml.azohra.com/docs/queries/) covers the language.
 
@@ -114,8 +118,9 @@ The release contract is evidence, not a universal compliance claim:
 | Expected YAML Test Suite outcomes | 282/282 |
 | Strict-invalid inputs rejected | 91/91 |
 | Categorized programs matching yq v4.53.3 | 2,610/2,610 |
+| Real-world workflow programs matching yq | 35/35 |
 | Cross-file programs matching yq | 8/8 |
-| Behavioral tests | 84 |
+| Behavioral tests | 90 |
 | Grammar-guided properties | 12,000/12,000 |
 | Exact presentation mutations | 400/400 |
 | Scale contract | 125,000 nodes; 1,500 documents; ≤224 MiB RSS |
@@ -156,6 +161,7 @@ ysh eval-all QUERY FILE...
 | `-d N`, `--all-documents` | Select one or every YAML document |
 | `--type`, `--tag`, `--line` | Inspect selected node metadata |
 | `--ast`, `--events` | Inspect parser structure |
+| `--explain` | Report mutations and presentation behavior to stderr |
 | `--max-input-bytes`, `--max-nodes`, `--max-depth` | Bound hostile input |
 
 Run `ysh --help` for the complete interface.

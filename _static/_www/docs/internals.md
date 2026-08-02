@@ -1,6 +1,6 @@
 # Parser internals
 
-Version 1.7 is still one shell script, with a semantic graph and source-presentation layer working together.
+Version 1.8 is still one shell script, with a semantic graph and source-presentation layer working together.
 
 ```text
 /bin/sh CLI

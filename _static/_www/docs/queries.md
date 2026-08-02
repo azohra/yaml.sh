@@ -1,6 +1,6 @@
 # Queries
 
-Version 1.7 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
+Version 1.8 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
 
 ## Paths
 
@@ -173,7 +173,7 @@ ysh '.name | sub("-"; "_")' config.yml
 
 This portable regex subset does not promise yq/RE2 flags, named captures, or replacement backreferences.
 
-## Variables, dynamic indexes, and reduce
+## Variables, dynamic keys, and reducers
 
 Bind a result with `as $name`. The expression after the pipe keeps the original current input and can refer to that value repeatedly:
 
@@ -182,10 +182,17 @@ ysh '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' config.yml
 ysh '.key as $key | .data[$key]' config.yml
 ```
 
-Dynamic brackets accept a computed string key or integer index. `reduce` folds a stream into one value:
+Dynamic brackets accept a computed string key or integer index. Parenthesized object keys are computed from the current input:
+
+```sh
+ysh '.services[] as $service ireduce ({}; . * {($service.name): $service.port})' config.yml
+```
+
+Both reducer forms fold a stream into one value:
 
 ```sh
 ysh 'reduce .services[].port as $port (0; . + $port)' config.yml
+ysh -n '[1, 2, 3][] as $item ireduce (0; . + $item)'
 ```
 
 The `*` operator recursively merges two mappings; at non-mapping leaves, the right side wins. It remains numeric multiplication for two numbers.
@@ -251,6 +258,13 @@ The compound forms `+=`, `-=`, `*=`, `/=`, and `%=` are relative arithmetic upda
 ysh -o=yaml '(.services[] | select(.enabled) | .tier) = "active"' config.yml
 ```
 
+`setpath` creates a path from string keys and non-negative indexes. `delpaths` removes several paths in one transform:
+
+```sh
+ysh -o=yaml 'setpath(["spec", "replicas"]; 4)' deploy.yml
+ysh -o=yaml 'delpaths([["metadata", "annotations"], ["metadata", "managedFields"]])' deploy.yml
+```
+
 Use `-i` to atomically replace a real, non-symlink input file after every document transforms successfully. Safe scalar edits, direct inserts/deletes, and pure sequence reorders preserve presentation; other structural edits use stable semantic YAML.
 
 ## Merged and aliased nodes
@@ -259,8 +273,22 @@ Expressions follow aliases and mapping merge sources automatically. Explicit ent
 
 Aliases are genuine shared graph references. Updating through an alias or an inherited merge value therefore updates the referenced source node too. Use construction to materialize an independent value when shared identity is not what you want.
 
+`anchor` and `alias` return a selected node's graph name. `explode(.)` clones the value with aliases and merge keys materialized.
+
+## Presentation
+
+`style` and `line_comment` inspect YAML presentation metadata. Their yq-shaped property forms edit it:
+
+```sh
+ysh '.image | line_comment' deploy.yml
+ysh -i '.image line_comment = "promoted by release"' deploy.yml
+ysh -i '.image style = "double" | .labels style = "flow"' deploy.yml
+```
+
+Style editing supports plain, single-quoted, and double-quoted scalars plus flow collections. Literal/folded conversion and head/foot comment operators are not implemented.
+
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 1.7 does not implement ireduce, date or load operators, non-YAML codecs, regex flags/captures, comment/style query operators, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
+This is a useful yq-shaped language, not the complete yq language. Version 1.8 does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.

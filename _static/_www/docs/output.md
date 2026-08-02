@@ -46,9 +46,9 @@ ysh -o=yaml '.release.channel = "stable"' config.yml
 
 Multiple results are separated with `---`, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.
 
-The emitter is semantic. It deliberately uses a stable block layout and quotes string values and ordinary mapping keys. Comments, blank lines, original quote choices, flow-vs-block style, directive spelling, and exact scalar formatting are not retained when this emitter is selected directly.
+The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/flow styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.
 
-Version 1.7 keeps the rich `-i` presentation layer. Common replacements, direct block inserts/deletes, and pure sequence reorders patch the original source, retaining comments, whitespace, quoting, flow/block style, anchors, tags, and directives. Other structural changes use the semantic emitter. Replacement is atomic through a sibling temporary file, preserves permission bits, and refuses symlinks.
+Version 1.8 keeps the rich `-i` presentation layer. Common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders patch the original source. Other structural changes use the semantic emitter. Replacement is atomic through a sibling temporary file, preserves permission bits, and refuses symlinks.
 
 ## Type
 
@@ -105,3 +105,13 @@ ysh --events config.yml
 ```
 
 This is useful while extending the parser or reducing an unexpected input to a minimal test case.
+
+## Explain an edit
+
+`--explain` leaves normal output on stdout and reports evaluation behavior on stderr:
+
+```sh
+ysh --explain -i '.image.tag = "stable"' deploy.yml
+```
+
+The report includes parsed/generated node counts, result and mutation counts, changed paths, and whether presentation was preserved or regenerated. Values are intentionally omitted.
