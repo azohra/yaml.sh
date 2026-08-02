@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.8.0" "$(./ysh --version)"
+    assertEquals "v1.9.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -10,6 +10,7 @@ testHelp() {
     assertContains "$result" "yq-style paths"
     assertContains "$result" "events"
     assertContains "$result" "explain"
+    assertContains "$result" "transactionally"
 }
 
 testYqStyleFileQuery() {
@@ -47,6 +48,10 @@ testJsonScalarTypes() {
 testYqStyleOutputFlags() {
     assertEquals '{"name":"two","value":2}' "$(./ysh -o=json ".object_list.list[1]" test/test.yml)"
     assertEquals "value" "$(./ysh --output-format=raw ".key_value.key" test/test.yml)"
+    ./ysh --indent=0 -o=yaml '.' test/test.yml >/dev/null 2>&1
+    assertEquals 2 $?
+    ./ysh --unwrap-scalar=maybe '.key_value.key' test/test.yml >/dev/null 2>&1
+    assertEquals 2 $?
 }
 
 testCollectionsEmitJsonByDefault() {
@@ -338,7 +343,9 @@ testMultipleInputEvaluationAndMetadata() {
     assertEquals "$expected" "$(./ysh eval --json '[filename, fileIndex, documentIndex, .answer]' "$first" "$second")"
     assertEquals "$(printf '%s\n' '"answer": 1' '---' '"answer": 2')" "$(./ysh -o yaml '.' "$first" "$second")"
     ./ysh -i '.answer = 3' "$first" "$second" >/dev/null 2>&1
-    assertEquals 2 $?
+    assertEquals 0 $?
+    assertEquals 3 "$(./ysh '.answer' "$first")"
+    assertEquals 3 "$(./ysh '.answer' "$second")"
     ./ysh ea -i '.answer = 3' "$first" >/dev/null 2>&1
     assertEquals 2 $?
     rm -f "$first" "$second"
@@ -424,6 +431,66 @@ testInplaceFailureIsAtomic() {
     set -- "test/.$(basename "$inplace_file").ysh."*
     assertFalse "temporary file must be removed" "[ -e \"$1\" ]"
     rm -f "$link_file" "$backup_file" "$inplace_file"
+}
+
+testInplaceTransactionAcrossFiles() {
+    first_file=test/.tmp-inplace-transaction-first-$$.yml
+    second_file=test/.tmp-inplace-transaction-second-$$.yml
+    spaced_file="test/.tmp inplace transaction spaced $$.yml"
+    invalid_file=test/.tmp-inplace-transaction-invalid-$$.yml
+    explain_file=test/.tmp-inplace-transaction-explain-$$.jsonl
+    printf '%s\n' 'name: first # keep one' > "$first_file"
+    printf '%s\n' 'name: second # keep two' > "$second_file"
+    printf '%s\n' 'name: spaced # keep three' > "$spaced_file"
+
+    ./ysh -i --explain=json '.name = "ready"' "$first_file" "$second_file" "$spaced_file" 2> "$explain_file"
+    assertEquals 0 $?
+    assertEquals 'name: ready # keep one' "$(cat "$first_file")"
+    assertEquals 'name: ready # keep two' "$(cat "$second_file")"
+    assertEquals 'name: ready # keep three' "$(cat "$spaced_file")"
+    assertEquals 3 "$(wc -l < "$explain_file" | tr -d ' ')"
+    assertContains "$(sed -n '1p' "$explain_file")" '"presentation":"preserved"'
+    assertContains "$(sed -n '2p' "$explain_file")" '"path":".name"'
+    assertNotContains "$(cat "$explain_file")" '"ready"'
+    if command -v jq >/dev/null 2>&1; then
+        jq -e 'has("input") and has("changes") and (.changes[0].path == ".name")' "$explain_file" >/dev/null
+        assertEquals 0 $?
+    fi
+
+    printf '%s\n' 'name: unchanged' > "$first_file"
+    printf '%s\n' 'broken: [one' > "$invalid_file"
+    ./ysh -i --explain=json '.name = "should-not-land"' "$first_file" "$invalid_file" >/dev/null 2> "$explain_file"
+    assertNotEquals 0 $?
+    assertEquals 'name: unchanged' "$(cat "$first_file")"
+    assertNotContains "$(cat "$explain_file")" '"input"'
+
+    ./ysh -i '.name = "duplicate"' "$first_file" "$first_file" >/dev/null 2>&1
+    assertEquals 2 $?
+    assertEquals 'name: unchanged' "$(cat "$first_file")"
+
+    set -- "test/.$(basename "$first_file").ysh-new."* "test/.$(basename "$first_file").ysh-old."*
+    assertFalse "transaction files must be removed" "[ -e \"$1\" ]"
+    assertFalse "transaction files must be removed" "[ -e \"$2\" ]"
+    rm -f "$explain_file" "$invalid_file" "$spaced_file" "$second_file" "$first_file"
+}
+
+testInplaceTransactionRollsBackCommitFailure() {
+    first_file=test/.tmp-inplace-rollback-first-$$.yml
+    second_file=test/.tmp-inplace-rollback-second-$$.yml
+    state_file=test/.tmp-inplace-rollback-state-$$
+    report_file=test/.tmp-inplace-rollback-report-$$
+    printf '%s\n' 'name: first' > "$first_file"
+    printf '%s\n' 'name: second' > "$second_file"
+    real_mv=$(command -v mv)
+
+    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_MV=$real_mv YSH_FAIL_MV_AT=2 YSH_MV_STATE=$state_file \
+        ./ysh -i --explain=json '.name = "changed"' "$first_file" "$second_file" >/dev/null 2> "$report_file"
+    assertNotEquals 0 $?
+    assertEquals 'name: first' "$(cat "$first_file")"
+    assertEquals 'name: second' "$(cat "$second_file")"
+    assertNotContains "$(cat "$report_file")" '"input"'
+
+    rm -f "$report_file" "$state_file" "$second_file" "$first_file"
 }
 
 testInplaceTransformsAllDocuments() {
@@ -569,6 +636,33 @@ testExpressionYamlGraphOperators() {
     assertEquals "" "$(./ysh 'explode(.) | .shared | alias' test/workflows/deployment.yml)"
 }
 
+testExpressionWritableYamlGraphMetadata() {
+    graph_file=test/.tmp-graph-metadata-$$.yml
+    printf '%s\n' 'source: &old one' 'copy: *old' 'target: two' > "$graph_file"
+
+    result=$(./ysh -o=yaml '.source anchor = "current" | .source tag = "!!str" | .target alias = "current"' "$graph_file")
+    assertEquals 0 $?
+    assertEquals 'current' "$(printf '%s\n' "$result" | ./ysh '.source | anchor')"
+    assertEquals 'current' "$(printf '%s\n' "$result" | ./ysh '.copy | alias')"
+    assertEquals 'current' "$(printf '%s\n' "$result" | ./ysh '.target | alias')"
+    assertEquals '!!str' "$(printf '%s\n' "$result" | ./ysh '.source | tag')"
+    assertEquals '{"source":"one","copy":"one","target":"one"}' "$(printf '%s\n' "$result" | ./ysh --json '.')"
+
+    ./ysh -i '.source anchor = "current" | .source tag = "!!str" | .target alias = "current"' "$graph_file"
+    assertEquals 0 $?
+    assertEquals '{"source":"one","copy":"one","target":"one"}' "$(./ysh --json '.' "$graph_file")"
+    assertEquals 'current' "$(./ysh '.copy | alias' "$graph_file")"
+
+    result=$(./ysh -o=yaml '.source anchor = ""' "$graph_file" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'aliases still reference it'
+
+    result=$(printf '%s\n' 'first: one' 'later: &later two' | ./ysh -o=yaml '.first alias = "later"' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'forward alias'
+    rm -f "$graph_file"
+}
+
 testExpressionPresentationMetadata() {
     assertEquals "promoted by CI" "$(./ysh '.spec.template.spec.containers[0].image | line_comment' test/workflows/kubernetes.yml)"
     assertEquals "double" "$(./ysh '.metadata.annotations["deployment.kubernetes.io/revision"] | style' test/workflows/kubernetes.yml)"
@@ -580,6 +674,27 @@ testExpressionPresentationMetadata() {
     assertEquals '"new note"' "$(printf '%s\n' 'name: api # old' | ./ysh --json '.name line_comment = "new note" | .name | line_comment')"
     assertEquals '"single"' "$(printf '%s\n' 'name: api' | ./ysh --json '.name style = "single" | .name | style')"
     assertEquals '"items": ["one", "two"]' "$(printf '%s\n' 'items: [one, two]' | ./ysh -o yaml '.items style = "flow"')"
+}
+
+testExpressionBlockStylesAndOutputControls() {
+    literal=$(printf '%s\n' 'value: one' | ./ysh -o=yaml '.value = "hello\nworld" | .value style = "literal"')
+    folded=$(printf '%s\n' 'value: one' | ./ysh -o=yaml '.value = "hello\nworld" | .value style = "folded"')
+    assertContains "$literal" '|-'
+    assertContains "$folded" '>-'
+    assertEquals '"hello\nworld"' "$(printf '%s\n' "$literal" | ./ysh --json '.value')"
+    assertEquals '"hello\nworld"' "$(printf '%s\n' "$folded" | ./ysh --json '.value')"
+
+    result=$(printf '%s\n' 'root:' '  child: value' | ./ysh -I4 -o=yaml '.')
+    assertContains "$result" '    "child": "value"'
+    assertEquals '"Things" # note' "$(printf '%s\n' 'value: "Things" # note' | ./ysh --unwrap-scalar=false '.value')"
+
+    style_file=test/.tmp-block-style-$$.yml
+    printf '%s\n' 'value: one # note' > "$style_file"
+    ./ysh -i '.value = "hello\nworld" | .value style = "folded"' "$style_file"
+    assertEquals 0 $?
+    assertEquals '"hello\nworld"' "$(./ysh --json '.value' "$style_file")"
+    assertEquals 'folded' "$(./ysh '.value | style' "$style_file")"
+    rm -f "$style_file"
 }
 
 testExplainSelectionsAndMutations() {
@@ -804,10 +919,12 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.8.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.9.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.8.0"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.9.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.9"
+    assertNotContains "$(cat _static/_www/story/index.html)" "v1.8"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
     assertNotContains "$(cat _static/_www/index.html)" "A real parser this time"
@@ -822,7 +939,7 @@ testReleaseArtifactsStayInSync() {
     assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "282/282"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "91/91"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,610/2,610"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,620/2,620"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "12,000/12,000"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "400/400"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "35/35"

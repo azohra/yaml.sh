@@ -1,6 +1,6 @@
 # Queries
 
-Version 1.8 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
+Version 1.9 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
 
 ## Paths
 
@@ -265,7 +265,13 @@ ysh -o=yaml 'setpath(["spec", "replicas"]; 4)' deploy.yml
 ysh -o=yaml 'delpaths([["metadata", "annotations"], ["metadata", "managedFields"]])' deploy.yml
 ```
 
-Use `-i` to atomically replace a real, non-symlink input file after every document transforms successfully. Safe scalar edits, direct inserts/deletes, and pure sequence reorders preserve presentation; other structural edits use stable semantic YAML.
+Use `-i` to transactionally replace one or more real, non-symlink inputs. Every candidate is complete before the first replacement; a commit failure restores the originals.
+
+```sh
+ysh -i '.image.tag = "stable"' services/*.yml
+```
+
+Safe scalar edits, direct inserts/deletes, and pure sequence reorders preserve presentation; other structural edits use stable semantic YAML.
 
 ## Merged and aliased nodes
 
@@ -273,7 +279,14 @@ Expressions follow aliases and mapping merge sources automatically. Explicit ent
 
 Aliases are genuine shared graph references. Updating through an alias or an inherited merge value therefore updates the referenced source node too. Use construction to materialize an independent value when shared identity is not what you want.
 
-`anchor` and `alias` return a selected node's graph name. `explode(.)` clones the value with aliases and merge keys materialized.
+`anchor` and `alias` return a selected node's graph name. `tag`, `anchor`, and `alias` also have writable property forms:
+
+```sh
+ysh -o=yaml '.defaults anchor = "base" | .copy alias = "base"' config.yml
+ysh -o=yaml '.release tag = "!release"' config.yml
+```
+
+Anchor renames update aliases that already reference the same node. Removing a referenced anchor, creating a duplicate anchor, or constructing a recursive alias fails. `explode(.)` clones the value with aliases and merge keys materialized.
 
 ## Presentation
 
@@ -283,12 +296,13 @@ Aliases are genuine shared graph references. Updating through an alias or an inh
 ysh '.image | line_comment' deploy.yml
 ysh -i '.image line_comment = "promoted by release"' deploy.yml
 ysh -i '.image style = "double" | .labels style = "flow"' deploy.yml
+ysh -o=yaml '.notes style = "literal"' deploy.yml
 ```
 
-Style editing supports plain, single-quoted, and double-quoted scalars plus flow collections. Literal/folded conversion and head/foot comment operators are not implemented.
+Scalar styles can be reset or set to plain, single, double, literal, or folded. Collections can be reset to block output or set to flow. Head/foot comments and key-node presentation are not implemented.
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 1.8 does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
+This is a useful yq-shaped language, not the complete yq language. Version 1.9 does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.

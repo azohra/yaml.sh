@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.8.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.9.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -99,7 +99,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.8.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.9.0</span></div>
       <article>
           <h1 id="security-limits">Security &amp; limits</h1>
           <p>YAML.sh parses data. It does not evaluate YAML as shell, load neighboring files, run commands, or execute application-specific tag constructors.</p>
@@ -108,7 +108,7 @@
             <li>No <code>load</code>, dynamic <code>eval</code>, system execution, network, or plugin operators.</li>
             <li>No application-specific object construction from YAML tags.</li>
             <li>Environment access is limited to explicit <code>env</code>, <code>strenv</code>, and <code>envsubst</code> operators.</li>
-            <li>In-place writes reject symlinks and replace a file only after a successful complete transformation.</li>
+            <li>In-place writes reject symlinks and duplicate inputs, then preflight the complete file set before replacement.</li>
             <li>Input bytes, graph nodes, and nesting depth have hard configurable ceilings.</li>
           </ul>
           <p>This is a narrower attack surface than a general automation language. It is not a sandbox for arbitrary expressions: a query can still consume CPU and memory up to the configured limits.</p>
@@ -164,8 +164,8 @@ USER_NAME=&quot;$UNTRUSTED_NAME&quot; ysh '.users[strenv(USER_NAME)]' config.yml
           </div>
           <p>Use <code>--security-disable-env-ops</code> when even that environment read is inappropriate.</p>
           <h2 id="in-place-writes"><a href="#in-place-writes">In-place writes<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p><code>-i</code> requires one real file. YAML.sh creates a sibling temporary file, preserves permissions, transforms every document, and only then replaces the original. It refuses symlinks to avoid redirecting a write through an unexpected target.</p>
-          <p>Keep normal backups and version control. Atomic replacement protects against partial output, not a logically wrong query.</p>
+          <p><code>-i</code> requires one or more real files. YAML.sh creates candidate and rollback siblings beside every input, preserves permissions, and transforms the complete set before replacing anything. It refuses symlinks and duplicate inputs. A commit failure or interrupt restores preserved originals.</p>
+          <p>Keep normal backups and version control. The transaction protects against partial output, not a logically wrong query or a machine failure during rollback.</p>
           <h2 id="reporting-a-vulnerability"><a href="#reporting-a-vulnerability">Reporting a vulnerability<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Do not open a public issue for an undisclosed vulnerability. Follow the repository <a href="https://github.com/azohra/yaml.sh/security/policy">security policy</a>.</p>
       </article>

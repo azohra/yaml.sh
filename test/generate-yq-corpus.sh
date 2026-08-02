@@ -8,6 +8,7 @@ BASE=${YQ_DIFFERENTIAL_BASE:-$SCRIPT_DIR/yq-corpus-base.tsv}
 awk -F '\t' '
 function classify(query) {
     if (index(query, "\\(")) return "interpolation"
+    if (query ~ /(style|line_comment|tag|anchor|alias)/) return "yaml-metadata"
     if (query ~ /(^|[| ])(test|sub)\(/) return "regex"
     if (query ~ /(env\(|strenv\(|envsubst)/) return "environment"
     if (query ~ /(path|parent|fileIndex|documentIndex|filename)/) return "context"

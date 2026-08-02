@@ -1,6 +1,6 @@
 # Parser internals
 
-Version 1.8 is still one shell script, with a semantic graph and source-presentation layer working together.
+Version 1.9 is still one shell script, with a semantic graph, source-presentation layer, and repository transaction working together.
 
 ```text
 /bin/sh CLI
@@ -20,7 +20,7 @@ presentation patcher or value / JSON / YAML / metadata / AST / events
 
 ## The shell layer
 
-The `/bin/sh` launcher handles arguments, input, output mode, and atomic in-place replacement. It feeds the embedded program to AWK through a here-document, avoiding small `ARG_MAX` limits in minimal systems. Query text travels through the POSIX environment so AWK never rewrites backslashes before lexing interpolation or regex syntax.
+The `/bin/sh` launcher handles arguments, input, output mode, and in-place transactions. It prepares every transformed candidate before entering the commit window and keeps rollback siblings until all replacements succeed. It feeds the embedded program to AWK through a here-document, avoiding small `ARG_MAX` limits in minimal systems. Query text travels through the POSIX environment so AWK never rewrites backslashes before lexing interpolation or regex syntax.
 
 The development sources remain separate:
 

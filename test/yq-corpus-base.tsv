@@ -313,6 +313,16 @@ advanced.yml	.types.hex
 advanced.yml	.types.trailing_float
 advanced.yml	.types.exponent
 advanced.yml	.types.forced_string
+workflows/deployment.yml	.production anchor = "production" | [.production | anchor, .production.region]
+workflows/deployment.yml	.shared alias = "defaults" | [.shared | alias, .shared.region]
+workflows/deployment.yml	.production tag = "!release" | [.production | tag, .production.region]
+workflows/deployment.yml	.production tag = "!!map" | [.production | tag, .production.region]
+workflows/deployment.yml	.production.region style = "double" | [.production.region | style, .production.region]
+workflows/deployment.yml	.production.region style = "single" | [.production.region | style, .production.region]
+workflows/deployment.yml	.production.region style = "literal" | [.production.region | style, .production.region]
+workflows/deployment.yml	.production.region style = "folded" | [.production.region | style, .production.region]
+workflows/deployment.yml	.production.region style = "" | [.production.region | style, .production.region]
+workflows/deployment.yml	.production.region line_comment = "managed" | [.production.region | line_comment, .production.region]
 advanced.yml	.["explicit key"]
 advanced.yml	.shared_list | length
 advanced.yml	.flow.y | map(upcase)

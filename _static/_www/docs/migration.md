@@ -66,7 +66,7 @@ The following v0.x flags are not accepted in v1:
 - `-f`, because the input file is positional.
 - `-T`, because the transpiled representation is gone.
 - `-q` and `-Q`, because the positional query replaces them.
-- `-s`, `-l`, `-L`, `-c`, and `-I`, because node selection uses one query grammar.
+- `-s`, `-l`, `-L`, and `-c`, because node selection uses one query grammar. The old `-I` meaning is gone; modern `-I N` controls YAML indentation.
 - The v0.x meaning of `-i`. Modern YAML.sh uses `-i` for atomic yq-style file updates and preserves rich presentation for common edits.
 - `--next`, because `--document N` addresses a document directly.
 

@@ -95,9 +95,9 @@ mutation	expressions.yml	.metadata | del(.region)
 mutation	expressions.yml	.services | del(.[1]) | map(.name)
 selection	expressions.yml	.. | select(type == "!!str")
 paths	advanced.yml	.scalar
-paths	advanced.yml	.scalar_alias
-collections	advanced.yml	.mapping_alias.color
-paths	advanced.yml	.list_alias[1]
+yaml-metadata	advanced.yml	.scalar_alias
+yaml-metadata	advanced.yml	.mapping_alias.color
+yaml-metadata	advanced.yml	.list_alias[1]
 paths	advanced.yml	.flow.y[1]
 paths	advanced.yml	.merged.color
 paths	advanced.yml	.merged.shape
@@ -275,19 +275,19 @@ mutation	expressions.yml	.services | del(.[-1]) | map(.name)
 paths	expressions.yml	.metadata.owner = "core" | .metadata.owner
 paths	expressions.yml	.release.channel = "stable" | .release
 mutation	expressions.yml	.services[].enabled |= not | [.services[].enabled]
-collections	advanced.yml	.mapping_alias
-collections	advanced.yml	.mapping_alias.nested.enabled
-collections	advanced.yml	.mapping_alias.values
-collections	advanced.yml	.mapping_alias.values[]
+yaml-metadata	advanced.yml	.mapping_alias
+yaml-metadata	advanced.yml	.mapping_alias.nested.enabled
+yaml-metadata	advanced.yml	.mapping_alias.values
+yaml-metadata	advanced.yml	.mapping_alias.values[]
 paths	advanced.yml	.shared_list
 paths	advanced.yml	.shared_list[0]
 paths	advanced.yml	.flow
 paths	advanced.yml	.flow.x
 paths	advanced.yml	.flow.y
-paths	advanced.yml	.flow_alias.x
-paths	advanced.yml	.sequence_aliases
-paths	advanced.yml	.sequence_aliases[0]
-paths	advanced.yml	.sequence_aliases[1].x
+yaml-metadata	advanced.yml	.flow_alias.x
+yaml-metadata	advanced.yml	.sequence_aliases
+yaml-metadata	advanced.yml	.sequence_aliases[0]
+yaml-metadata	advanced.yml	.sequence_aliases[1].x
 practical	advanced.yml	.first
 paths	advanced.yml	.second
 paths	advanced.yml	.merged
@@ -295,7 +295,7 @@ paths	advanced.yml	.inline_merge
 paths	advanced.yml	.literal_merge
 paths	advanced.yml	.block_merge
 paths	advanced.yml	.quoted_merge_key
-collections	advanced.yml	.tagged_mapping.item
+yaml-metadata	advanced.yml	.tagged_mapping.item
 paths	advanced.yml	.types.string
 paths	advanced.yml	.types.quoted_number
 paths	advanced.yml	.types.null
@@ -305,6 +305,16 @@ paths	advanced.yml	.types.hex
 paths	advanced.yml	.types.trailing_float
 paths	advanced.yml	.types.exponent
 paths	advanced.yml	.types.forced_string
+yaml-metadata	workflows/deployment.yml	.production anchor = "production" | [.production | anchor, .production.region]
+yaml-metadata	workflows/deployment.yml	.shared alias = "defaults" | [.shared | alias, .shared.region]
+yaml-metadata	workflows/deployment.yml	.production tag = "!release" | [.production | tag, .production.region]
+yaml-metadata	workflows/deployment.yml	.production tag = "!!map" | [.production | tag, .production.region]
+yaml-metadata	workflows/deployment.yml	.production.region style = "double" | [.production.region | style, .production.region]
+yaml-metadata	workflows/deployment.yml	.production.region style = "single" | [.production.region | style, .production.region]
+yaml-metadata	workflows/deployment.yml	.production.region style = "literal" | [.production.region | style, .production.region]
+yaml-metadata	workflows/deployment.yml	.production.region style = "folded" | [.production.region | style, .production.region]
+yaml-metadata	workflows/deployment.yml	.production.region style = "" | [.production.region | style, .production.region]
+yaml-metadata	workflows/deployment.yml	.production.region line_comment = "managed" | [.production.region | line_comment, .production.region]
 paths	advanced.yml	.["explicit key"]
 collections	advanced.yml	.shared_list | length
 collections	advanced.yml	.flow.y | map(upcase)

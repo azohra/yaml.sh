@@ -5,6 +5,7 @@ YAML.sh is a focused, yq-like tool delivered as one readable shell file. It runs
 ```sh
 ysh '.services[] | select(.enabled) | .name' config.yml
 ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
+ysh -i '.release.channel = "stable"' services/*.yml
 ```
 
 ## Start with the task
@@ -56,7 +57,7 @@ Unsupported neighboring syntax should fail explicitly, not produce a plausible l
 
 ## Trust it appropriately
 
-Input bytes, graph nodes, and nesting depth have configurable ceilings. Environment access can be disabled. In-place writes reject symlinks and only replace a file after the full transformation succeeds.
+Input bytes, graph nodes, and nesting depth have configurable ceilings. Environment access can be disabled. In-place writes reject symlinks, preflight every input, and roll back a partial commit.
 
 Read [security and limits](security.md) before handling untrusted documents or expressions.
 
@@ -66,6 +67,7 @@ Read [security and limits](security.md) before handling untrusted documents or e
 ysh --events config.yml
 ysh --ast config.yml
 ysh --explain -i '.image.tag = "stable"' config.yml
+ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 
 The [internals guide](internals.md) follows a document through the parser. The [development guide](development.md) explains how each new promise earns fixtures, differential cases, rejection tests, and portability evidence.

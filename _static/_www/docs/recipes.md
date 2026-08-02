@@ -43,6 +43,14 @@ ysh -i '.image.tag = "stable"' deploy.yml
 
 `-i` refuses symlinks and only replaces the original after every document succeeds.
 
+Update a repository as one transaction:
+
+```sh
+ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
+```
+
+Every candidate is prepared before the first replacement. The JSON Lines report records paths and decisions without recording changed values.
+
 ## Set values from the environment
 
 `strenv` always creates a string. `env` parses the variable as YAML.
