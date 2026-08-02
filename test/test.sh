@@ -700,9 +700,17 @@ testGeneratedDifferentialCorpusStaysInSync() {
 }
 
 testReleaseArtifactsStayInSync() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        release_sha256=$(sha256sum ysh)
+    else
+        release_sha256=$(shasum -a 256 ysh)
+    fi
+    release_sha256=${release_sha256%% *}
     assertContains "$(cat README.md)" "v1.7.0/ysh"
     assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.7.0/ysh"
     assertContains "$(cat _static/_www/install)" "v1.7.0/ysh"
+    assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
+    assertContains "$(cat _static/_www/install)" "checksum verification failed"
     assertContains "$(cat _static/_www/index.html)" "Install v1.7"
     assertContains "$(cat _static/_www/index.html)" "style.css?v=1.7.0"
     assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.7.0"

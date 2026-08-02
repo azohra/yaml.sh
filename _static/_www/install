@@ -5,6 +5,26 @@ install_dir=${YSH_INSTALL_DIR:-/usr/local/bin}
 temporary_file=$(mktemp "${TMPDIR:-/tmp}/ysh.XXXXXX")
 trap 'rm -f "${temporary_file}"' 0 HUP INT TERM
 
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.7.0/ysh -o "${temporary_file}"
+expected_sha256=b34b2f5e867293e59e78a89c2f2c3b7fa3d25121fb13dc985e059b2e818d410c
+curl -fsSL https://github.com/azohra/yaml.sh/releases/download/v1.7.0/ysh -o "${temporary_file}"
+
+if command -v sha256sum >/dev/null 2>&1; then
+    actual_sha256=$(sha256sum "${temporary_file}")
+    actual_sha256=${actual_sha256%% *}
+elif command -v shasum >/dev/null 2>&1; then
+    actual_sha256=$(shasum -a 256 "${temporary_file}")
+    actual_sha256=${actual_sha256%% *}
+elif command -v openssl >/dev/null 2>&1; then
+    actual_sha256=$(openssl dgst -sha256 "${temporary_file}")
+    actual_sha256=${actual_sha256##* }
+else
+    printf '%s\n' 'YAML.sh requires sha256sum, shasum, or openssl to verify the download.' >&2
+    exit 1
+fi
+if [ "${actual_sha256}" != "${expected_sha256}" ]; then
+    printf '%s\n' 'YAML.sh checksum verification failed; refusing to install.' >&2
+    exit 1
+fi
+
 mkdir -p "${install_dir}"
 install -m 755 "${temporary_file}" "${install_dir}/ysh"
