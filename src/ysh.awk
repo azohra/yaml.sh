@@ -134,7 +134,7 @@ function decode_double_quoted(value,    result, i, char, next_char, digits, coun
             result = result unicode_utf8(codepoint)
             i += count
         } else {
-            result = result "\\" next_char
+            fail("invalid escape sequence on line " NR)
         }
     }
     return result
@@ -443,6 +443,10 @@ function expand_tag(token,    inner, rest, position, handle, suffix, key) {
     if (substr(token, 1, 2) == "!<" && substr(token, length(token), 1) == ">") {
         return substr(token, 3, length(token) - 3)
     }
+    if (index(token, "[") || index(token, "]") || index(token, "{") ||
+        index(token, "}") || index(token, ",")) {
+        fail("invalid tag " token " on line " NR)
+    }
     if (substr(token, 1, 2) == "!!") {
         key = document_index SUBSEP "!!"
         if (key in tag_prefix) {
@@ -632,6 +636,10 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
         return alias_node(alias_name, source_line)
     }
 
+    if ((substr(value, 1, 1) == "[" || substr(value, 1, 1) == "{") && flow_balance(value) != 0) {
+        fail("unbalanced flow collection on line " source_line)
+    }
+
     if (substr(value, 1, 1) == "[" && substr(value, length(value), 1) == "]") {
         node = new_node("sequence", source_line, "", "", tag)
         bind_anchor(anchor, node, source_line)
@@ -647,6 +655,9 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
             if (i == count && piece == "") {
                 delete flow_piece_saved[flow_serial, i]
                 continue
+            }
+            if (piece == "") {
+                fail("empty entry between flow commas on line " source_line)
             }
             separator = find_mapping_separator(piece, 1)
             if (!separator && (substr(piece, 1, 1) == "\"" || substr(piece, 1, 1) == sprintf("%c", 39))) {
@@ -686,6 +697,9 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
                 delete flow_piece_saved[flow_serial, i]
                 continue
             }
+            if (piece == "") {
+                fail("empty entry between flow commas on line " source_line)
+            }
             separator = find_mapping_separator(piece, 0)
             if (separator) {
                 raw_key = trim(substr(piece, 1, separator - 1))
@@ -711,6 +725,10 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
         fail("multiline or unclosed flow collection on line " source_line)
     }
 
+    if ((substr(value, 1, 1) == "\"" && substr(value, length(value), 1) != "\"") ||
+        (substr(value, 1, 1) == sprintf("%c", 39) && substr(value, length(value), 1) != sprintf("%c", 39))) {
+        fail("trailing content after quoted scalar on line " source_line)
+    }
     node = new_node("scalar", source_line, scalar_value(value), scalar_type(value, tag, scalar_value(value)), tag)
     bind_anchor(anchor, node, source_line)
     return node
@@ -727,11 +745,21 @@ function parse_value(value, source_line, indent, allow_block,    cleaned, remain
         bind_anchor(anchor, node, source_line)
         return node
     }
+    if (!allow_block && remainder == "-") {
+        fail("plain dash is not valid in a flow collection on line " source_line)
+    }
     if (allow_block && remainder ~ /^[|>]([-+]?[1-9]?|[1-9][-+]?)$/) {
         node = new_node("scalar", source_line, "", "string", tag)
         bind_anchor(anchor, node, source_line)
         start_block(node, remainder, indent, source_line)
         return node
+    }
+    if (allow_block && remainder ~ /^[|>]/) {
+        fail("invalid block scalar indicator on line " source_line)
+    }
+    if (!(substr(remainder, 1, 1) == "*" && valid_anchor_name(substr(remainder, 2))) &&
+        find_top_level_colon(remainder, 1)) {
+        fail("mapping indicator inside plain scalar on line " source_line)
     }
     return parse_core(remainder, source_line, tag, anchor)
 }
@@ -962,7 +990,15 @@ function parse_directive(text, source_line,    count, i, handle, prefix) {
     count = split(text, directive_piece, /[[:space:]]+/)
     directive_piece_count = count
 
-    if (directive_piece[1] == "%YAML" && count == 2 && directive_piece[2] ~ /^(1\.1|1\.2)$/) {
+    document_directive_pending[document_index] = 1
+    if (directive_piece[1] == "%YAML") {
+        if (count != 2 || directive_piece[2] !~ /^[0-9]+\.[0-9]+$/) {
+            fail("malformed YAML directive on line " source_line)
+        }
+        if (document_yaml_directive_seen[document_index]) {
+            fail("duplicate YAML directive on line " source_line)
+        }
+        document_yaml_directive_seen[document_index] = 1
         document_yaml_version[document_index] = directive_piece[2]
         return
     }
@@ -970,9 +1006,17 @@ function parse_directive(text, source_line,    count, i, handle, prefix) {
         handle = directive_piece[2]
         prefix = directive_piece[3]
         if (substr(handle, 1, 1) == "!" && substr(handle, length(handle), 1) == "!") {
+            if (document_tag_directive_seen[document_index SUBSEP handle]) {
+                fail("duplicate TAG directive on line " source_line)
+            }
+            document_tag_directive_seen[document_index SUBSEP handle] = 1
             tag_prefix[document_index SUBSEP handle] = prefix
             return
         }
+        fail("malformed TAG directive on line " source_line)
+    }
+    if (directive_piece[1] == "%TAG") {
+        fail("malformed TAG directive on line " source_line)
     }
     if (substr(directive_piece[1], 1, 1) == "%") {
         return
@@ -1089,6 +1133,9 @@ function append_plain_scalar(node, text, source_line,    cleaned, separator) {
     if (cleaned == "") {
         return 0
     }
+    if (find_top_level_colon(cleaned, 1)) {
+        fail("mapping indicator inside multiline plain scalar on line " source_line)
+    }
     separator = source_line > node_last_content_line[node] + 1 ? "\n" : " "
     node_value[node] = node_value[node] separator scalar_value(cleaned)
     node_type[node] = scalar_type(node_value[node], node_tag[node], node_value[node])
@@ -1168,7 +1215,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
             document_index++
             document_ended = 0
             clear_structure()
-        } else if (indent != 0 || (document_index in document_root)) {
+        } else if (indent != 0 || (document_index in document_root) || document_explicit[document_index]) {
             fail("directives must appear before a document on line " source_line)
         }
         parse_directive(clean, source_line)
@@ -1185,6 +1232,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
             document_index++
         }
         document_explicit[document_index] = 1
+        delete document_directive_pending[document_index]
         document_ended = 0
         clear_structure()
         if (marker_content != "") {
@@ -1195,6 +1243,9 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         return
     }
     if (clean == "...") {
+        if (document_directive_pending[document_index]) {
+            fail("directive requires a document marker before line " source_line)
+        }
         fail_pending_explicit_keys(source_line)
         if (!document_has_content[document_index]) {
             create_empty_document(source_line)
@@ -4198,6 +4249,10 @@ END {
                 add_explicit_null(pending_indent, NR + 1)
             }
         }
+    }
+    if (!exit_status && document_directive_pending[document_index]) {
+        print "Error: directive requires a following document" > "/dev/stderr"
+        exit_status = 1
     }
     if (!exit_status) {
         if (!(0 in document_root) && node_count == 0) {

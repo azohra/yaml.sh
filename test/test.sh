@@ -278,6 +278,30 @@ testInplaceUpdate() {
     rm -f "$inplace_file"
 }
 
+testInplaceFailureIsAtomic() {
+    inplace_file=test/.tmp-inplace-atomic-$$.yml
+    backup_file=test/.tmp-inplace-atomic-backup-$$.yml
+    link_file=test/.tmp-inplace-atomic-link-$$.yml
+    printf '%s\n' 'service:' '  name: api' > "$inplace_file"
+    cp "$inplace_file" "$backup_file"
+
+    ./ysh -i '.service.name = ' "$inplace_file" >/dev/null 2>&1
+    assertNotEquals 0 $?
+    cmp -s "$backup_file" "$inplace_file"
+    assertEquals 0 $?
+
+    ln -s "$(basename "$inplace_file")" "$link_file"
+    result=$(./ysh -i '.service.name = "worker"' "$link_file" 2>&1)
+    assertEquals 2 $?
+    assertContains "$result" 'refuses symbolic links'
+    cmp -s "$backup_file" "$inplace_file"
+    assertEquals 0 $?
+
+    set -- "test/.$(basename "$inplace_file").ysh."*
+    assertFalse "temporary file must be removed" "[ -e \"$1\" ]"
+    rm -f "$link_file" "$backup_file" "$inplace_file"
+}
+
 testInplaceTransformsAllDocuments() {
     inplace_file=test/.tmp-inplace-multi-$$.yml
     cp test/test.yml "$inplace_file"

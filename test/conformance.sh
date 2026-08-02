@@ -7,6 +7,7 @@ PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 SUITE_DIR=${YAML_TEST_SUITE_DIR:-${1:-}}
 YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
 KNOWN_PASSES=${YAML_CONFORMANCE_PASSES:-$SCRIPT_DIR/conformance-pass.txt}
+KNOWN_REJECTIONS=${YAML_REJECTION_PASSES:-$SCRIPT_DIR/rejection-pass.txt}
 
 if [ -z "$SUITE_DIR" ] || [ ! -d "$SUITE_DIR" ]; then
     printf '%s\n' "Set YAML_TEST_SUITE_DIR to the YAML Test Suite data-2022-01-17 checkout." >&2
@@ -24,7 +25,8 @@ if [ ! -x "$YSH_BINARY" ]; then
 fi
 
 RESULTS_FILE=$(mktemp "${TMPDIR:-/tmp}/ysh-conformance.XXXXXX")
-trap 'rm -f "$RESULTS_FILE"' 0 1 2 3 15
+REJECTIONS_FILE=$(mktemp "${TMPDIR:-/tmp}/ysh-rejections.XXXXXX")
+trap 'rm -f "$RESULTS_FILE" "$REJECTIONS_FILE"' 0 1 2 3 15
 
 find "$SUITE_DIR" -name in.json -type f | sort | while IFS= read -r expected_file; do
     case_dir=${expected_file%/in.json}
@@ -95,5 +97,38 @@ while IFS= read -r case_id; do
 done < "$KNOWN_PASSES"
 
 if [ "$regressions" -ne 0 ]; then
+    exit 1
+fi
+
+find "$SUITE_DIR" -name error -type f | sort | while IFS= read -r error_file; do
+    case_dir=${error_file%/error}
+    case_id=${case_dir#"$SUITE_DIR"/}
+    if [ -f "$case_dir/in.json" ]; then
+        continue
+    fi
+    if "$YSH_BINARY" --json '.' "$case_dir/in.yaml" >/dev/null 2>&1; then
+        printf 'accept\t%s\n' "$case_id"
+    else
+        printf 'reject\t%s\n' "$case_id"
+    fi
+done > "$REJECTIONS_FILE"
+
+reject_count=$(awk -F '\t' '$1 == "reject" {count++} END {print count + 0}' "$REJECTIONS_FILE")
+accept_count=$(awk -F '\t' '$1 == "accept" {count++} END {print count + 0}' "$REJECTIONS_FILE")
+rejection_total=$((reject_count + accept_count))
+printf 'YAML Test Suite strict rejection results: %s/%s reject invalid input\n' "$reject_count" "$rejection_total"
+
+rejection_regressions=0
+while IFS= read -r case_id; do
+    case "$case_id" in
+    ''|'#'*) continue ;;
+    esac
+    if ! awk -F '\t' -v wanted="$case_id" '$1 == "reject" && $2 == wanted {found=1} END {exit !found}' "$REJECTIONS_FILE"; then
+        printf 'Rejection regression: invalid case %s is now accepted\n' "$case_id" >&2
+        rejection_regressions=$((rejection_regressions + 1))
+    fi
+done < "$KNOWN_REJECTIONS"
+
+if [ "$rejection_regressions" -ne 0 ]; then
     exit 1
 fi
