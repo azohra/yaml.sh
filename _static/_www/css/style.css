@@ -269,8 +269,7 @@ h1 span {
   border: 1px solid rgba(216, 255, 69, 0.38);
   border-radius: 8px;
   background: #0b0e0b;
-  box-shadow: 24px 24px 0 rgba(216, 255, 69, 0.08), 0 28px 90px rgba(0, 0, 0, 0.42);
-  transform: rotate(1.25deg);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
 }
 
 .terminal-bar,
@@ -353,25 +352,34 @@ h1 span {
 .terminal-command {
   margin-top: 24px;
   color: var(--paper-dim);
+  font-weight: 600;
   white-space: nowrap;
+  animation: terminal-command-in 900ms steps(12, end) 240ms both;
 }
 
 .terminal-output {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--paper);
-  font-size: 24px;
-  font-weight: 700;
+  margin-top: 10px;
+  color: var(--paper-dim);
+  font-size: inherit;
+  font-weight: 500;
+  line-height: 1.65;
+  animation: terminal-output-in 180ms ease-out 1.2s both;
 }
 
-.cursor {
-  width: 8px;
-  height: 21px;
-  display: inline-block;
-  background: var(--acid);
-  animation: blink 1.05s step-end infinite;
+@keyframes terminal-command-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}
+
+@keyframes terminal-output-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .terminal-footer {
@@ -837,6 +845,7 @@ footer nav {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
   }
 }
