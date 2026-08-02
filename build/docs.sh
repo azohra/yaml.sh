@@ -7,7 +7,7 @@ SOURCE=$ROOT/_static/_www/docs
 DOCS=${YSH_DOCS_OUTPUT:-$SOURCE}
 RENDERER=$ROOT/build/docs-page.awk
 VERSION=${YSH_DOCS_VERSION:-$(sed -n 's/^YSH_VERSION=//p' "$ROOT/ysh" | head -n 1)}
-PAGES='README getting-started recipes queries documents output yq-compatibility supported_yml security migration internals development versioning'
+PAGES='README getting-started recipes queries documents output yq-compatibility supported_yml security migration internals development'
 
 mkdir -p "$DOCS"
 
@@ -25,7 +25,6 @@ description_for() {
     migration) printf '%s\n' 'Move scripts from the pre-v1 interface.' ;;
     internals) printf '%s\n' 'Follow YAML from source text into the node graph.' ;;
     development) printf '%s\n' 'Build, test, and extend the portable implementation.' ;;
-    versioning) printf '%s\n' 'How YAML.sh applies Semantic Versioning.' ;;
     esac
 }
 

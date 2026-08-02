@@ -49,7 +49,7 @@ For every supported feature:
 2. Test the selected value or structure.
 3. Test metadata when tags, types, or source lines matter.
 4. Add an explicit rejection test if a neighboring syntax remains unsupported.
-5. Update the support contract.
+5. Update the YAML support reference.
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 

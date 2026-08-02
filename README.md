@@ -126,9 +126,9 @@ Common in-place replacements, inserts, deletes, and sequence reorders preserve c
 
 Multi-file `-i` is one transaction: all inputs parse and transform before the first replacement. A commit failure or interrupt restores preserved originals. Writable `eval-all` can read a value from one file and update another under the same transaction.
 
-## Useful, measured, bounded
+## Tested where it matters
 
-The release contract is evidence, not a universal compliance claim:
+The test suite covers parser behavior, yq-shaped queries, safe edits, portability, and useful scale:
 
 | Evidence | What it establishes |
 | --- | --- |
@@ -137,11 +137,11 @@ The release contract is evidence, not a universal compliance claim:
 | Grammar/property matrix | Every combination of 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties |
 | Presentation matrix | Exact compound edits across scalar styles and value/comment variants |
 | Repository transactions | Clean, drift, error, no-op, cross-file data flow, rollback, and interruption behavior |
-| Scale contract | 125,000 nodes; 1,500 documents; ≤224 MiB RSS |
+| Scale checks | 125,000 nodes; 1,500 documents; ≤224 MiB RSS |
 
 Supported behavior has a test. Nearby unsupported behavior gets an explicit error instead of a confident misparse.
 
-Read the exact [YAML support contract](https://yaml.azohra.com/docs/supported_yml/) and the honest [yq capability map](https://yaml.azohra.com/docs/yq-compatibility/).
+See [YAML support](https://yaml.azohra.com/docs/supported_yml/) for syntax and limits, and the [yq capability map](https://yaml.azohra.com/docs/yq-compatibility/) for feature overlap.
 
 ## A deliberately small security model
 
@@ -191,10 +191,6 @@ make all
 That builds the standalone file, runs ShellCheck, and executes the behavioral suite. The portability matrix covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells. The longer conformance, differential, fuzz, presentation, adversarial, and scale evidence runs before releases and weekly.
 
 The implementation is intentionally inspectable. Start with the [internals guide](https://yaml.azohra.com/docs/internals/) or [development guide](https://yaml.azohra.com/docs/development/).
-
-## Versions mean compatibility
-
-YAML.sh follows [Semantic Versioning](VERSIONING.md). Features grow v1 with minor releases; fixes use patches; v2 requires a necessary, named incompatibility and migration path. Capability belongs in the evidence, not an inflated major number.
 
 ## License
 

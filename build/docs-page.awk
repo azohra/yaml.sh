@@ -92,11 +92,30 @@ function close_list() {
     }
 }
 
-function table_cells(row, cells,    count, cleaned) {
+function table_cells(row, cells,    count, cleaned, cell, ch, i, in_code, key) {
     cleaned = row
     sub(/^\|[[:space:]]*/, "", cleaned)
     sub(/[[:space:]]*\|$/, "", cleaned)
-    count = split(cleaned, cells, /[[:space:]]*\|[[:space:]]*/)
+    for (key in cells) delete cells[key]
+    count = 1
+    cell = ""
+    in_code = 0
+    for (i = 1; i <= length(cleaned); i++) {
+        ch = substr(cleaned, i, 1)
+        if (ch == "`") {
+            in_code = !in_code
+            cell = cell ch
+        } else if (ch == "\\" && substr(cleaned, i + 1, 1) == "|") {
+            cell = cell "|"
+            i++
+        } else if (ch == "|" && !in_code) {
+            cells[count++] = cell
+            cell = ""
+        } else {
+            cell = cell ch
+        }
+    }
+    cells[count] = cell
     return count
 }
 
@@ -148,7 +167,6 @@ function print_nav() {
     nav_group("Start", "index", "Overview", "getting-started", "Install & quick start", "recipes", "Recipes", "", "")
     nav_group("Use", "queries", "Query language", "documents", "Files & documents", "output", "Output & metadata", "yq-compatibility", "yq compatibility")
     nav_group("Trust", "supported_yml", "YAML support", "security", "Security & limits", "internals", "How it works", "development", "Development")
-    nav_group("Project", "versioning", "Versioning", "", "", "", "", "", "")
 }
 
 function print_header() {
@@ -298,7 +316,7 @@ END {
     close_blocks()
     if (in_code) print "</code></pre></div>"
     print "      </article>"
-    print "      <nav class=\"page-turn\" aria-label=\"More documentation\"><a href=\"/docs/recipes/\"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href=\"/docs/supported_yml/\"><span>Read the contract</span><strong>See exactly what works →</strong></a></nav>"
+    print "      <nav class=\"page-turn\" aria-label=\"More documentation\"><a href=\"/docs/recipes/\"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href=\"/docs/supported_yml/\"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>"
     print "    </main>"
     if (toc_count) {
         print "    <aside class=\"page-nav\" aria-label=\"On this page\">"
@@ -313,7 +331,7 @@ END {
     print "  <dialog class=\"search-dialog\" data-search-dialog>"
     print "    <form method=\"dialog\" class=\"search-box\"><label for=\"docs-search\">Search the docs</label><button value=\"close\" aria-label=\"Close search\">×</button><input id=\"docs-search\" type=\"search\" autocomplete=\"off\" placeholder=\"Try “merge files” or “envsubst”\"><div class=\"search-results\" aria-live=\"polite\"></div><p><kbd>↑</kbd><kbd>↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close</p></form>"
     print "  </dialog>"
-    print "  <footer class=\"site-footer\"><p>YAML.sh · yq energy, zero baggage.</p><p><a href=\"https://github.com/azohra/yaml.sh\">Source</a> · <a href=\"/docs/development/\">Contribute</a> · <a href=\"/docs/versioning/\">Versioning</a></p></footer>"
+    print "  <footer class=\"site-footer\"><p>YAML.sh · yq energy, zero baggage.</p><p><a href=\"https://github.com/azohra/yaml.sh\">Source</a> · <a href=\"/docs/development/\">Contribute</a></p></footer>"
     print "</body>"
     print "</html>"
 }

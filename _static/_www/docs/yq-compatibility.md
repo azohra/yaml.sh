@@ -17,7 +17,7 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 | YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
 | YAML presentation | Focused | comments and styles survive common edits; line comments and scalar/collection styles are writable |
 
-“Strong” still means the forms covered by the test suite, not every obscure polymorphic combination accepted by yq.
+“Strong” means the common forms documented and tested here. It does not mean every polymorphic combination accepted by yq.
 
 ## Where YAML.sh wins
 
@@ -30,7 +30,7 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 - `--check` uses the real write path and reports clean, drift, or error without touching files.
 - Multi-file queries compile once. Writable `eval-all` can read one file, mutate several others, preflight the complete set, skip no-ops, and roll back commit failures.
 - `--explain=json` produces one value-free audit record per input for CI.
-- Every release pins semantic YAML outcomes, strict-invalid rejection, differential programs, generated properties, presentation edits, and a time/memory scale contract.
+- Parser outcomes, invalid input, yq comparisons, presentation edits, and useful scale are covered by repeatable tests.
 
 yq remains the better choice for its complete operator surface, many codecs, polished platform packaging, and broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, and a deliberately narrow security model matter more than total surface area.
 
@@ -48,8 +48,8 @@ yq remains the better choice for its complete operator surface, many codecs, pol
 
 Some areas remain partial: `eval-all` supports combined reads, bindings, merges, and cross-file transactions but is not a general clone of yq's stream engine. Anchor renames deliberately keep existing aliases valid, even where yq leaves their displayed alias name unchanged.
 
-## Measured, not hand-waved
+## Compared with yq
 
-The release suite pins mikefarah/yq v4.53.3 and compares canonical JSON across 2,628 categorized programs plus Kubernetes, Compose, GitHub Actions, GitLab CI, deployment-overlay, metadata, and cross-file workflows. See the [support contract](supported_yml.md) and the repository's corpora for every query.
+The suite compares canonical JSON with mikefarah/yq v4.53.3 across 2,628 categorized programs plus Kubernetes, Compose, GitHub Actions, GitLab CI, deployment-overlay, metadata, and cross-file workflows. See [YAML support](supported_yml.md) for parser coverage and limits.
 
 If a form is not in the query guide or tests, treat it as unsupported even when a nearby form works.

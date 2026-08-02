@@ -52,12 +52,6 @@
               <li><a href="/docs/development/" aria-current="page">Development</a></li>
             </ul>
           </section>
-          <section class="nav-group">
-            <p class="nav-title">Project</p>
-            <ul>
-              <li><a href="/docs/versioning/">Versioning</a></li>
-            </ul>
-          </section>
   </nav></details>
   <div class="docs-shell">
     <aside class="docs-nav" aria-label="Documentation">
@@ -87,12 +81,6 @@
               <li><a href="/docs/security/">Security & limits</a></li>
               <li><a href="/docs/internals/">How it works</a></li>
               <li><a href="/docs/development/" aria-current="page">Development</a></li>
-            </ul>
-          </section>
-          <section class="nav-group">
-            <p class="nav-title">Project</p>
-            <ul>
-              <li><a href="/docs/versioning/">Versioning</a></li>
             </ul>
           </section>
       </nav>
@@ -148,7 +136,7 @@ _static/_www/install    installer
             <li>Test the selected value or structure.</li>
             <li>Test metadata when tags, types, or source lines matter.</li>
             <li>Add an explicit rejection test if a neighboring syntax remains unsupported.</li>
-            <li>Update the support contract.</li>
+            <li>Update the YAML support reference.</li>
           </ol>
           <p>The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.</p>
           <p>Run <code>make conformance</code> with <code>YAML_TEST_SUITE_DIR</code> set to the pinned data checkout. Run <code>make differential</code> with yq v4.53.3 and jq available. <code>make fuzz</code> crosses 6 layouts, 7 collection sizes, 2 states, and 8 parser/query/mutation properties; set <code>YSH_FUZZ_MATRICES</code> and <code>YSH_FUZZ_SEED</code> for rotating value sweeps. <code>make presentation</code>, <code>make adversarial</code>, and <code>make scale</code> cover exact source retention, hostile shapes, and bounded scale.</p>
@@ -158,7 +146,7 @@ _static/_www/install    installer
           <p>Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform <code>/bin/sh</code>. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly as drift detection.</p>
           <p>Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.</p>
       </article>
-      <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Read the contract</span><strong>See exactly what works →</strong></a></nav>
+      <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
@@ -176,6 +164,6 @@ _static/_www/install    installer
   <dialog class="search-dialog" data-search-dialog>
     <form method="dialog" class="search-box"><label for="docs-search">Search the docs</label><button value="close" aria-label="Close search">×</button><input id="docs-search" type="search" autocomplete="off" placeholder="Try “merge files” or “envsubst”"><div class="search-results" aria-live="polite"></div><p><kbd>↑</kbd><kbd>↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close</p></form>
   </dialog>
-  <footer class="site-footer"><p>YAML.sh · yq energy, zero baggage.</p><p><a href="https://github.com/azohra/yaml.sh">Source</a> · <a href="/docs/development/">Contribute</a> · <a href="/docs/versioning/">Versioning</a></p></footer>
+  <footer class="site-footer"><p>YAML.sh · yq energy, zero baggage.</p><p><a href="https://github.com/azohra/yaml.sh">Source</a> · <a href="/docs/development/">Contribute</a></p></footer>
 </body>
 </html>

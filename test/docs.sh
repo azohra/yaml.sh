@@ -6,7 +6,7 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 PUBLISHED=$ROOT/_static/_www/docs
 STORY=$ROOT/_static/_www/story
 GENERATED=$(mktemp -d "${TMPDIR:-/tmp}/ysh-docs.XXXXXX")
-PAGES='getting-started recipes queries documents output yq-compatibility supported_yml security migration internals development versioning'
+PAGES='getting-started recipes queries documents output yq-compatibility supported_yml security migration internals development'
 trap 'rm -rf "$GENERATED"' 0 1 2 3 15
 
 YSH_DOCS_OUTPUT=$GENERATED "$ROOT/build/docs.sh" >/dev/null
@@ -49,6 +49,12 @@ fi
 
 if grep -En 'href="[[:alnum:]_-]+\.md([#"]|$)' "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html >/dev/null; then
     printf '%s\n' 'Generated documentation contains a source Markdown link.' >&2
+    exit 1
+fi
+
+if ! grep -Fq '<code>|=</code>' "$GENERATED/yq-compatibility/index.html" ||
+    grep -Fq '<td>=<code>' "$GENERATED/yq-compatibility/index.html"; then
+    printf '%s\n' 'A pipe inside inline code broke a generated documentation table.' >&2
     exit 1
 fi
 
