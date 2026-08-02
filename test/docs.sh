@@ -4,6 +4,7 @@ set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 PUBLISHED=$ROOT/_static/_www/docs
+STORY=$ROOT/_static/_www/story
 GENERATED=$(mktemp -d "${TMPDIR:-/tmp}/ysh-docs.XXXXXX")
 PAGES='getting-started recipes queries documents output yq-compatibility supported_yml security migration internals development versioning'
 trap 'rm -rf "$GENERATED"' 0 1 2 3 15
@@ -55,7 +56,7 @@ if grep -En 'scroll-behavior:[[:space:]]*smooth' "$PUBLISHED/docs.css" >/dev/nul
     exit 1
 fi
 
-for asset in "$ROOT/_static/_www/brand/hero.svg" "$ROOT/_static/_www/og.png" "$PUBLISHED/docs.css" "$PUBLISHED/docs.js"; do
+for asset in "$ROOT/_static/_www/brand/hero.svg" "$ROOT/_static/_www/og.png" "$STORY/story.css" "$PUBLISHED/docs.css" "$PUBLISHED/docs.js"; do
     if [ ! -s "$asset" ]; then
         printf 'Missing documentation asset: %s\n' "$asset" >&2
         exit 1
@@ -63,7 +64,7 @@ for asset in "$ROOT/_static/_www/brand/hero.svg" "$ROOT/_static/_www/og.png" "$P
 done
 
 LINKS=$GENERATED/.links
-for source in "$ROOT/_static/_www/index.html" "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html; do
+for source in "$ROOT/_static/_www/index.html" "$STORY/index.html" "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html; do
     awk -v source="$source" '
     {
         line = $0
@@ -107,7 +108,7 @@ while IFS="	" read -r source link; do
     fi
 done < "$LINKS"
 
-if grep -En 'og-v[0-9]|v[0-9]+\.[0-9]+.*(\.png|\.svg)' "$ROOT/README.md" "$ROOT/_static/_www/index.html" "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html >/dev/null; then
+if grep -En 'og-v[0-9]|v[0-9]+\.[0-9]+.*(\.png|\.svg)' "$ROOT/README.md" "$ROOT/_static/_www/index.html" "$STORY/index.html" "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html >/dev/null; then
     printf '%s\n' 'A release-specific image reference returned.' >&2
     exit 1
 fi

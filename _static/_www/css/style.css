@@ -616,6 +616,45 @@ h1 span {
   border-top: 1px solid var(--line);
 }
 
+.story-callout {
+  padding-block: 96px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+  gap: 72px;
+  align-items: end;
+  border-top: 1px solid var(--line);
+}
+
+.story-callout h2 {
+  max-width: 700px;
+  margin: 0;
+  color: var(--paper);
+  font-size: clamp(48px, 6vw, 82px);
+  line-height: .94;
+  letter-spacing: -.065em;
+}
+
+.story-callout > div:last-child > p {
+  margin: 0;
+  color: var(--paper-dim);
+  font-size: 18px;
+}
+
+.story-callout a {
+  margin-top: 28px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--acid);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.story-callout a:hover { color: var(--paper); }
+
 .install-copy > p:last-child {
   max-width: 520px;
   margin-top: 26px;
@@ -736,6 +775,11 @@ footer nav {
   .install {
     grid-template-columns: 1fr;
   }
+
+  .story-callout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
 }
 
 @media (max-width: 680px) {
@@ -797,6 +841,7 @@ footer nav {
   .architecture,
   .playground,
   .features,
+  .story-callout,
   .install {
     padding-block: 86px;
   }
