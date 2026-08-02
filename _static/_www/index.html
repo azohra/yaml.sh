@@ -19,7 +19,7 @@
   <meta name="twitter:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com">
   <link rel="icon" href="favicon.ico">
-  <link rel="stylesheet" href="css/style.css?v=2">
+  <link rel="stylesheet" href="css/style.css?v=3">
   <title>YAML.sh — yq energy. zero baggage.</title>
 </head>
 <body>
@@ -74,7 +74,7 @@
           <div class="terminal-command">
             <span class="prompt">$</span> ysh <span class="query">'.services[] | select(.enabled) | .name'</span> config.yml
           </div>
-          <div class="terminal-output"><span>api<br>web</span><i class="cursor" aria-hidden="true"></i></div>
+          <div class="terminal-output">api<br>web</div>
         </div>
         <div class="terminal-footer">
           <span>node graph → resolver → expression stream</span>
@@ -98,7 +98,7 @@
 
     <section class="architecture section-shell" id="architecture">
       <div class="section-heading">
-        <p class="kicker">A real parser this time</p>
+        <p class="kicker">Structure all the way through</p>
         <h2>It parses before it queries.</h2>
         <p>YAML.sh parses a proper node graph before evaluating expressions. Mappings, sequences, tags, anchors, aliases, and source lines stay intact from input to output.</p>
       </div>
