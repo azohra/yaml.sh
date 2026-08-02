@@ -425,11 +425,13 @@ testRootScalarsAndCollections() {
     assertContains "$result" '"two":2'
 }
 
-testEmptyDocumentsAreNull() {
-    assertEquals "null" "$(printf "" | ./ysh "." --json)"
+testEmptyStreamsAndDocuments() {
+    assertEquals "" "$(printf "" | ./ysh "." --json)"
+    assertEquals "" "$(printf '%s\n' '...' | ./ysh "." --json)"
     assertEquals "null" "$(printf "%s\n" "---" "..." | ./ysh "." --json)"
     assertEquals "null" "$(printf "%s\n" "---" "---" "key: value" | ./ysh -d 0 "." --json)"
     assertEquals "value" "$(printf "%s\n" "---" "---" "key: value" | ./ysh -d 1 ".key")"
+    assertEquals "value" "$(printf '%s\n' 'first' '...' 'key: value' | ./ysh -d 1 '.key')"
 }
 
 testPrimaryTagHandleExpansion() {

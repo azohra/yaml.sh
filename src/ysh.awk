@@ -825,40 +825,75 @@ function start_block(node, indicator, indent, source_line,    digit) {
     block_source_line = source_line
 }
 
-function append_block_line(value) {
+function append_block_line(value, more_indented, raw_blank) {
     block_lines[++block_count] = value
+    block_line_more[block_count] = more_indented
+    block_line_raw_blank[block_count] = raw_blank
 }
 
-function flush_block(    value, i, separator) {
+function flush_block(    value, i, line, previous, more, previous_more, seen_nonblank, last_nonblank_more, blank_run) {
     if (!block_active) {
         return
     }
 
     value = ""
+    previous = ""
+    previous_more = 0
+    seen_nonblank = 0
+    last_nonblank_more = 0
+    blank_run = 0
     for (i = 1; i <= block_count; i++) {
-        value = value block_lines[i]
-        if (i < block_count) {
-            if (block_style == ">" && block_lines[i] != "" && block_lines[i + 1] != "") {
-                separator = " "
+        line = block_lines[i]
+        if (block_line_raw_blank[i]) {
+            if (block_content_indent >= 0) {
+                line = length(line) > block_content_indent ? substr(line, block_content_indent + 1) : ""
             } else {
-                separator = "\n"
+                line = ""
             }
-            value = value separator
         }
+        more = block_line_more[i]
+        if (block_line_raw_blank[i] && line != "") {
+            more = 1
+        }
+        if (block_style == "|") {
+            value = value line "\n"
+        } else if (line == "") {
+            value = value "\n"
+            blank_run = 1
+        } else {
+            if (i == 1 || previous == "") {
+                if (blank_run && seen_nonblank && (last_nonblank_more || more)) {
+                    value = value "\n"
+                }
+                value = value line
+            } else if (previous_more || more) {
+                value = value "\n" line
+            } else {
+                value = value " " line
+            }
+            seen_nonblank = 1
+            last_nonblank_more = more
+            blank_run = 0
+        }
+        previous = line
+        previous_more = more
         delete block_lines[i]
+        delete block_line_more[i]
+        delete block_line_raw_blank[i]
+    }
+    if (block_style == ">" && block_count > 0 && previous != "") {
+        value = value "\n"
     }
 
-    if (block_count > 0) {
-        if (block_chomp == "strip") {
-            while (substr(value, length(value), 1) == "\n") {
-                value = substr(value, 1, length(value) - 1)
-            }
-        } else if (block_chomp == "clip") {
-            while (substr(value, length(value), 1) == "\n") {
-                value = substr(value, 1, length(value) - 1)
-            }
-            value = value "\n"
-        } else {
+    if (block_chomp == "strip") {
+        while (substr(value, length(value), 1) == "\n") {
+            value = substr(value, 1, length(value) - 1)
+        }
+    } else if (block_chomp == "clip") {
+        while (substr(value, length(value), 1) == "\n") {
+            value = substr(value, 1, length(value) - 1)
+        }
+        if (value != "") {
             value = value "\n"
         }
     }
@@ -1147,24 +1182,37 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     sub(/\r$/, "", raw)
 
     if (block_active) {
+        candidate = strip_inline_comment(trim(raw))
+        if (raw !~ /^[[:space:]]/ && (candidate == "..." || candidate == "---" || candidate ~ /^---[[:space:]]/)) {
+            flush_block()
+        }
+    }
+
+    if (block_active) {
         if (raw ~ /^[[:space:]]*$/) {
-            append_block_line("")
+            append_block_line(raw, 0, 1)
             return
         }
         prefix = raw
         sub(/[^ ].*$/, "", prefix)
         indent = length(prefix)
-        if (indent > block_base_indent) {
-            if (block_content_indent < 0) {
-                block_content_indent = indent
-            }
-            if (indent < block_content_indent) {
-                fail("invalid block scalar indentation on line " source_line)
-            }
-            append_block_line(substr(raw, block_content_indent + 1))
+        if (block_content_indent < 0 && indent > block_base_indent) {
+            block_content_indent = indent
+        }
+        if (block_content_indent >= 0 && indent >= block_content_indent) {
+            append_block_line(substr(raw, block_content_indent + 1),
+                indent > block_content_indent || substr(raw, block_content_indent + 1, 1) ~ /[ \t]/, 0)
             return
         }
-        flush_block()
+        if (block_content_indent >= 0 && trim(raw) ~ /^#/) {
+            flush_block()
+        } else if (indent > block_base_indent) {
+            if (block_content_indent < 0 || indent < block_content_indent) {
+                fail("invalid block scalar indentation on line " source_line)
+            }
+        } else {
+            flush_block()
+        }
     }
 
     if (raw ~ /^[[:space:]]*$/ || raw ~ /^[[:space:]]*#/) {
@@ -1243,11 +1291,14 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         return
     }
     if (clean == "...") {
+        if (document_ended) {
+            return
+        }
         if (document_directive_pending[document_index]) {
             fail("directive requires a document marker before line " source_line)
         }
         fail_pending_explicit_keys(source_line)
-        if (!document_has_content[document_index]) {
+        if (!document_has_content[document_index] && document_explicit[document_index]) {
             create_empty_document(source_line)
         }
         document_ended = 1
@@ -1255,7 +1306,11 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         return
     }
     if (document_ended) {
-        fail("content after document end requires --- on line " source_line)
+        if ((document_index in document_root) || document_explicit[document_index] || document_has_content[document_index]) {
+            document_index++
+        }
+        document_ended = 0
+        clear_structure()
     }
 
     clear_deeper(indent)
@@ -1269,6 +1324,14 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     parent = find_parent(indent)
     if (parent && node_kind[parent] == "scalar" && node_plain_continuable[parent]) {
         append_plain_scalar(parent, text, source_line)
+        return
+    }
+    if (parent && node_kind[parent] == "pending" &&
+        trim(text) ~ /^[|>]([-+]?[1-9]?|[1-9][-+]?)$/) {
+        node_kind[parent] = "scalar"
+        node_value[parent] = ""
+        node_type[parent] = "string"
+        start_block(parent, trim(text), indentation(raw_input_line[node_line[parent]], source_line), source_line)
         return
     }
     if (parent && node_kind[parent] == "pending" &&
@@ -4146,6 +4209,9 @@ function output_expression_node(target, output_mode,    resolved) {
 
 function output_result(document, query, output_mode,    root, expression, input, results, i) {
     if (!(document in document_root)) {
+        if (document == 0 && node_count == 0) {
+            return
+        }
         fail("document index not found: " document)
     }
     if (output_mode == "ast") {
@@ -4255,7 +4321,7 @@ END {
         exit_status = 1
     }
     if (!exit_status) {
-        if (!(0 in document_root) && node_count == 0) {
+        if (null_input_mode && !(0 in document_root) && node_count == 0) {
             document_index = 0
             create_empty_document(1)
         } else if (document_explicit[document_index] && !document_has_content[document_index]) {

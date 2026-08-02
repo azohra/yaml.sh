@@ -75,6 +75,7 @@ ysh_run_awk() {
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v null_input_mode="$YSH_NULL_INPUT" \
             -v inplace_mode="$YSH_INPLACE" \
             /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
@@ -82,6 +83,7 @@ ysh_run_awk() {
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v null_input_mode="$YSH_NULL_INPUT" \
             -v inplace_mode="$YSH_INPLACE" \
             /dev/fd/3 3<&0
     else
@@ -89,6 +91,7 @@ ysh_run_awk() {
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v null_input_mode="$YSH_NULL_INPUT" \
             -v inplace_mode="$YSH_INPLACE" \
             "$YSH_INPUT_FILE"
     fi
