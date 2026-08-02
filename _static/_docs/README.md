@@ -1,1 +1,1 @@
-[Guide](https://raw.githubusercontent.com/azohra/strapped/master/README.md ":include")
+[YAML.sh guide](https://raw.githubusercontent.com/azohra/yaml.sh/master/README.md ":include")

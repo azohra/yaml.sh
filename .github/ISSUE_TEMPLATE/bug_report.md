@@ -1,35 +1,35 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-
+about: Report incorrect parsing or CLI behavior
+labels: bug
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## Input
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+Provide the smallest YAML document that reproduces the problem.
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+```yaml
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+```
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+## Command and output
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+```console
+$ ysh --version
+$ ysh ...
+```
 
-**Additional context**
-Add any other context about the problem here.
+## Expected behavior
+
+Describe the expected output and, when possible, the relevant YAML syntax.
+
+## Environment
+
+- YAML.sh version:
+- Operating system and version:
+- Bash version (`bash --version`):
+- AWK implementation/version (`awk --version` or `awk -W version`):
+
+## Additional context
+
+Include anything else that may help reproduce the problem. Remove secrets from all sample configuration.

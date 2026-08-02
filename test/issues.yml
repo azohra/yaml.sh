@@ -1,0 +1,29 @@
+---
+complex: {name: feature, details: {type: request, priority: medium}}
+inline: [one, two, "three, four", {name: item}]
+indented:
+  - item1
+  - item2
+indentless:
+- item1
+- item2
+literal: |-
+  This value
+  can span multiple lines
+folded: >-
+  This value
+  folds onto one line
+quotes:
+  double: "say \"hello\""
+  single: 'it''s fine'
+comment: value # ignored comment
+long_list: [zero, one, two, three, four, five, six, seven, eight, nine, ten, eleven]
+entidad:
+  - src/bankaccount/model.rs
+  - src/bankcard/model.rs
+lenguaje: rust
+fichero_tareas:
+  - make.toml
+urls:
+  - https://yaml.sh
+  - https://example.com/path

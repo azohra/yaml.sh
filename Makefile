@@ -1,18 +1,18 @@
 BUILDERS = $(shell find build/*)
 INSTALL_DIR=/usr/local/bin
 
-.PHONY: lint test all install uninstall docs
+.PHONY: lint test all install uninstall docs clean
 
 all: ysh lint test
 
 ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 	@echo "👷 Building"
 	@awk -f build/shbuilder.awk src/ysh.sh > ysh
-	@chmod u+x ysh
+	@chmod 755 ysh
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh
+	@shellcheck -e SC2016 ysh test/test.sh
 
 test: ysh
 	@echo "🔬 Testing"
@@ -26,7 +26,7 @@ install: ysh
 
 uninstall:
 	@echo "🗑️  Uninstalling ysh"
-	@rm $(INSTALL_DIR)/ysh
+	@rm -f $(INSTALL_DIR)/ysh
 
 docs: ysh
 	@echo "📚 Updating docs"
@@ -35,3 +35,6 @@ docs: ysh
 	@mv .tmp_README.md README.md
 	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_get/index.html > .tmp_index.html
 	@mv .tmp_index.html _static/_get/index.html
+
+clean:
+	@rm -f ysh

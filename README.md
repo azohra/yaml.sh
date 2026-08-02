@@ -1,37 +1,23 @@
-# Yaml.sh
-[![Build Status](https://travis-ci.org/azohra/yaml.sh.svg?branch=master)](https://travis-ci.org/azohra/yaml.sh)
+# YAML.sh
 
----
+[![CI](https://github.com/azohra/yaml.sh/actions/workflows/ci.yml/badge.svg)](https://github.com/azohra/yaml.sh/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/azohra/yaml.sh)](https://github.com/azohra/yaml.sh/releases/latest)
 
-Yup. A YAML parser completely in bash. I can't believe it either.
+YAML.sh reads a practical subset of YAML using only Bash, AWK, and standard Unix tools. It is useful in small bootstrap scripts where installing a full YAML implementation is not an option.
 
-> At the moment, we support [a subset of the yaml spec](https://docs.yaml.azohra.com/#/supported_yml).
+> YAML.sh is intentionally not a complete YAML 1.2 implementation. For untrusted input or advanced YAML features such as anchors, aliases, tags, directives, and explicit complex keys, use a maintained full parser.
 
-## Getting Started
+## Install
 
-Install it:
+Download a pinned release:
+
 ```bash
-$ curl -s https://get.yaml.sh | sh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v0.3.0/ysh -o ysh
+chmod +x ysh
+sudo mv ysh /usr/local/bin/ysh
 ```
 
-Then query with it:
-```bash
-$ ysh -f my.yml -q "path.to.awesomeness"
-```
-
-## Library use
-
-If installed:
-```bash
-YSH_LIB=1;source /usr/local/bin/ysh
-```
-
-If you want the internet as your only dependency:
-```bash
-$ YSH_LIB=1;source /dev/stdin <<< "$(curl -s https://raw.githubusercontent.com/azohra/yaml.sh/v0.2.0/ysh)"
-```
-
-## Cook Book
+## Quick start
 
 ```yaml
 ---
@@ -39,125 +25,106 @@ block_no: 0
 level_one:
   level_two:
     key: value
-    quoted: "value"
-    simple_lists:
-      - first
-      - second item
-      - "third item"
-    object_lists:
-      - {name: one, value: 1}
-      - {name: "second thing", value: 2}
-    expanded_lists:
+    simple_list: [first, second, third]
+    object_list:
       - name: one
         value: 1
-      - name: two
-        value: 2
-      - name: "quoted thing"
-        value: 9000
----
-block_no: 1
+      - {name: two, value: 2}
+message: |-
+  Values can span
+  multiple lines.
 ```
 
-### Read from a file:
 ```bash
-ysh -f input.yaml -Q "block_no"
+ysh -f input.yaml -Q 'level_one.level_two.key'
+# value
+
+ysh -f input.yaml -Q 'level_one.level_two.simple_list[1]'
+# second
+
+ysh -f input.yaml -Q 'level_one.level_two.object_list[1].name'
+# two
 ```
 
-### Re-use an already transpiled file
+YAML can also be piped in:
+
 ```bash
-file=$(ysh -f input.yaml)
-ysh -T $file -Q "block_no"
+printf '%s\n' 'name: yaml.sh' | ysh -Q name
 ```
 
-### Query piped yaml
+## Reuse transpiled data
+
+Parsing produces a line-oriented intermediate representation. Store it once when several queries need the same input, and always quote the variable when passing it back with `-T`:
+
 ```bash
-cat input.yaml | ysh -Q "block_no"
+data=$(ysh -f input.yaml)
+ysh -T "${data}" -Q block_no
+ysh -T "${data}" -Q 'level_one.level_two.key'
 ```
 
-### Query for a value
+Unquoted `-T ${data}` is not safe: the shell splits the intermediate representation into separate arguments before YAML.sh can read it.
+
+## Query source lines
+
+`--line` returns the original line containing a key or value. This is available for file and standard-input YAML, but not for already-transpiled data because source positions are not present there.
+
 ```bash
-ysh -f file.yaml -Q "block_no"
+ysh -f input.yaml --line 'level_one.level_two.key'
+# 5
 ```
 
-### Query from a stored sub structure
-```bash
-sub=$(ysh -f file.yaml -s "level_one")
-ysh -T $sub -Q "level_two.key"
-```
+## Multiple documents
 
-### Query i'th item from a simple list
-```bash
-ysh -f input.yaml -Q "level_one.level_two.simple_lists[1]"
-```
+Use `--next` to move through documents separated by `---`:
 
-### Query i'th item from a complex list
 ```bash
-ysh -f input.yaml -Q "level_one.level_two.expanded_lists[1].name"
-```
-
-### Print value from each block
-```bash
- #!/bin/bash
-YSH_LIB=1; source /usr/local/bin/ysh
-
-file=$(ysh -f input.yaml)
-while [ -n "${file}" ]; do
-  echo "Block Number:" $(ysh -T "${file}" -Q "block_no")
-  file=$(ysh -T "${file}" -n)
+data=$(ysh -f input.yaml)
+while [ -n "${data}" ]; do
+  ysh -T "${data}" -Q block_no
+  data=$(ysh -T "${data}" --next)
 done
 ```
 
+## Command reference
 
-## Flags
+| Flag | Purpose |
+| --- | --- |
+| `-f, --file FILE` | Parse a YAML file. |
+| `-T, --transpiled DATA` | Read one quoted intermediate-data argument. |
+| `-q, --query PATH` | Return an encoded value or chainable child structure. |
+| `-Q, --query-val PATH` | Return a decoded scalar value. |
+| `-s, --sub PATH` | Return a child structure. |
+| `-l, --list PATH` | Return a list structure. |
+| `-L, --list-val PATH` | Return the decoded scalar values in a list. |
+| `-c, --count PATH` | Count list elements. |
+| `-i, --index N` | Select a list item from a chained query. |
+| `-I, --index-val N` | Return a decoded scalar list item. |
+| `-p, --line PATH` | Return source line number(s). |
+| `-t, --tops` | Return the top-level keys of the current structure. |
+| `-n, --next` | Move to the next YAML document. |
+| `-v, --version` | Print the installed version. |
+| `-h, --help` | Print CLI help. |
 
-> **TIP:** 
-> Most flags have an upper-case and lower case usage. Upper case
-> flags denote the expectation of a value (empty otherwise),
-> where lowercase flags are chainable queries that can also
-> be passed back in with `-T`. In most cases queries will end
-> with an uppercase flag.
+See the [supported YAML reference](_static/_docs/supported_yml.md) for syntax details.
 
+## Library use
 
-`-f, --file        <file_name>`
-> Read from a file.
+```bash
+YSH_LIB=1
+source /usr/local/bin/ysh
 
-`-T, --transpiled  <file_name>`
-> Read from a pre-transpiled string.
+document=$(YSH_parse input.yaml)
+YSH_safe_query "${document}" 'level_one.level_two.key'
+```
 
-`-q, --query       <query>`
-> Generic query string. DOES NOT SUPPORT `[n]` NOTATION
+## Development
 
-`-Q, --query-val   <query>`
-> Safe query. Guarentees the return is a value. DOES NOT SUPPORT `[n]` NOTATION
+```bash
+make all
+```
 
-`-s, --sub         <query>`
-> Query for a subtree of yaml. Guarentees results are a subtree and no values are returned.
+This rebuilds the standalone `ysh` executable, runs ShellCheck, and executes the test suite. CI covers current Ubuntu and macOS runners.
 
-`-l, --list        <query>`
-> Query for a list.
+## License
 
-`-L, --list        <query>`
-> Query for a list of values. Guarentees results are all values.
-
-`-c, --count       <query>`
-> Query for a list and count the elements.
-
-`-i, --index       <i>`
-> Access i'th element from chained list query.
-
-`-I, --index-val   <i>`
-> Access i'th element from chained list query. Garentees result is a value.
-
-`-t, --tops           `
-> Return top level keys of structure.
-
-`-n, --next           `
-> Moves to next block
-
-`-h, --help           `
-> Show this help dialog.
-
-For more complete usage and examples look at the [docs](https://docs.yaml.azohra.com).
-
----
-Made with ❤️ by the developers at [azohra.com](https://azohra.com)
+[MIT](LICENSE)

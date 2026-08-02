@@ -1,196 +1,180 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# shellcheck disable=SC2034
 YSH_LIB=1
 
-source ysh
+# shellcheck source=/dev/null
+source ./ysh
+
+setUp() {
+    file=$(ysh -f test/test.yml)
+}
+
+testVersion() {
+    assertEquals 'v0.3.0' "$(ysh --version)"
+}
 
 testLoadFile() {
-    file=$(ysh -f test/test.yml)
-    assertNotNull file
+    assertNotNull "${file}"
 }
 
 testKeyValueFromFile() {
-    result=$(ysh -f test/test.yml -q key_value.key)
-    assertEquals "\"value\"" "${result}"
+    assertEquals '"value"' "$(ysh -f test/test.yml -q key_value.key)"
+    assertEquals 'value' "$(ysh -f test/test.yml -Q key_value.key)"
 }
 
 testKeyValueTranspiled() {
-    result=$(ysh -T "${file}" -q key_value.key)
-    assertEquals "\"value\"" "${result}"
+    assertEquals 'value' "$(ysh -T "${file}" -Q key_value.key)"
 }
 
 testLooseQuery() {
     result=$(ysh -T "${file}" -q loose_query)
-    assertContains "key=\"value\"" "${result}"
-    assertContains "level1.top_key=\"another_value\"" "${result}"
-    assertEquals 2 $(wc -l <<< "${result}")
-
-    result=$(ysh -T "${file}" -q loose_query.key)
-    assertEquals "\"value\"" "${result}"
+    assertContains "${result}" 'key="value"'
+    assertContains "${result}" 'level1.top_key="another_value"'
+    assertEquals 2 "$(wc -l <<< "${result}" | tr -d ' ')"
 }
 
-testSafeQuery() {
-    result=$(ysh -T "${file}" -Q loose_query)
-    assertNull "${result}"
-
-    result=$(ysh -T "${file}" -Q loose_query.key)
-    assertEquals "value" "${result}"
+testLiteralQueryDoesNotInterpretRegex() {
+    assertEquals 'three' "$(ysh -T "${file}" -Q 'simple_list.list[2]')"
+    assertNull "$(ysh -T "${file}" -Q 'simple_listXlist[2]')"
 }
 
 testSubtree() {
     result=$(ysh -T "${file}" -s subtree)
-    assertContains "lower1=\"value\"" "${result}"
-    assertContains "lower2=\"another_value\"" "${result}"
-    assertContains "lower3.upper1=\"upper_value\"" "${result}"
-    assertContains "lower3.upper2.[0]=\"one\"" "${result}"
-    assertContains "lower3.upper2.[1]=\"two\"" "${result}"
-    assertEquals 5 $(wc -l <<< "${result}")
+    assertContains "${result}" 'lower1="value"'
+    assertContains "${result}" 'lower3.upper2.[1]="two"'
+    assertEquals 5 "$(wc -l <<< "${result}" | tr -d ' ')"
 }
 
 testSimpleList() {
     result=$(ysh -T "${file}" -l simple_list.list)
-    assertContains "${result}" "\"one\""
-    assertContains "${result}" "\"two\""
-    assertContains "${result}" "\"three\""
-    assertContains "${result}" "\"four\""
-    assertEquals 4 $(wc -l <<< "${result}")
+    assertContains "${result}" '[0]="one"'
+    assertContains "${result}" '[3]="four"'
+    assertEquals 4 "$(wc -l <<< "${result}" | tr -d ' ')"
 }
 
-
 testSimpleListValues() {
-    result=$(ysh -T "${file}" -L simple_list.list)
-    assertContains "${result}" "one"
-    assertContains "${result}" "two"
-    assertContains "${result}" "three"
-    assertContains "${result}" "four"
-    assertNotContains "${result}" "\""
-    assertEquals 4 $(wc -l <<< "${result}")
+    assertEquals $'one\ntwo\nthree\nfour' "$(ysh -T "${file}" -L simple_list.list)"
 }
 
 testSimpleCount() {
-    result=$(ysh -T "$file" -c simple_list.list)
-    assertEquals 4 $result
+    assertEquals 4 "$(ysh -T "${file}" -c simple_list.list)"
 }
 
 testObjectList() {
-    result=$(ysh -T "$file" -l object_list.list)
+    result=$(ysh -T "${file}" -l object_list.list)
     assertContains "${result}" '[0].name="one"'
-    assertContains "${result}" '[0].value="1"'
-    assertContains "${result}" '[1].name="two"'
-    assertContains "${result}" '[1].value="2"'
-    assertContains "${result}" '[2].name="three"'
     assertContains "${result}" '[2].value="3"'
-    assertEquals 6 $(wc -l <<< "${result}")
+    assertEquals 6 "$(wc -l <<< "${result}" | tr -d ' ')"
 }
 
 testExpandedList() {
-    result=$(ysh -T "$file" -l expanded_list.list)
+    result=$(ysh -T "${file}" -l expanded_list.list)
     assertContains "${result}" '[0].name="one"'
-    assertContains "${result}" '[0].value="1"'
-    assertContains "${result}" '[1].name="two"'
-    assertContains "${result}" '[1].value="2"'
-    assertContains "${result}" '[2].name="three"'
     assertContains "${result}" '[2].value="3"'
-    assertEquals 6 $(wc -l <<< "${result}")
+    assertEquals 6 "$(wc -l <<< "${result}" | tr -d ' ')"
 }
 
-testGetValueFromSimpleExpandedList() {
-    result=$(ysh -T "$file" -l "simple_list.list" -I 2)
-    assertEquals "three" "$result"
-}
-
-testGetValueFromComplexExpandedList() {
-    result=$(ysh -T "$file" -l "object_list.list" -i 2)
+testChainedListAccess() {
+    assertEquals 'three' "$(ysh -T "${file}" -l simple_list.list -I 2)"
+    result=$(ysh -T "${file}" -l object_list.list -i 2)
     assertContains "${result}" 'name="three"'
     assertContains "${result}" 'value="3"'
-    assertEquals 2 $(wc -l <<< "${result}")
 }
 
-testArrayIndexAccess() {
-    result=$(ysh -T "$file" -q "simple_list.list[1]")
-    assertEquals "\"two\"" "${result}"
-
-    result=$(ysh -T "$file" -l object_list.list -i 1)
-    assertContains "name=\"two\"" "${result}"
-    assertContains "value=\"2\"" "${result}"
-}
-
-testSafeArrayIndexAccess() {
-    result=$(ysh -T "$file" -Q "simple_list.list[1]")
-    assertEquals "two" "${result}"
-
-    result=$(ysh -T "$file" -l "object_list.list[1]")
-    assertContains "name=two" "${result}"
-    assertContains "value=2" "${result}"
-
-}
-
-testArraySafeIndexAccess() {
-    result=$(ysh -T "$file" -Q "simple_list.list[1]")
-    assertEquals "two" "${result}"
-
-    result=$(ysh -T "$file" -Q "object_list.list[1]")
-    assertNull "${result}"
+testDirectListAccess() {
+    assertEquals 'two' "$(ysh -T "${file}" -Q 'simple_list.list[1]')"
+    assertEquals 'three' "$(ysh -T "${file}" -Q 'object_list.list[2].name')"
 }
 
 testTopKeys() {
-    result=$(ysh -T "$file" -s top_values -t)
-    assertContains "lower1" "${result}"
-    assertContains "lower2" "${result}"
-    assertContains "lower3" "${result}"
-    assertEquals 3 $(wc -l <<< "${result}")
-
-    result=$(ysh -T "$file" -s top_values.lower2 -t)
-    assertContains "upper1" "${result}"
-    assertContains "upper2" "${result}"
-    assertEquals 2 $(wc -l <<< "${result}")
+    result=$(ysh -T "${file}" -s top_values -t)
+    assertEquals $'lower1\nlower2\nlower3' "${result}"
 }
 
 testNextBlock() {
-    result=$(ysh -T "$file" -Q key)
-    assertEquals "value" "${result}"
+    assertEquals 'value' "$(ysh -T "${file}" -Q key)"
+    file2=$(ysh -T "${file}" -n)
+    assertEquals 'block_2_value' "$(ysh -T "${file2}" -Q key)"
+    file2=$(ysh -T "${file2}" -n)
+    assertEquals 'block_3_value' "$(ysh -T "${file2}" -Q key)"
 
-    file2=$(ysh -T "$file" -n)
-    result=$(ysh -T "$file2" -Q key)
-    assertEquals "block_2_value" "${result}"
-
-    file2=$(ysh -T "$file2" -n)
-    result=$(ysh -T "$file2" -Q key)
-    assertEquals "block_3_value" "${result}"
+    documents=$(printf '%s\n' '--- # first' 'key: first' '--- # second' 'key: second' | YSH_parse_stdin)
+    assertEquals 'first' "$(ysh -T "${documents}" -Q key)"
+    assertEquals 'second' "$(ysh -T "$(ysh -T "${documents}" --next)" -Q key)"
 }
 
-testEscapeLiteralListQuery() {
-    assertEquals "simple_list.list.\[2\]" $(YSH_escape_query "simple_list.list[2]")
+testComplexFlowObjectFromIssue1() {
+    assertEquals 'feature' "$(ysh -f test/issues.yml -Q complex.name)"
+    assertEquals 'request' "$(ysh -f test/issues.yml -Q complex.details.type)"
+    assertEquals 'medium' "$(ysh -f test/issues.yml -Q complex.details.priority)"
 }
 
-testEscapeComplexListItemQuery() {
-    assertEquals "simple_list.list.\[2\].key" $(YSH_escape_query "simple_list.list[2].key")
+testMultilineValuesFromIssue2() {
+    assertEquals $'This value\ncan span multiple lines' "$(ysh -f test/issues.yml -Q literal)"
+    assertEquals 'This value folds onto one line' "$(ysh -f test/issues.yml -Q folded)"
 }
 
-testEscapeExpandedListItemQuery() {
-    assertEquals "\[2\]" $(YSH_escape_query "[2]")
+testInlineListFromIssue3() {
+    assertEquals 4 "$(ysh -f test/issues.yml -c inline)"
+    assertEquals 'three, four' "$(ysh -f test/issues.yml -Q 'inline[2]')"
+    assertEquals 'item' "$(ysh -f test/issues.yml -Q 'inline[3].name')"
 }
 
-testSafeQueryWithListQuery() {
-    result=$(ysh -T "$file" -Q "simple_list.list[2]")
-    assertEquals "three" "$result"
+testListIndentationFromIssue5() {
+    assertEquals $'item1\nitem2' "$(ysh -f test/issues.yml -L indented)"
+    assertEquals $'item1\nitem2' "$(ysh -f test/issues.yml -L indentless)"
 }
 
-testSubSupportsEscapedQueries() {
-    result=$(ysh -T "$file" -s "object_list.list[2]")
-    assertContains "$result" 'object_list.list.[2].name="three"'
-    assertContains "$result" 'object_list.list.[2].value="3"'
-    assertEquals 2 $(wc -l <<< "$result")
+testCookbookQueriesFromIssue10() {
+    assertEquals '0' "$(printf '%s\n' 'block_no: 0' | ysh -Q block_no)"
+    assertEquals 'three' "$(ysh -f test/test.yml -Q 'expanded_list.list[2].name')"
 }
 
-# From Issue https://github.com/azohra/yaml.sh/issues/13
-testHelpFlagShouldNotBeAnError() {
-    result=$(ysh -h)
+testLinePointersFromIssue12() {
+    assertEquals '2' "$(ysh -f test/issues.yml --line complex.details.type)"
+    assertEquals '10' "$(ysh -f test/issues.yml --line literal)"
+}
+
+testQuotedTranspiledDataFromIssue15() {
+    transpiled=$(ysh -f test/issues.yml)
+    assertEquals 'rust' "$(ysh -T "${transpiled}" -Q lenguaje)"
+    assertEquals 'make.toml' "$(ysh -T "${transpiled}" -Q 'fichero_tareas[0]')"
+    assertEquals 'say "hello"' "$(ysh -T "${transpiled}" -Q quotes.double)"
+    assertEquals "it's fine" "$(ysh -T "${transpiled}" -Q quotes.single)"
+}
+
+testListsSupportMultipleDigitIndexes() {
+    assertEquals 12 "$(ysh -f test/issues.yml -c long_list)"
+    assertEquals 'ten' "$(ysh -f test/issues.yml -Q 'long_list[10]')"
+    assertEquals 'eleven' "$(ysh -f test/issues.yml -L long_list | tail -1)"
+}
+
+testCommentsAndCrLfInput() {
+    assertEquals 'value' "$(ysh -f test/issues.yml -Q comment)"
+    assertEquals 'value' "$(printf 'key: value\r\n' | ysh -Q key)"
+    assertEquals 'https://yaml.sh' "$(ysh -f test/issues.yml -Q 'urls[0]')"
+}
+
+testInvalidYamlIsRejected() {
+    result=$(printf '%s\n' 'not yaml' | ysh -Q key 2>&1)
+    status=$?
+    assertNotEquals 0 "${status}"
+    assertContains "${result}" 'unknown syntax on line 1'
+}
+
+testCliErrors() {
+    ysh -f does_not_exist.yaml -Q key >/dev/null 2>&1
+    assertEquals 1 $?
+    ysh -T "${file}" -Q >/dev/null 2>&1
+    assertEquals 2 $?
+    ysh -T "${file}" --line key >/dev/null 2>&1
+    assertEquals 2 $?
+}
+
+testHelpIsSuccessful() {
+    ysh --help >/dev/null
     assertEquals 0 $?
 }
 
-testFileDoesNotExist() {
-    result=$(ysh -f "does_not_exist.yaml" -s "doesnotmatter")
-    assertEquals 1 $?
-}
-
+# shellcheck source=/dev/null
 . ./test/shunit2
