@@ -3761,8 +3761,14 @@ function expression_deep_merge(left, right, flags,    left_node, right_node, res
             for (i = 1; i <= sequence_count[right_node]; i++) {
                 child = sequence_child[right_node, i]
                 if (i <= sequence_count[result]) {
-                    merged = expression_deep_merge(sequence_child[result, i], child, flags)
-                    expression_replace_node(sequence_child[result, i], merged)
+                    existing = sequence_child[result, i]
+                    if (only_new &&
+                        !((node_kind[resolve_alias(existing)] == "mapping" && node_kind[resolve_alias(child)] == "mapping") ||
+                          (node_kind[resolve_alias(existing)] == "sequence" && node_kind[resolve_alias(child)] == "sequence"))) {
+                        continue
+                    }
+                    merged = expression_deep_merge(existing, child, flags)
+                    expression_replace_node(existing, merged)
                 } else if (!only_existing) {
                     add_sequence(result, expression_clone_node(child), 0)
                 }
