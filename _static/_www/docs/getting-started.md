@@ -5,7 +5,7 @@ YAML.sh ships as one executable text file. The released file contains both the p
 ## Install the pinned release
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.6.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.7.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -120,8 +120,25 @@ Use `-` explicitly when it helps a generated command read clearly:
 generate-config | ysh '.release.version' -
 ```
 
+## Compose configuration
+
+Environment values can stay strings or be parsed as YAML:
+
+```sh
+IMAGE_TAG=v1.7 ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
+LIMITS='{cpu: 2, memory: 1Gi}' ysh '.resources = env(LIMITS)' deploy.yml
+```
+
+Evaluate files independently by listing them, or evaluate one expression across the combined document stream:
+
+```sh
+ysh '[filename, .name]' one.yml two.yml
+ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
+```
+
 ## Next steps
 
 - [Learn paths, streams, construction, and updates](queries.md)
 - [Choose value, JSON, YAML, type, tag, or line output](output.md)
 - [Read the YAML support contract](supported_yml.md)
+- [Compare the focused surface with yq](yq-compatibility.md)

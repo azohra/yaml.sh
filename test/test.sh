@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.6.0" "$(./ysh --version)"
+    assertEquals "v1.7.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -259,6 +259,105 @@ testExpressionVariablesAndDynamicIndexes() {
 testExpressionReduceAndDeepMerge() {
     assertEquals '20170' "$(./ysh --json 'reduce .services[].port as $port (0; . + $port)' test/expressions.yml)"
     assertEquals '{"a":{"x":1,"y":3,"z":4},"b":1,"c":2}' "$(./ysh -n --json '{a: {x: 1, y: 2}, b: 1} * {a: {y: 3, z: 4}, c: 2}')"
+}
+
+testExpressionEnvironmentComposition() {
+    assertEquals '{"name":"api","ports":[80,443]}' "$(YSH_TEST_CONFIG='{name: api, ports: [80, 443]}' ./ysh -n --json 'env(YSH_TEST_CONFIG)')"
+    assertEquals '"literal: [text]"' "$(YSH_TEST_TEXT='literal: [text]' ./ysh -n --json 'strenv(YSH_TEST_TEXT)')"
+    assertEquals '""' "$(env -u YSH_TEST_MISSING ./ysh -n --json 'strenv(YSH_TEST_MISSING)')"
+    assertEquals '"hello world / world"' "$(printf '%s\n' 'value: hello $YSH_TEST_NAME / ${YSH_TEST_NAME}' | YSH_TEST_NAME=world ./ysh --json '.value | envsubst')"
+    assertEquals '"fallback/default"' "$(printf '%s\n' 'value: ${YSH_TEST_EMPTY:-fallback}/${YSH_TEST_MISSING-default}' | YSH_TEST_EMPTY='' ./ysh --json '.value | envsubst')"
+
+    result=$(YSH_TEST_CONFIG=value ./ysh --security-disable-env-ops -n 'env(YSH_TEST_CONFIG)' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "environment operations are disabled"
+    result=$(env -u YSH_TEST_MISSING ./ysh -n 'env(YSH_TEST_MISSING)' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "not provided in env()"
+    result=$(printf '%s\n' 'value: ${YSH_TEST_EMPTY}' | YSH_TEST_EMPTY='' ./ysh '.value | envsubst(ne, ff)' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "is empty"
+}
+
+testExpressionStructuralContextAndScopedUpdates() {
+    input=$(printf '%s\n' 'a:' '  b: [10, 20]' 'c: 3')
+    assertEquals '["a","b",1]' "$(printf '%s\n' "$input" | ./ysh --json '.. | select(. == 20) | path')"
+    assertEquals '[10,20]' "$(printf '%s\n' "$input" | ./ysh --json '.. | select(. == 20) | parent')"
+    assertEquals '[]' "$(printf '%s\n' "$input" | ./ysh --json 'path')"
+    assertEquals '' "$(printf '%s\n' "$input" | ./ysh --json 'parent')"
+    assertEquals '{"a":{"x":9,"y":2},"b":3}' "$(printf '%s\n' 'a:' '  x: 1' '  y: 2' 'b: 3' | ./ysh --json 'with(.a; .x = 9)')"
+}
+
+testExpressionConversionAndKeyOrdering() {
+    assertEquals '12' "$(printf '%s\n' 'value: "12"' | ./ysh --json '.value | to_number')"
+    assertEquals '1.5' "$(printf '%s\n' 'value: "1.5"' | ./ysh --json '.value | to_number')"
+    assertEquals '{"a":2,"m":{"z":3,"a":4},"z":1}' "$(printf '%s\n' 'z: 1' 'a: 2' 'm:' '  z: 3' '  a: 4' | ./ysh --json 'sort_keys(.)')"
+
+    result=$(printf '%s\n' 'value: nope' | ./ysh '.value | to_number' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "cannot convert value to number"
+}
+
+testExpressionFocusedCollectionOperators() {
+    input=$(printf '%s\n' 'a:' '  - cat' '  - dog' '  - cow')
+    assertEquals '"dog"' "$(printf '%s\n' "$input" | ./ysh --json '.a | first(. == "dog")')"
+    assertEquals '"cat"' "$(printf '%s\n' "$input" | ./ysh --json '.a | first')"
+    assertEquals '["dog","cow"]' "$(printf '%s\n' "$input" | ./ysh --json '.a | filter(. != "cat")')"
+    assertEquals '["cow","cat"]' "$(printf '%s\n' "$input" | ./ysh --json '.a | pick([2, 0, 99])')"
+    assertEquals '["dog","cow"]' "$(printf '%s\n' "$input" | ./ysh --json '.a | omit([0, 99])')"
+    assertEquals '[["a","x"],["b",null]]' "$(./ysh -n --json '[["a", "b"], ["x"]] | pivot')"
+    assertEquals '{"a":[1,3],"b":[2,null],"c":[null,4]}' "$(./ysh -n --json '[{"a": 1, "b": 2}, {"a": 3, "c": 4}] | pivot')"
+}
+
+testExpressionNodeMetadata() {
+    input=$(printf '%s\n' 'a:' '  - cat' '  - dog')
+    assertEquals '3' "$(printf '%s\n' "$input" | ./ysh --json '.a[1] | line')"
+    assertEquals '1' "$(printf '%s\n' "$input" | ./ysh --json '.a[1] | key')"
+    assertEquals '"!!str"' "$(printf '%s\n' "$input" | ./ysh --json '.a[1] | tag')"
+}
+
+testMultipleInputEvaluationAndMetadata() {
+    first=$(mktemp "${TMPDIR:-/tmp}/ysh-first.XXXXXX")
+    second=$(mktemp "${TMPDIR:-/tmp}/ysh-second.XXXXXX")
+    printf '%s\n' 'answer: 1' > "$first"
+    printf '%s\n' 'answer: 2' > "$second"
+    expected=$(printf '["%s",0,0,1]\n["%s",1,0,2]' "$first" "$second")
+    assertEquals "$expected" "$(./ysh eval --json '[filename, fileIndex, documentIndex, .answer]' "$first" "$second")"
+    assertEquals "$(printf '%s\n' '"answer": 1' '---' '"answer": 2')" "$(./ysh -o yaml '.' "$first" "$second")"
+    ./ysh -i '.answer = 3' "$first" "$second" >/dev/null 2>&1
+    assertEquals 2 $?
+    ./ysh ea -i '.answer = 3' "$first" >/dev/null 2>&1
+    assertEquals 2 $?
+    rm -f "$first" "$second"
+}
+
+testAllDocumentEvaluation() {
+    input=$(printf '%s\n' '---' 'answer: 1' '---' 'answer: 2' '---' 'answer: 3')
+    assertEquals "$(printf '%s\n' '[0,1]' '[1,2]' '[2,3]')" "$(printf '%s\n' "$input" | ./ysh --all-documents --json '[documentIndex, .answer]')"
+    assertEquals "$(printf '%s\n' '"answer": 1' '---' '"answer": 2' '---' '"answer": 3')" "$(printf '%s\n' "$input" | ./ysh --all-documents -o yaml '.')"
+}
+
+testEvalAllAcrossFiles() {
+    first=$(mktemp "${TMPDIR:-/tmp}/ysh-eval-all-first.XXXXXX")
+    second=$(mktemp "${TMPDIR:-/tmp}/ysh-eval-all-second.XXXXXX")
+    printf '%s\n' 'a: 1' > "$first"
+    printf '%s\n' '---' 'b: 2' '---' 'c: 3' > "$second"
+    expected=$(printf '["%s",0,0,"%s",1,0,"%s",1,1]' "$first" "$second" "$second")
+    assertEquals "$expected" "$(./ysh eval-all --json '[filename, fileIndex, documentIndex]' "$first" "$second")"
+    assertEquals '[{"a":1},{"b":2},{"c":3}]' "$(./ysh ea --json '[.]' "$first" "$second")"
+    assertEquals "$(printf '%s\n' '{"a":1,"b":2}' '{"a":1,"c":3}')" "$(./ysh ea --json 'select(fileIndex == 0) * select(fileIndex == 1)' "$first" "$second")"
+    rm -f "$first" "$second"
+}
+
+testExitStatusAndEmptyStreams() {
+    printf '%s\n' 'value: true' | ./ysh -e '.value' >/dev/null
+    assertEquals 0 $?
+    printf '%s\n' 'value: false' | ./ysh --exit-status '.value' >/dev/null
+    assertEquals 1 $?
+    printf '%s\n' 'value: null' | ./ysh -e '.value' >/dev/null
+    assertEquals 1 $?
+    printf '%s\n' 'value: true' | ./ysh -e 'empty' >/dev/null
+    assertEquals 1 $?
 }
 
 testExpandedYamlSyntax() {
@@ -601,21 +700,21 @@ testGeneratedDifferentialCorpusStaysInSync() {
 }
 
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.6.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.6.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.6.0/ysh"
-    assertContains "$(cat _static/_www/index.html)" "Install v1.6"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.6.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.6.0"
+    assertContains "$(cat README.md)" "v1.7.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.7.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.7.0/ysh"
+    assertContains "$(cat _static/_www/index.html)" "Install v1.7"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.7.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.7.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
-    assertContains "$(cat README.md)" "og-v1.6.png"
-    assertContains "$(cat _static/_www/index.html)" "og-v1.6.png"
-    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.6.png ]"
+    assertContains "$(cat README.md)" "og-v1.7.png"
+    assertContains "$(cat _static/_www/index.html)" "og-v1.7.png"
+    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.7.png ]"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "282/282"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "91/91"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "1,110/1,110"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "10,000/10,000"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "250/250"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,610/2,610"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "12,000/12,000"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "400/400"
 }
 
 # shellcheck source=/dev/null

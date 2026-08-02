@@ -2,6 +2,28 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [1.7.0] - 2026-08-02
+
+Version 1.7 makes YAML.sh useful for real configuration composition while keeping the runtime to one auditable POSIX shell and AWK file.
+
+### Added
+
+- `env`, `strenv`, and `envsubst` with defaults, validation options, and a security disable switch.
+- `path`, `parent`, `key`, `line`, `tag`, `filename`, `fileIndex`, and `documentIndex` context.
+- `with`, `filter`, `first`, `pick`, `omit`, `pivot`, `sort_keys`, and `to_number`.
+- Multiple-file evaluation, `--all-documents`, focused `eval-all`/`ea`, and `-e` exit status.
+- An explicit yq capability map and 2,610/2,610 ordinary plus 8/8 cross-file differential cases against yq v4.53.3.
+
+### Changed
+
+- The deterministic property gate now covers five families and 12,000 cases; presentation grows to 400 cases; scale grows to 125,000 payload nodes and 1,500 documents.
+- Versioned site, docs, installer, README, and social artwork now identify v1.7 consistently.
+
+### Known boundaries
+
+- `eval-all` covers slurp, metadata, filtering, construction, and practical cross-file merges; it is not yq's complete general stream engine.
+- Load, dynamic eval, date/time, non-YAML codecs, comment/style queries, and advanced regex captures remain deliberately outside the portable runtime.
+
 ## [1.6.0] - 2026-08-02
 
 Version 1.6 adds a useful slice of missing yq syntax and makes the evidence substantially harder to fake.

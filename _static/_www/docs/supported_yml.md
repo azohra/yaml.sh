@@ -72,7 +72,7 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Common in-place replacements, direct block inserts/deletes, and pure sequence reorders preserve comments, whitespace, quoting, block/flow style, anchors, tags, and directives. Other structural changes fall back to semantic YAML.
 - Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
 - Sequence slices, scalar interpolation, grouping, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
-- The expression language does not implement ireduce, comment/style mutation operators, file-loading operators, date operators, or yq's non-YAML codecs.
+- The expression language does not implement ireduce, comment/style query operators, file-loading operators, date operators, or yq's non-YAML codecs.
 
 YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond this contract is required.
 
@@ -80,15 +80,16 @@ YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth 
 
 Pinned release gates:
 
-| Gate | v1.6 |
+| Gate | v1.7 |
 | --- | ---: |
 | YAML Test Suite expected outcomes | 282/282 |
 | YAML Test Suite strict-invalid inputs rejected | 91/91 |
-| Categorized programs matching yq v4.53.3 | 1,110/1,110 |
-| Behavioral tests | 75 |
-| Grammar-guided generated properties | 10,000/10,000 |
-| Exact presentation mutations | 250/250 |
-| Scale contract | 100,000 payload nodes; 1,000 documents |
+| Categorized programs matching yq v4.53.3 | 2,610/2,610 |
+| Cross-file programs matching yq v4.53.3 | 8/8 |
+| Behavioral tests | 84 |
+| Grammar-guided generated properties | 12,000/12,000 |
+| Exact presentation mutations | 400/400 |
+| Scale contract | 125,000 payload nodes; 1,500 documents |
 
 Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance. CI spans macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and multiple POSIX shells.
 

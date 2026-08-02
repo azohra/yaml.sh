@@ -83,7 +83,7 @@ jobs:
       - name: Run deterministic and adversarial suites
         if: runner.os == 'Linux'
         env:
-          YSH_FUZZ_CASES: ${{ matrix.os == 'ubuntu-latest' && '10000' || '1000' }}
+          YSH_FUZZ_CASES: ${{ matrix.os == 'ubuntu-latest' && '12000' || '1500' }}
         run: |
           make fuzz
           make presentation

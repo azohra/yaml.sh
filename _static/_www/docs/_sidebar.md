@@ -4,6 +4,7 @@
   - [Migrate from v0.x](migration.md)
 - **Use**
   - [Queries](queries.md)
+  - [yq compatibility](yq-compatibility.md)
   - [Output & metadata](output.md)
   - [Multiple documents](documents.md)
 - **Understand**

@@ -1,6 +1,6 @@
 # Queries
 
-Version 1.6 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
+Version 1.7 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
 
 ## Paths
 
@@ -145,6 +145,15 @@ ysh -n --json '[[1, 2], [3, [4]]] | flatten'
 ysh -n --json '["yaml", "sh"] | join(".")'
 ```
 
+Focused helpers cover common selection and reshaping jobs:
+
+```sh
+ysh '.services | filter(.enabled) | first' config.yml
+ysh '.metadata | pick(["name", "owner"])' config.yml
+ysh '.metadata | omit(["internal"]) | sort_keys(.)' config.yml
+ysh -n --json '[["a", "b"], ["x"]] | pivot'
+```
+
 ## Slices, interpolation, and regular expressions
 
 Sequence slices use zero-based, end-exclusive bounds. Either bound may be omitted or negative:
@@ -180,6 +189,38 @@ ysh 'reduce .services[].port as $port (0; . + $port)' config.yml
 ```
 
 The `*` operator recursively merges two mappings; at non-mapping leaves, the right side wins. It remains numeric multiplication for two numbers.
+
+## Context and environment
+
+`path`, `parent`, `key`, `line`, and `tag` expose graph context. `filename`, `fileIndex`, and `documentIndex` identify input provenance:
+
+```sh
+ysh '.. | select(. == "api") | path' config.yml
+ysh '.services[0].name | [filename, line, tag]' config.yml
+```
+
+`env(NAME)` parses the variable as YAML. `strenv(NAME)` always creates a string. `envsubst` expands `$NAME` and `${NAME}`, including `-` and `:-` defaults; `nu`, `ne`, and `ff` options are accepted. Use `--security-disable-env-ops` when expressions must not read the environment.
+
+```sh
+IMAGE_TAG=v1.7 ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
+LIMITS='{cpu: 2}' ysh '.limits = env(LIMITS)' deploy.yml
+ysh '.message | envsubst(nu, ff)' config.yml
+```
+
+`to_number` converts numeric strings. `with(PATH; UPDATE)` applies an update in a selected context while returning the original input.
+
+## Files and documents
+
+List files to evaluate the query independently over each one. `--all-documents` evaluates every document in one YAML stream. `eval-all`/`ea` evaluates once across all documents and files, enabling slurp and practical cross-file merge:
+
+```sh
+ysh '[filename, .name]' one.yml two.yml
+ysh --all-documents '[documentIndex, .name]' stream.yml
+ysh ea '[.]' one.yml two.yml
+ysh ea 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
+```
+
+`eval-all` is intentionally focused; it is not a complete clone of yq's general stream algebra.
 
 ## Construct values
 
@@ -220,6 +261,6 @@ Aliases are genuine shared graph references. Updating through an alias or an inh
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 1.6 does not implement ireduce, date or file operators, non-YAML codecs, regex flags/captures, comment/style operators, or yq's complete cross-document and flag surface. Slices target sequences; interpolation is intentionally scalar-oriented.
+This is a useful yq-shaped language, not the complete yq language. Version 1.7 does not implement ireduce, date or load operators, non-YAML codecs, regex flags/captures, comment/style query operators, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.

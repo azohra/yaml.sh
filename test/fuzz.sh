@@ -5,7 +5,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
-FUZZ_CASES=${YSH_FUZZ_CASES:-10000}
+FUZZ_CASES=${YSH_FUZZ_CASES:-12000}
 FUZZ_SEED=${YSH_FUZZ_SEED:-1}
 FUZZ_REPLAY=${YSH_FUZZ_REPLAY:-}
 FAILURE_ROOT=${YSH_FUZZ_FAILURE_DIR:-${TMPDIR:-/tmp}}
@@ -104,7 +104,7 @@ generate_case() {
 }
 
 property_for_case() {
-    property_mode=$((($1 + FUZZ_SEED) % 3))
+    property_mode=$((($1 + FUZZ_SEED) % 5))
     case "$property_mode" in
     0)
         PROPERTY=roundtrip
@@ -122,6 +122,14 @@ property_for_case() {
     2)
         PROPERTY=mutation
         QUERY='.meta.checked = true | .items |= map(.score += 1)'
+        ;;
+    3)
+        PROPERTY=query
+        QUERY='.items | sort_by(.score) | reverse | map(.name) | .[0:3]'
+        ;;
+    4)
+        PROPERTY=query
+        QUERY='.items | map(.score) | unique | sort | min'
         ;;
     esac
 }
