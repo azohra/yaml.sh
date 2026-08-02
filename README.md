@@ -59,7 +59,7 @@ chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
 
-Or let the tiny installer do those three lines:
+Or let the tiny installer download and checksum-verify the pinned release:
 
 ```sh
 curl -fsSL https://yaml.azohra.com/install | sh
