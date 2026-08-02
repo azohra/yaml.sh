@@ -16,6 +16,6 @@ Version 2 needs a necessary, named incompatibility; migration docs and compatibi
 
 ## Release identity
 
-Every release keeps `ysh --version`, its signed tag, installer, README, docs, site, and imagery in sync. Capability is reported with tests and compatibility measurements.
+Every release keeps `ysh --version`, its signed tag, installer, generated docs, and release evidence in sync. The visual identity is evergreen SVG/HTML; a release number is ordinary generated text, never baked into a new logo or social image.
 
 See the full [`VERSIONING.md`](https://github.com/azohra/yaml.sh/blob/main/VERSIONING.md) policy.

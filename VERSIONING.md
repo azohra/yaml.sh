@@ -32,7 +32,7 @@ Version 2 requires:
 
 ## Release mechanics
 
-Releases come from tested `main` commits and use signed `vMAJOR.MINOR.PATCH` tags. The executable, installer, docs, site, and imagery must agree. Tests and compatibility measurements report capability progress.
+Releases come from tested `main` commits and use signed `vMAJOR.MINOR.PATCH` tags. The executable, installer, and generated release text must agree. Brand artwork is evergreen rather than versioned. Tests and compatibility measurements report capability progress.
 
 ## The v1.3 correction
 

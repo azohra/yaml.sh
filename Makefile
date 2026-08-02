@@ -1,9 +1,9 @@
 BUILDERS = $(shell find build/*)
 INSTALL_DIR=/usr/local/bin
 
-.PHONY: lint test conformance differential fuzz presentation adversarial benchmark scale all install uninstall docs clean
+.PHONY: lint test docs-check conformance differential fuzz presentation adversarial benchmark scale all install uninstall docs clean
 
-all: ysh lint test
+all: ysh lint test docs-check
 
 ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 	@echo "👷 Building"
@@ -12,11 +12,15 @@ ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh test/test.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/adversarial.sh bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/adversarial.sh bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
 	@./test/test.sh
+
+docs-check: ysh
+	@echo "📚 Checking static documentation"
+	@./test/docs.sh
 
 conformance: ysh
 	@echo "🧭 Measuring YAML conformance"
@@ -64,6 +68,9 @@ docs: ysh
 	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/install > .tmp_install
 	@mv .tmp_install _static/_www/install
 	@chmod 755 _static/_www/install
+	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/index.html > .tmp_index.html
+	@mv .tmp_index.html _static/_www/index.html
+	@./build/docs.sh
 
 clean:
 	@rm -f ysh

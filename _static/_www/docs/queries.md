@@ -202,7 +202,7 @@ ysh '.services[0].name | [filename, line, tag]' config.yml
 `env(NAME)` parses the variable as YAML. `strenv(NAME)` always creates a string. `envsubst` expands `$NAME` and `${NAME}`, including `-` and `:-` defaults; `nu`, `ne`, and `ff` options are accepted. Use `--security-disable-env-ops` when expressions must not read the environment.
 
 ```sh
-IMAGE_TAG=v1.7 ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
+IMAGE_TAG=stable ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
 LIMITS='{cpu: 2}' ysh '.limits = env(LIMITS)' deploy.yml
 ysh '.message | envsubst(nu, ff)' config.yml
 ```

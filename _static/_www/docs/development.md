@@ -6,7 +6,7 @@
 make all
 ```
 
-The default workflow rebuilds `ysh`, validates the shell with ShellCheck, and runs the shUnit2 suite.
+The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, and verifies that the committed static documentation is generated and internally linked correctly.
 
 ## Source layout
 
@@ -23,12 +23,23 @@ test/presentation-matrix.sh exact compound-edit matrix
 test/adversarial.sh     resource and recursion guards
 bench/benchmark.sh      repeatable throughput sample
 bench/scale.sh          125,000-node resource contract
+build/docs.sh           static documentation build
+build/docs-page.awk     controlled Markdown-to-HTML renderer
+test/docs.sh            generated page, link, anchor, and asset checks
 test/advanced.yml       v1 conformance fixture
 test/expressions.yml    v1 expression and transformation fixture
 _static/_www            unified Cloudflare Pages site
 _static/_www/docs       documentation
 _static/_www/install    installer
 ```
+
+## Build documentation
+
+```sh
+make docs
+```
+
+Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork.
 
 ## Add parser behavior
 
