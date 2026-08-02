@@ -166,7 +166,8 @@ testExpressionJsonStreams() {
 testExpressionRecursiveAndOptionalTraversal() {
     assertEquals "$(printf '%s\n' api worker web)" "$(./ysh '.. | select(has("name")) | .name' test/expressions.yml)"
     assertEquals "" "$(./ysh '.metadata.owner[]?' test/expressions.yml)"
-    assertEquals "" "$(./ysh '.missing?' test/expressions.yml)"
+    assertEquals "null" "$(./ysh --json '.missing?' test/expressions.yml)"
+    assertEquals "null" "$(./ysh --json '.services[99]?' test/expressions.yml)"
 }
 
 testExpressionArrayAndObjectConstruction() {

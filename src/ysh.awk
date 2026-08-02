@@ -3071,7 +3071,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 }
                 if (child) {
                     expression_stream_push(output, child)
-                } else if (!expression_optional[expression]) {
+                } else if (node_kind[resolved] == "mapping" || !expression_optional[expression]) {
                     child = expression_null()
                     expression_missing_parent[child] = resolved
                     expression_missing_key[child] = expression_value[expression]
@@ -3089,7 +3089,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 }
                 if (child) {
                     expression_stream_push(output, child)
-                } else if (!expression_optional[expression]) {
+                } else if (node_kind[resolved] == "sequence" || !expression_optional[expression]) {
                     expression_stream_push(output, expression_null())
                 }
             } else if (node_kind[resolved] == "sequence") {
@@ -3134,7 +3134,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     }
                     if (collection >= 0 && collection < sequence_count[resolved]) {
                         expression_stream_push(output, sequence_child[resolved, collection + 1])
-                    } else if (!expression_optional[expression]) {
+                    } else {
                         expression_stream_push(output, expression_null())
                     }
                 } else if (node_kind[resolved] == "mapping") {
@@ -3142,7 +3142,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                     child = mapping_lookup(resolved, key)
                     if (child) {
                         expression_stream_push(output, child)
-                    } else if (!expression_optional[expression]) {
+                    } else {
                         child = expression_null()
                         expression_missing_parent[child] = resolved
                         expression_missing_key[child] = key
@@ -3601,7 +3601,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 if (node_kind[resolved] == "mapping") {
                     matched = expression_mapping_length(resolved)
                 } else if (node_kind[resolved] == "sequence") {
-                    matched = sequence_count[resolved]
+                    matched = sequence_count[resolved] + 0
                 } else if (node_type[resolved] == "null") {
                     matched = 0
                 } else {
@@ -3642,7 +3642,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 if (node_kind[resolved] == "mapping") {
                     matched = mapping_lookup(resolved, node_value[argument]) != 0
                 } else if (node_kind[resolved] == "sequence" && node_type[argument] == "int") {
-                    matched = (node_value[argument] + 0) >= 0 && (node_value[argument] + 0) < sequence_count[resolved]
+                    collection = node_value[argument] + 0
+                    if (collection < 0) {
+                        collection = sequence_count[resolved] + collection
+                    }
+                    matched = collection >= 0 && collection < sequence_count[resolved]
                 } else {
                     matched = 0
                 }
