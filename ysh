@@ -3376,7 +3376,7 @@ ysh_set_output_mode() {
 
 ysh_run_awk() {
     if [ "$YSH_NULL_INPUT" -eq 1 ]; then
-        awk \
+        LC_ALL=C awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
@@ -3384,14 +3384,14 @@ ysh_run_awk() {
             "$YAML_AWK_PARSER" \
             /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
-        awk \
+        LC_ALL=C awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v inplace_mode="$YSH_INPLACE" \
             "$YAML_AWK_PARSER"
     else
-        awk \
+        LC_ALL=C awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
