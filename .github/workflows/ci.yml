@@ -48,3 +48,16 @@ jobs:
         env:
           YAML_TEST_SUITE_DIR: ${{ runner.temp }}/yaml-test-suite
         run: PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make conformance
+      - name: Install pinned yq oracle
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64 -o "${RUNNER_TEMP}/yq"
+          printf '%s  %s\n' 'fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4' "${RUNNER_TEMP}/yq" | sha256sum --check
+          chmod 755 "${RUNNER_TEMP}/yq"
+      - name: Compare with yq
+        if: runner.os == 'Linux'
+        env:
+          YQ_BINARY: ${{ runner.temp }}/yq
+        run: |
+          make differential
+          PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make differential
