@@ -2983,10 +2983,15 @@ function presentation_comment_position(value,    i, char, previous, quote, escap
     return 0
 }
 
-function presentation_plain_safe(value,    lowered) {
+function presentation_plain_safe(value,    lowered, i) {
     lowered = tolower(value)
-    if (value == "" || value ~ /^[[:space:]]/ || value ~ /[[:space:]]$/ || value ~ /[:#\[\]{},&*!|>@`]/) {
+    if (value == "" || value ~ /^[[:space:]]/ || value ~ /[[:space:]]$/) {
         return 0
+    }
+    for (i = 1; i <= length(value); i++) {
+        if (index(":#[]{},&*!|>@`", substr(value, i, 1))) {
+            return 0
+        }
     }
     if (lowered == "null" || lowered == "true" || lowered == "false" || value == "~") {
         return 0
