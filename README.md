@@ -3,16 +3,16 @@
 [![CI](https://github.com/azohra/yaml.sh/actions/workflows/ci.yml/badge.svg)](https://github.com/azohra/yaml.sh/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/azohra/yaml.sh)](https://github.com/azohra/yaml.sh/releases/latest)
 
-YAML.sh reads a practical subset of YAML using only Bash, AWK, and standard Unix tools. It is useful in small bootstrap scripts where installing a full YAML implementation is not an option.
+YAML.sh reads a practical, documented subset of YAML using only Bash, AWK, and standard Unix tools. It is useful in small bootstrap scripts where installing a full YAML implementation is not an option.
 
-> YAML.sh is intentionally not a complete YAML 1.2 implementation. For untrusted input or advanced YAML features such as anchors, aliases, tags, directives, and explicit complex keys, use a maintained full parser.
+It supports backward anchors and aliases, merge keys, tags and directives, and explicit scalar keys. It intentionally remains a query-oriented subset rather than a validating YAML 1.2 implementation; see the [support contract](_static/_docs/supported_yml.md) for exact boundaries.
 
 ## Install
 
 Download a pinned release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v0.3.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v0.4.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -73,6 +73,20 @@ ysh -f input.yaml --line 'level_one.level_two.key'
 # 5
 ```
 
+## Inspect scalar types
+
+Scalar values are still returned as text, which preserves the CLI's shell-friendly behavior. For file or standard-input YAML, `--type` reports the recognized core type without coercing the value:
+
+```bash
+printf '%s\n' 'enabled: true' | ysh --type enabled
+# bool
+
+printf '%s\n' 'enabled: true' | ysh -Q enabled
+# true
+```
+
+Reported types are `string`, `null`, `bool`, `int`, `float`, `timestamp`, and `tagged`.
+
 ## Multiple documents
 
 Use `--next` to move through documents separated by `---`:
@@ -100,6 +114,7 @@ done
 | `-i, --index N` | Select a list item from a chained query. |
 | `-I, --index-val N` | Return a decoded scalar list item. |
 | `-p, --line PATH` | Return source line number(s). |
+| `--type PATH` | Return recognized scalar type(s). |
 | `-t, --tops` | Return the top-level keys of the current structure. |
 | `-n, --next` | Move to the next YAML document. |
 | `-v, --version` | Print the installed version. |

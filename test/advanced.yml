@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !example! tag:example.com,2026:
+---
+scalar: &greeting "hello"
+scalar_alias: *greeting
+defaults: &defaults
+  color: red
+  nested:
+    enabled: true
+  values: [one, two]
+mapping_alias: *defaults
+shared_list: &shared_list
+  - first
+  - second
+list_alias: *shared_list
+flow: &flow {x: 1, y: [a, b]}
+flow_alias: *flow
+sequence_aliases:
+  - *greeting
+  - *flow
+first: &first {color: red, size: small}
+second: &second {color: blue, shape: square}
+merged:
+  <<: [*first, *second]
+  size: large
+inline_merge: {<<: *first, color: green}
+literal_merge:
+  <<: {from: flow, active: true}
+quoted_merge_key:
+  "<<": literal
+types:
+  string: text
+  quoted_number: "12"
+  null: null
+  boolean: true
+  integer: 42
+  binary: 0b101010
+  octal: 0o17
+  hex: 0x2A
+  float: 3.14
+  trailing_float: 5.
+  exponent: 1e3
+  timestamp: 2026-08-02
+  forced_string: !!str 123
+  custom: !example!widget payload
+? explicit key
+: explicit value
+---
+fresh: &greeting second
+fresh_alias: *greeting

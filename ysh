@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck source=/dev/null
-YSH_version='0.3.0'
+YSH_version='0.4.0'
 
 # Replaced by the build with the embedded AWK parser.
 YAML_AWK_PARSER='
@@ -98,14 +98,182 @@ function scalar_value(value,    quote) {
     return value
 }
 
-function emit(path, value, source_line,    prefix) {
-    prefix = repeat("-", document_index)
-    if (line_numbers) {
-        print prefix path "=" source_line
-    } else {
-        print prefix path "=\"" encode(value) "\""
+function scalar_type(raw, tag, value,    lowered, normalized_tag) {
+    normalized_tag = tag
+    sub(/^!</, "", normalized_tag)
+    sub(/>$/, "", normalized_tag)
+    sub(/^!!/, "", normalized_tag)
+    sub(/^tag:yaml.org,2002:/, "", normalized_tag)
+
+    if (normalized_tag == "str") {
+        return "string"
     }
+    if (normalized_tag == "null" || normalized_tag == "bool" || normalized_tag == "int" || normalized_tag == "float" || normalized_tag == "timestamp") {
+        return normalized_tag
+    }
+    if (tag != "") {
+        return "tagged"
+    }
+
+    raw = trim(raw)
+    if ((substr(raw, 1, 1) == "\"" && substr(raw, length(raw), 1) == "\"") ||
+        (substr(raw, 1, 1) == sprintf("%c", 39) && substr(raw, length(raw), 1) == sprintf("%c", 39))) {
+        return "string"
+    }
+
+    lowered = tolower(value)
+    if (value == "~" || lowered == "null" || value == "") {
+        return "null"
+    }
+    if (lowered == "true" || lowered == "false") {
+        return "bool"
+    }
+    if (value ~ /^[-+]?(0|[1-9][0-9_]*)$/ || value ~ /^[-+]?0b[01_]+$/ || value ~ /^[-+]?0o[0-7_]+$/ || value ~ /^[-+]?0x[0-9a-fA-F_]+$/) {
+        return "int"
+    }
+    if (value ~ /^[-+]?[0-9][0-9_]*\.[0-9_]*([eE][-+]?[0-9]+)?$/ ||
+        value ~ /^[-+]?\.[0-9_]+([eE][-+]?[0-9]+)?$/ ||
+        value ~ /^[-+]?[0-9][0-9_]*[eE][-+]?[0-9]+$/ || lowered ~ /^[-+]?\.(inf|nan)$/) {
+        return "float"
+    }
+    if (value ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]([Tt]|[[:space:]]|$)/) {
+        return "timestamp"
+    }
+    return "string"
+}
+
+function record_key(document, path) {
+    return document SUBSEP path
+}
+
+function emit(path, value, source_line, value_type,    key, position) {
+    key = record_key(document_index, path)
+    if (merge_mode && (key in record_position)) {
+        return
+    }
+
+    if (key in record_position) {
+        position = record_position[key]
+        if (!record_merged[position]) {
+            fail("duplicate or ambiguous mapping path " path " on line " source_line)
+        }
+    } else {
+        position = ++record_count
+        record_position[key] = position
+        record_document[position] = document_index
+        record_path[position] = path
+    }
+
+    record_value[position] = value
+    record_line[position] = source_line
+    record_type[position] = (value_type == "" ? "string" : value_type)
+    record_merged[position] = merge_mode
     content_seen = 1
+}
+
+function output_records(    i, prefix) {
+    for (i = 1; i <= record_count; i++) {
+        prefix = repeat("-", record_document[i])
+        if (line_numbers) {
+            print prefix record_path[i] "=" record_line[i]
+        } else if (value_types) {
+            print prefix record_path[i] "=" record_type[i]
+        } else {
+            print prefix record_path[i] "=\"" encode(record_value[i]) "\""
+        }
+    }
+}
+
+function valid_anchor_name(name) {
+    return name ~ /^[A-Za-z0-9_-]+$/
+}
+
+function define_anchor(name, path, source_line,    key) {
+    if (!valid_anchor_name(name)) {
+        fail("invalid anchor name on line " source_line)
+    }
+    key = document_index SUBSEP name
+    anchor_path[key] = path
+    anchor_defined[key] = 1
+}
+
+function parse_properties(value, path, source_line,    token, separator, anchor_name) {
+    parsed_property_tag = ""
+    parsed_property_anchor = ""
+    value = trim(value)
+
+    while (substr(value, 1, 1) == "&" || substr(value, 1, 1) == "!") {
+        separator = match(value, /[[:space:]]/)
+        if (separator) {
+            token = substr(value, 1, separator - 1)
+            value = trim(substr(value, separator + 1))
+        } else {
+            token = value
+            value = ""
+        }
+
+        if (substr(token, 1, 1) == "&") {
+            anchor_name = substr(token, 2)
+            define_anchor(anchor_name, path, source_line)
+            parsed_property_anchor = anchor_name
+        } else {
+            parsed_property_tag = token
+        }
+    }
+    return value
+}
+
+function copy_anchor(name, target_path, source_line, as_merge,    key, source_path, limit, i, relative_path, destination, found, previous_merge) {
+    key = document_index SUBSEP name
+    if (!(key in anchor_defined)) {
+        fail("undefined alias *" name " on line " source_line)
+    }
+    source_path = anchor_path[key]
+    if (target_path == source_path || index(target_path, source_path ".") == 1) {
+        fail("recursive alias *" name " on line " source_line)
+    }
+
+    limit = record_count
+    found = 0
+
+    if (as_merge) {
+        for (i = 1; i <= limit; i++) {
+            if (record_document[i] != document_index) {
+                continue
+            }
+            if (record_path[i] == source_path) {
+                fail("merge alias *" name " does not reference a mapping on line " source_line)
+            }
+            if (index(record_path[i], source_path ".") == 1) {
+                relative_path = substr(record_path[i], length(source_path) + 2)
+                if (substr(relative_path, 1, 1) == "[") {
+                    fail("merge alias *" name " does not reference a mapping on line " source_line)
+                }
+            }
+        }
+    }
+
+    previous_merge = merge_mode
+    merge_mode = as_merge
+    for (i = 1; i <= limit; i++) {
+        if (record_document[i] != document_index) {
+            continue
+        }
+        if (record_path[i] == source_path) {
+            destination = target_path
+        } else if (index(record_path[i], source_path ".") == 1) {
+            relative_path = substr(record_path[i], length(source_path) + 2)
+            destination = join_path(target_path, relative_path)
+        } else {
+            continue
+        }
+        emit(destination, record_value[i], source_line, record_type[i])
+        found = 1
+    }
+    merge_mode = previous_merge
+
+    # Empty collections have no flattened values, so a defined anchor may copy no records.
+    return found
 }
 
 function strip_inline_comment(value,    i, char, previous, quote, escaped, braces, brackets) {
@@ -235,8 +403,16 @@ function split_flow(value, output,    count, start, i, char, quote, escaped, bra
     return count
 }
 
-function parse_node(value, path, source_line,    inner, count, pieces, i, separator, key, child_value) {
+function parse_node(value, path, source_line,    inner, count, pieces, i, separator, raw_key, key, child_value, tag, resolved_value, alias_name) {
     value = strip_inline_comment(trim(value))
+    value = parse_properties(value, path, source_line)
+    tag = parsed_property_tag
+
+    if (value ~ /^\*[A-Za-z0-9_-]+$/) {
+        alias_name = substr(value, 2)
+        copy_anchor(alias_name, path, source_line, 0)
+        return
+    }
 
     if (substr(value, 1, 1) == "[" && substr(value, length(value), 1) == "]") {
         inner = substr(value, 2, length(value) - 2)
@@ -256,15 +432,25 @@ function parse_node(value, path, source_line,    inner, count, pieces, i, separa
             if (!separator) {
                 fail("invalid flow mapping on line " source_line)
             }
-            key = scalar_value(substr(pieces[i], 1, separator - 1))
+            raw_key = trim(substr(pieces[i], 1, separator - 1))
+            key = scalar_value(raw_key)
             child_value = substr(pieces[i], separator + 1)
-            parse_node(child_value, join_path(path, key), source_line)
+            if (raw_key == "<<") {
+                apply_merge(child_value, path, source_line)
+            } else {
+                parse_node(child_value, join_path(path, key), source_line)
+            }
             delete pieces[i]
         }
         return
     }
 
-    emit(path, scalar_value(value), source_line)
+    if (substr(value, 1, 1) == "[" || substr(value, 1, 1) == "{") {
+        fail("multiline or unclosed flow collection on line " source_line)
+    }
+
+    resolved_value = scalar_value(value)
+    emit(path, resolved_value, source_line, scalar_type(value, tag, resolved_value))
 }
 
 function clear_deeper(indent,    i) {
@@ -273,6 +459,8 @@ function clear_deeper(indent,    i) {
         delete context_valid[i]
         delete list_path[i]
         delete list_valid[i]
+        delete explicit_key[i]
+        delete explicit_key_valid[i]
     }
     if (indent > max_indent) {
         max_indent = indent
@@ -285,8 +473,18 @@ function clear_structure(    i) {
         delete context_valid[i]
         delete list_path[i]
         delete list_valid[i]
+        delete explicit_key[i]
+        delete explicit_key_valid[i]
     }
     max_indent = 0
+}
+
+function fail_pending_explicit_keys(source_line,    i) {
+    for (i = 0; i <= max_indent; i++) {
+        if (explicit_key_valid[i]) {
+            fail("explicit scalar key has no mapping value before line " source_line)
+        }
+    }
 }
 
 function find_parent(indent,    i) {
@@ -355,23 +553,60 @@ function flush_block(    value, i, separator) {
     block_count = 0
 }
 
-function parse_mapping(value, indent, parent, source_line,    separator, key, child_path, child_value) {
-    separator = find_top_level_colon(value)
-    if (!separator) {
-        fail("unknown syntax on line " source_line)
+function apply_merge_value(value, target_path, source_line,    alias_name, previous_merge) {
+    value = trim(value)
+    if (value ~ /^\*[A-Za-z0-9_-]+$/) {
+        alias_name = substr(value, 2)
+        copy_anchor(alias_name, target_path, source_line, 1)
+        return
     }
+    if (substr(value, 1, 1) == "{" && substr(value, length(value), 1) == "}") {
+        previous_merge = merge_mode
+        merge_mode = 1
+        parse_node(value, target_path, source_line)
+        merge_mode = previous_merge
+        return
+    }
+    fail("merge value must be an alias, alias list, or flow mapping on line " source_line)
+}
 
-    key = scalar_value(substr(value, 1, separator - 1))
-    if (key == "") {
-        fail("empty key on line " source_line)
+function apply_merge(value, target_path, source_line,    inner, count, pieces, i) {
+    value = strip_inline_comment(trim(value))
+    if (substr(value, 1, 1) == "[" && substr(value, length(value), 1) == "]") {
+        inner = substr(value, 2, length(value) - 2)
+        count = split_flow(inner, pieces)
+        for (i = 1; i <= count; i++) {
+            apply_merge_value(pieces[i], target_path, source_line)
+            delete pieces[i]
+        }
+        return
     }
-    child_path = join_path(parent, key)
-    child_value = strip_inline_comment(substr(value, separator + 1))
+    apply_merge_value(value, target_path, source_line)
+}
+
+function parse_mapping_value(key, child_value, indent, parent, source_line, is_merge_key,    child_path, original_value, property_value, property_tag, property_anchor) {
+    child_value = strip_inline_comment(child_value)
 
     delete list_path[indent]
     delete list_valid[indent]
 
-    if (child_value == "") {
+    if (is_merge_key) {
+        delete context_path[indent]
+        delete context_valid[indent]
+        if (child_value == "") {
+            fail("block merge lists are not supported on line " source_line "; use <<: [*first, *second]")
+        }
+        apply_merge(child_value, parent, source_line)
+        return
+    }
+
+    child_path = join_path(parent, key)
+    original_value = child_value
+    property_value = parse_properties(child_value, child_path, source_line)
+    property_tag = parsed_property_tag
+    property_anchor = parsed_property_anchor
+
+    if (property_value == "") {
         context_path[indent] = child_path
         context_valid[indent] = 1
         return
@@ -379,14 +614,29 @@ function parse_mapping(value, indent, parent, source_line,    separator, key, ch
 
     delete context_path[indent]
     delete context_valid[indent]
-    if (child_value ~ /^[|>][-+0-9]*$/) {
-        start_block(child_path, child_value, indent, source_line)
+    if (property_value ~ /^[|>][-+0-9]*$/) {
+        start_block(child_path, property_value, indent, source_line)
     } else {
-        parse_node(child_value, child_path, source_line)
+        parse_node(original_value, child_path, source_line)
     }
 }
 
-function parse_sequence(value, indent, source_line,    parent, counter_key, item_index, item_path, item_value, mapping_separator, mapping_suffix) {
+function parse_mapping(value, indent, parent, source_line,    separator, raw_key, key, child_value) {
+    separator = find_top_level_colon(value)
+    if (!separator) {
+        fail("unknown syntax on line " source_line)
+    }
+
+    raw_key = trim(substr(value, 1, separator - 1))
+    key = scalar_value(raw_key)
+    if (key == "") {
+        fail("empty key on line " source_line)
+    }
+    child_value = substr(value, separator + 1)
+    parse_mapping_value(key, child_value, indent, parent, source_line, raw_key == "<<")
+}
+
+function parse_sequence(value, indent, source_line,    parent, counter_key, item_index, item_path, item_value, original_value, property_value, mapping_separator, mapping_suffix) {
     if (list_valid[indent]) {
         parent = list_path[indent]
     } else if (context_valid[indent]) {
@@ -403,16 +653,23 @@ function parse_sequence(value, indent, source_line,    parent, counter_key, item
     context_path[indent] = item_path
     context_valid[indent] = 1
 
-    item_value = trim(substr(value, 2))
-    if (item_value == "") {
+    original_value = trim(substr(value, 2))
+    if (original_value == "") {
         return
     }
+
+    property_value = parse_properties(original_value, item_path, source_line)
+    if (property_value == "") {
+        return
+    }
+
+    item_value = property_value
     mapping_separator = find_top_level_colon(item_value)
     mapping_suffix = substr(item_value, mapping_separator + 1, 1)
     if (mapping_separator && (mapping_suffix == "" || mapping_suffix ~ /[[:space:]]/)) {
         parse_mapping(item_value, indent + 2, item_path, source_line)
     } else {
-        parse_node(item_value, item_path, source_line)
+        parse_node(original_value, item_path, source_line)
     }
 }
 
@@ -425,7 +682,7 @@ function indentation(value, source_line,    copy) {
     return length(copy)
 }
 
-function process_line(raw, source_line,    indent, text, parent) {
+function process_line(raw, source_line,    indent, text, parent, directive, key_text, child_value) {
     sub(/\r$/, "", raw)
 
     if (block_active) {
@@ -454,7 +711,20 @@ function process_line(raw, source_line,    indent, text, parent) {
     indent = indentation(raw, source_line)
     text = substr(raw, indent + 1)
 
+    if (substr(text, 1, 1) == "%") {
+        directive = strip_inline_comment(text)
+        if (indent != 0) {
+            fail("directives must not be indented on line " source_line)
+        }
+        if (directive ~ /^%YAML[[:space:]]+(1\.1|1\.2)$/ ||
+            directive ~ /^%TAG[[:space:]]+![^[:space:]]*[[:space:]]+[^[:space:]]+$/) {
+            return
+        }
+        fail("unsupported or malformed directive on line " source_line)
+    }
+
     if (strip_inline_comment(text) == "---") {
+        fail_pending_explicit_keys(source_line)
         if (content_seen) {
             document_index++
         }
@@ -462,11 +732,36 @@ function process_line(raw, source_line,    indent, text, parent) {
         return
     }
     if (strip_inline_comment(text) == "...") {
+        fail_pending_explicit_keys(source_line)
         clear_structure()
         return
     }
 
     clear_deeper(indent)
+    if (text == "?" || text ~ /^\?[[:space:]]/) {
+        key_text = trim(substr(text, 2))
+        if (key_text == "" || substr(key_text, 1, 1) == "[" || substr(key_text, 1, 1) == "{" || find_top_level_colon(key_text)) {
+            fail("collection-valued complex keys are not supported on line " source_line)
+        }
+        explicit_key[indent] = scalar_value(strip_inline_comment(key_text))
+        explicit_key_valid[indent] = 1
+        return
+    }
+    if (text == ":" || text ~ /^:[[:space:]]/) {
+        if (!explicit_key_valid[indent]) {
+            fail("explicit mapping value has no scalar key on line " source_line)
+        }
+        parent = find_parent(indent)
+        child_value = substr(text, 2)
+        parse_mapping_value(explicit_key[indent], child_value, indent, parent, source_line, 0)
+        delete explicit_key[indent]
+        delete explicit_key_valid[indent]
+        return
+    }
+
+    if (explicit_key_valid[indent]) {
+        fail("explicit scalar key has no mapping value before line " source_line)
+    }
     if (text == "-" || text ~ /^-[[:space:]]/) {
         parse_sequence(text, indent, source_line)
     } else {
@@ -481,7 +776,16 @@ function process_line(raw, source_line,    indent, text, parent) {
 
 END {
     if (!exit_status) {
-        flush_block()
+        for (pending_indent = 0; pending_indent <= max_indent; pending_indent++) {
+            if (explicit_key_valid[pending_indent]) {
+                print "Error: explicit scalar key has no mapping value at end of input" > "/dev/stderr"
+                exit_status = 1
+            }
+        }
+        if (!exit_status) {
+            flush_block()
+            output_records()
+        }
     }
     exit exit_status
 }
@@ -502,11 +806,19 @@ YSH_escape_query() {
 }
 
 YSH_parse() {
-    awk -v line_numbers="${2:-0}" "${YAML_AWK_PARSER}" "${1}"
+    case "${2:-values}" in
+    1|lines) awk -v line_numbers=1 "${YAML_AWK_PARSER}" "${1}" ;;
+    types) awk -v value_types=1 "${YAML_AWK_PARSER}" "${1}" ;;
+    *) awk "${YAML_AWK_PARSER}" "${1}" ;;
+    esac
 }
 
 YSH_parse_stdin() {
-    awk -v line_numbers="${1:-0}" "${YAML_AWK_PARSER}"
+    case "${1:-values}" in
+    1|lines) awk -v line_numbers=1 "${YAML_AWK_PARSER}" ;;
+    types) awk -v value_types=1 "${YAML_AWK_PARSER}" ;;
+    *) awk "${YAML_AWK_PARSER}" ;;
+    esac
 }
 
 # Compatibility alias for the misspelled helper in v0.2.x.
@@ -730,6 +1042,7 @@ queries:
   -i, --index       <index>        select a list element
   -I, --index-val   <index>        return a decoded list value
   -p, --line        <query>        return source line number(s)
+      --type        <query>        return scalar type(s)
   -t, --tops                       return top-level keys
   -n, --next                       move to the next YAML document
   -v, --version                    print the version
@@ -749,12 +1062,24 @@ YSH_needs_lines() {
     return 1
 }
 
+YSH_needs_types() {
+    local argument
+    for argument in "$@"; do
+        case "${argument}" in
+        --type) return 0 ;;
+        esac
+    done
+    return 1
+}
+
 ysh() {
     local raw_string=""
     local line_string=""
+    local type_string=""
     local stdin_string=""
     local status=0
     local supports_lines=0
+    local supports_types=0
 
     if [ "$#" -eq 0 ]; then
         YSH_usage
@@ -785,8 +1110,12 @@ ysh() {
             return "${status}"
         fi
         if YSH_needs_lines "$@"; then
-            line_string=$(YSH_parse "${2}" 1) || return $?
+            line_string=$(YSH_parse "${2}" lines) || return $?
             supports_lines=1
+        fi
+        if YSH_needs_types "$@"; then
+            type_string=$(YSH_parse "${2}" types) || return $?
+            supports_types=1
         fi
         shift 2
         ;;
@@ -806,15 +1135,19 @@ ysh() {
             return "${status}"
         fi
         if YSH_needs_lines "$@"; then
-            line_string=$(YSH_parse_stdin 1 <<< "${stdin_string}") || return $?
+            line_string=$(YSH_parse_stdin lines <<< "${stdin_string}") || return $?
             supports_lines=1
+        fi
+        if YSH_needs_types "$@"; then
+            type_string=$(YSH_parse_stdin types <<< "${stdin_string}") || return $?
+            supports_types=1
         fi
         ;;
     esac
 
     while [ "$#" -gt 0 ]; do
         case "${1}" in
-        -q|--query|-Q|--query-val|-s|--sub|-l|--list|-L|--list-val|-c|--count|-i|--index|-I|--index-val|-p|--line)
+        -q|--query|-Q|--query-val|-s|--sub|-l|--list|-L|--list-val|-c|--count|-i|--index|-I|--index-val|-p|--line|--type)
             if [ "$#" -lt 2 ]; then
                 YSH_error "${1} requires an argument"
                 return 2
@@ -837,6 +1170,14 @@ ysh() {
                 return 2
             fi
             raw_string=$(YSH_line_query "${line_string}" "${2}")
+            shift
+            ;;
+        --type)
+            if [ "${supports_types}" -ne 1 ]; then
+                YSH_error "type queries require YAML input from a file or stdin"
+                return 2
+            fi
+            raw_string=$(YSH_line_query "${type_string}" "${2}")
             shift
             ;;
         -n|--next) raw_string=$(YSH_next_block "${raw_string}") ;;

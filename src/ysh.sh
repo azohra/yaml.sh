@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck source=/dev/null
-YSH_version='0.3.0'
+YSH_version='0.4.0'
 
 # Replaced by the build with the embedded AWK parser.
 YAML_AWK_PARSER=$(cat src/ysh.awk)
@@ -20,11 +20,19 @@ YSH_escape_query() {
 }
 
 YSH_parse() {
-    awk -v line_numbers="${2:-0}" "${YAML_AWK_PARSER}" "${1}"
+    case "${2:-values}" in
+    1|lines) awk -v line_numbers=1 "${YAML_AWK_PARSER}" "${1}" ;;
+    types) awk -v value_types=1 "${YAML_AWK_PARSER}" "${1}" ;;
+    *) awk "${YAML_AWK_PARSER}" "${1}" ;;
+    esac
 }
 
 YSH_parse_stdin() {
-    awk -v line_numbers="${1:-0}" "${YAML_AWK_PARSER}"
+    case "${1:-values}" in
+    1|lines) awk -v line_numbers=1 "${YAML_AWK_PARSER}" ;;
+    types) awk -v value_types=1 "${YAML_AWK_PARSER}" ;;
+    *) awk "${YAML_AWK_PARSER}" ;;
+    esac
 }
 
 # Compatibility alias for the misspelled helper in v0.2.x.
@@ -248,6 +256,7 @@ queries:
   -i, --index       <index>        select a list element
   -I, --index-val   <index>        return a decoded list value
   -p, --line        <query>        return source line number(s)
+      --type        <query>        return scalar type(s)
   -t, --tops                       return top-level keys
   -n, --next                       move to the next YAML document
   -v, --version                    print the version
@@ -267,12 +276,24 @@ YSH_needs_lines() {
     return 1
 }
 
+YSH_needs_types() {
+    local argument
+    for argument in "$@"; do
+        case "${argument}" in
+        --type) return 0 ;;
+        esac
+    done
+    return 1
+}
+
 ysh() {
     local raw_string=""
     local line_string=""
+    local type_string=""
     local stdin_string=""
     local status=0
     local supports_lines=0
+    local supports_types=0
 
     if [ "$#" -eq 0 ]; then
         YSH_usage
@@ -303,8 +324,12 @@ ysh() {
             return "${status}"
         fi
         if YSH_needs_lines "$@"; then
-            line_string=$(YSH_parse "${2}" 1) || return $?
+            line_string=$(YSH_parse "${2}" lines) || return $?
             supports_lines=1
+        fi
+        if YSH_needs_types "$@"; then
+            type_string=$(YSH_parse "${2}" types) || return $?
+            supports_types=1
         fi
         shift 2
         ;;
@@ -324,15 +349,19 @@ ysh() {
             return "${status}"
         fi
         if YSH_needs_lines "$@"; then
-            line_string=$(YSH_parse_stdin 1 <<< "${stdin_string}") || return $?
+            line_string=$(YSH_parse_stdin lines <<< "${stdin_string}") || return $?
             supports_lines=1
+        fi
+        if YSH_needs_types "$@"; then
+            type_string=$(YSH_parse_stdin types <<< "${stdin_string}") || return $?
+            supports_types=1
         fi
         ;;
     esac
 
     while [ "$#" -gt 0 ]; do
         case "${1}" in
-        -q|--query|-Q|--query-val|-s|--sub|-l|--list|-L|--list-val|-c|--count|-i|--index|-I|--index-val|-p|--line)
+        -q|--query|-Q|--query-val|-s|--sub|-l|--list|-L|--list-val|-c|--count|-i|--index|-I|--index-val|-p|--line|--type)
             if [ "$#" -lt 2 ]; then
                 YSH_error "${1} requires an argument"
                 return 2
@@ -355,6 +384,14 @@ ysh() {
                 return 2
             fi
             raw_string=$(YSH_line_query "${line_string}" "${2}")
+            shift
+            ;;
+        --type)
+            if [ "${supports_types}" -ne 1 ]; then
+                YSH_error "type queries require YAML input from a file or stdin"
+                return 2
+            fi
+            raw_string=$(YSH_line_query "${type_string}" "${2}")
             shift
             ;;
         -n|--next) raw_string=$(YSH_next_block "${raw_string}") ;;
