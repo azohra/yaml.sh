@@ -220,6 +220,8 @@ testExpressionSequenceAndStringHelpers() {
     assertEquals '["yaml","sh"]' "$(./ysh -n --json '"yaml.sh" | split(".")')"
     assertEquals '"yaml.sh"' "$(./ysh -n --json '["yaml", "sh"] | join(".")')"
     assertEquals 'true' "$(./ysh -n --json '"yaml.sh" | startswith("yaml") and endswith(".sh")')"
+    assertEquals '6' "$(./ysh -n --json '[1, 2, 3] | add')"
+    assertEquals '"yaml.sh"' "$(./ysh -n --json '["yaml", ".", "sh"] | add')"
 }
 
 testExpressionProjectedCollectionsAndQuantifiers() {
@@ -228,6 +230,8 @@ testExpressionProjectedCollectionsAndQuantifiers() {
     assertEquals '[{"name":"worker","port":443},{"name":"api","port":80}]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | unique_by(.port)')"
     assertEquals '1' "$(./ysh -n --json '[3, 1, 2] | min')"
     assertEquals '3' "$(./ysh -n --json '[3, 1, 2] | max')"
+    assertEquals '"web"' "$(./ysh --json '.services | min_by(.port) | .name' test/expressions.yml)"
+    assertEquals '"worker"' "$(./ysh --json '.services | max_by(.port) | .name' test/expressions.yml)"
     assertEquals 'true' "$(./ysh -n --json '[false, true] | any')"
     assertEquals 'false' "$(./ysh -n --json '[true, false] | all')"
     assertEquals 'true' "$(./ysh -n --json '[1, 2, 3] | any_c(. == 2)')"
@@ -235,6 +239,7 @@ testExpressionProjectedCollectionsAndQuantifiers() {
 }
 
 testExpressionVariablesAndDynamicIndexes() {
+    assertEquals '"web"' "$(./ysh --json '.services[-1].name' test/expressions.yml)"
     assertEquals '"platform"' "$(./ysh -n --json '{key: "owner", data: {owner: "platform"}} | .key as $key | .data[$key]')"
     assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' test/expressions.yml)"
 }
@@ -414,6 +419,7 @@ testCommentsQuotesAndCrLf() {
 
 testMultilinePlainScalars() {
     assertEquals '"a b\nc"' "$(printf '%s\n' 'plain: a' ' b' '' ' c' | ./ysh --json '.plain')"
+    assertEquals '"not yaml another root"' "$(printf '%s\n' 'not yaml' 'another root' | ./ysh --json '.')"
     assertEquals '"flow in block"' "$(printf '%s\n' '-' '  "flow in block"' | ./ysh --json '.[0]')"
     assertEquals '"value"' "$(printf '%s\n' 'key: # comment' '  value' | ./ysh --json '.key')"
 }
@@ -449,10 +455,6 @@ testUnsupportedComplexKeysAreRejected() {
 }
 
 testMalformedYamlIsRejected() {
-    result=$(printf "%s\n" "not yaml" "another root" | ./ysh "." 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "unknown syntax"
-
     result=$(printf "%s\n" "items: [one," "  two" | ./ysh ".items" 2>&1)
     assertNotEquals 0 $?
     assertContains "$result" "unclosed multiline flow collection"

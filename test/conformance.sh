@@ -79,6 +79,8 @@ printf 'YAML Test Suite semantic load results: %s/%s pass, %s mismatch, %s rejec
 
 if [ "${YAML_CONFORMANCE_VERBOSE:-0}" = 1 ]; then
     awk -F '\t' '$1 != "pass" {print $1 "\t" $2}' "$RESULTS_FILE"
+elif [ "${YAML_CONFORMANCE_VERBOSE:-0}" = passes ]; then
+    awk -F '\t' '$1 == "pass" {print $2}' "$RESULTS_FILE"
 fi
 
 regressions=0
