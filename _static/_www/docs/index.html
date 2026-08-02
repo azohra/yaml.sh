@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.7.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.8.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -99,7 +99,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.7.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.8.0</span></div>
       <article>
           <h1 id="yaml-without-the-luggage">YAML without the luggage</h1>
           <p>YAML.sh is a focused, yq-like tool delivered as one readable shell file. It runs anywhere with <code>/bin/sh</code> and AWK: bootstrap scripts, minimal containers, old machines, and recovery environments where installing the better-known tool is the problem.</p>
@@ -158,6 +158,7 @@ value / JSON / YAML / metadata
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --events config.yml
 ysh --ast config.yml
+ysh --explain -i '.image.tag = &quot;stable&quot;' config.yml
 </code></pre>
           </div>
           <p>The <a href="/docs/internals/">internals guide</a> follows a document through the parser. The <a href="/docs/development/">development guide</a> explains how each new promise earns fixtures, differential cases, rejection tests, and portability evidence.</p>

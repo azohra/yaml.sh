@@ -77,6 +77,40 @@ awk -F '\t' '
     }
 ' "$RESULTS"
 
+workflow_total=0
+workflow_passed=0
+while IFS="$tab" read -r family id fixture query expected; do
+    case "$family" in
+    ''|'#'*) continue ;;
+    esac
+    workflow_total=$((workflow_total + 1))
+    input=$SCRIPT_DIR/workflows/$fixture
+    if ! "$YQ_BINARY" --yaml-fix-merge-anchor-to-spec -o=json -I=0 "$query" "$input" > "$YQ_RAW" 2>/dev/null ||
+        ! jq -cS . "$YQ_RAW" > "$YQ_OUTPUT"; then
+        printf 'yq failed real-world workflow %s/%s: %s\n' "$family" "$id" "$query" >&2
+        exit 1
+    fi
+    if ! "$YSH_BINARY" --json "$query" "$input" > "$YSH_RAW" 2>/dev/null ||
+        ! jq -cS . "$YSH_RAW" > "$YSH_OUTPUT"; then
+        printf 'YAML.sh failed real-world workflow %s/%s: %s\n' "$family" "$id" "$query" >&2
+        exit 1
+    fi
+    if [ "$(cat "$YSH_RAW")" != "$expected" ]; then
+        printf 'Committed workflow expectation drifted for %s/%s\n' "$family" "$id" >&2
+        exit 1
+    fi
+    if ! cmp -s "$YSH_OUTPUT" "$YQ_OUTPUT"; then
+        printf 'Real-world differential mismatch %s/%s: %s\n' "$family" "$id" "$query" >&2
+        exit 1
+    fi
+    workflow_passed=$((workflow_passed + 1))
+done < "$SCRIPT_DIR/workflows.tsv"
+printf 'Real-world workflows matching yq v4.53.3: %s/%s\n' "$workflow_passed" "$workflow_total"
+if [ "$workflow_total" -lt 24 ]; then
+    printf 'Real-world workflow corpus must contain at least 24 cases; found %s\n' "$workflow_total" >&2
+    exit 1
+fi
+
 eval_all_total=0
 eval_all_passed=0
 while IFS= read -r query; do

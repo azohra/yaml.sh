@@ -26,6 +26,14 @@ if ! awk -v version=9.9.9 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/in
     printf '%s\n' 'Homepage release text is not generated from the executable version.' >&2
     exit 1
 fi
+if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'expected_sha256=abc123'; then
+    printf '%s\n' 'Installer checksum is not generated from the release artifact.' >&2
+    exit 1
+fi
+if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'releases/download/v9.9.9/ysh'; then
+    printf '%s\n' 'Installer download URL is not generated from the release version.' >&2
+    exit 1
+fi
 
 if grep -En 'docsify|cdn\.jsdelivr|href="#/|theme\.css' "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html >/dev/null; then
     printf '%s\n' 'Generated documentation still references the retired runtime renderer.' >&2

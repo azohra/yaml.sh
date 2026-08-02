@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.7.0
+YSH_VERSION=1.8.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -50,6 +50,7 @@ Documents:
 
 Evaluation:
   -e, --exit-status       fail on no result, null, or false
+      --explain           report selections, mutations, and presentation behavior
       --security-disable-env-ops
                           disable env(), strenv(), and envsubst
 
@@ -91,6 +92,7 @@ ysh_invoke_awk() {
         -v null_input_mode="$YSH_NULL_INPUT" \
         -v inplace_mode="$YSH_INPLACE" \
         -v exit_status_mode="$YSH_EXIT_STATUS" \
+        -v explain_mode="$YSH_EXPLAIN" \
         -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
         -v input_filename="$YSH_INPUT_FILENAME" \
         -v input_file_index="$YSH_FILE_INDEX" \
@@ -203,6 +205,7 @@ ysh_main() {
     YSH_NULL_INPUT=0
     YSH_INPLACE=0
     YSH_EXIT_STATUS=0
+    YSH_EXPLAIN=0
     YSH_DISABLE_ENV_OPS=0
     YSH_INPUT_FILENAME=-
     YSH_FILE_INDEX=0
@@ -271,6 +274,10 @@ ysh_main() {
             ;;
         -e|--exit-status)
             YSH_EXIT_STATUS=1
+            shift
+            ;;
+        --explain)
+            YSH_EXPLAIN=1
             shift
             ;;
         --security-disable-env-ops)

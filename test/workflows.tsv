@@ -1,0 +1,36 @@
+# family<TAB>id<TAB>fixture<TAB>query<TAB>expected compact JSON
+kubernetes	read-name	kubernetes.yml	.metadata.name	"storefront"
+kubernetes	normalize-labels	kubernetes.yml	.metadata.labels | with_entries(.key |= upcase)	{"APP":"storefront","TIER":"web"}
+kubernetes	list-containers	kubernetes.yml	[.spec.template.spec.containers[].name]	["api","metrics"]
+kubernetes	select-resource	kubernetes.yml	.spec.template.spec.containers | map(select(.resources.requests.cpu == "100m") | .name)	["api"]
+kubernetes	update-image	kubernetes.yml	(.spec.template.spec.containers[] | select(.name == "api") | .image) = "ghcr.io/example/api:1.5.0" | .spec.template.spec.containers[0].image	"ghcr.io/example/api:1.5.0"
+kubernetes	append-env	kubernetes.yml	(.spec.template.spec.containers[] | select(.name == "metrics") | .env) += [{"name":"FEATURE_FLAG","value":"true"}] | .spec.template.spec.containers[1].env	[{"name":"FEATURE_FLAG","value":"true"}]
+kubernetes	setpath-env	kubernetes.yml	setpath(["spec","template","spec","containers",1,"env"]; [{"name":"PORT","value":"9090"}]) | .spec.template.spec.containers[1].env	[{"name":"PORT","value":"9090"}]
+kubernetes	delpaths-metadata	kubernetes.yml	delpaths([["metadata","annotations"],["spec","template","metadata"]]) | [.metadata | has("annotations"), .spec.template | has("metadata")]	[false,false]
+kubernetes	delete-annotation	kubernetes.yml	del(.metadata.annotations["deployment.kubernetes.io/revision"]) | .metadata.annotations	{}
+kubernetes	inspect-image-comment	kubernetes.yml	.spec.template.spec.containers[0].image | line_comment	"promoted by CI"
+kubernetes	inspect-quoted-style	kubernetes.yml	.metadata.annotations["deployment.kubernetes.io/revision"] | style	"double"
+kubernetes	set-image-comment	kubernetes.yml	.spec.template.spec.containers[0].image line_comment = "deployed by release" | .spec.template.spec.containers[0].image | line_comment	"deployed by release"
+kubernetes	set-name-style	kubernetes.yml	.metadata.name style = "single" | .metadata.name | style	"single"
+compose	list-services	compose.yml	.services | keys	["web","api","worker"]
+compose	select-profile	compose.yml	[.services | to_entries[] | select((.value.profiles // []) | any_c(. == "backend")) | .key]	["api","worker"]
+compose	default-log-level	compose.yml	.services | map_values(.environment.LOG_LEVEL // "unset")	{"web":"info","api":"unset","worker":"unset"}
+compose	parse-port	compose.yml	.services.web.ports[0] | split(":")[0]	"8080"
+compose	add-environment	compose.yml	.services.worker.environment += {"QUEUE":"critical"} | .services.worker.environment	{"QUEUE":"critical"}
+actions	read-trigger	github-actions.yml	.on.push.branches[0]	"main"
+actions	inspect-flow-style	github-actions.yml	.on.push.branches | style	"flow"
+actions	select-runners	github-actions.yml	[.jobs | to_entries[] | select(.value["runs-on"] == "ubuntu-latest") | .key]	["lint","test","deploy"]
+actions	project-steps	github-actions.yml	.jobs | with_entries(.value.steps |= map(.run // .uses))	{"lint":{"runs-on":"ubuntu-latest","steps":["actions/checkout@v4","make lint"]},"test":{"runs-on":"ubuntu-latest","needs":"lint","strategy":{"matrix":{"awk":["mawk","busybox","original"]}},"steps":["actions/checkout@v4","make test"]},"deploy":{"runs-on":"ubuntu-latest","needs":"test","if":"github.ref == 'refs/heads/main'","steps":["./deploy.sh"]}}
+actions	extend-matrix	github-actions.yml	.jobs.test.strategy.matrix.awk += ["gawk"] | .jobs.test.strategy.matrix.awk	["mawk","busybox","original","gawk"]
+actions	select-dependants	github-actions.yml	[.jobs | to_entries[] | select(.value.needs == "test") | .key]	["deploy"]
+actions	build-runner-map	github-actions.yml	.jobs | to_entries[] as $item ireduce ({}; . * {($item.key): $item.value["runs-on"]})	{"lint":"ubuntu-latest","test":"ubuntu-latest","deploy":"ubuntu-latest"}
+gitlab	select-stage	gitlab-ci.yml	[. | to_entries[] | select(.value | type == "!!map") | select(.value.stage == "test") | .key]	["test"]
+gitlab	dedupe-matrix	gitlab-ci.yml	.test.parallel.matrix[0].AWK | unique	["mawk","busybox"]
+gitlab	set-variable	gitlab-ci.yml	.variables.APP_ENV = "production" | .variables.APP_ENV	"production"
+deployment	read-merge	deployment.yml	.production.region	"us-west-2"
+deployment	inspect-anchor	deployment.yml	.defaults | anchor	"defaults"
+deployment	inspect-alias	deployment.yml	.shared | alias	"defaults"
+deployment	explode-shared-values	deployment.yml	explode(.) | [.shared.region, .production.region]	["us-west-2","us-west-2"]
+deployment	deep-update	deployment.yml	.production.resources *= {"memory":"1Gi"} | .production.resources	{"cpu":"250m","memory":"1Gi"}
+deployment	project-environment	deployment.yml	.production | {"region":.region,"replicas":.replicas}	{"region":"us-west-2","replicas":6}
+deployment	list-domains	deployment.yml	[.staging, .production] | map(.domain)	["staging.example.com","example.com"]

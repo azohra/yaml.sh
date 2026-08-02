@@ -1,0 +1,20 @@
+name: storefront
+services:
+  web:
+    image: ghcr.io/example/web:1.4.2
+    ports:
+      - "8080:8080"
+    environment:
+      LOG_LEVEL: info
+      API_URL: http://api:9000
+    depends_on:
+      - api
+  api:
+    image: ghcr.io/example/api:1.4.2
+    profiles: [backend]
+    environment:
+      DATABASE_URL: postgres://db/storefront
+  worker:
+    image: ghcr.io/example/worker:1.4.2
+    profiles: [backend, jobs]
+    environment: {}

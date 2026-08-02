@@ -1,0 +1,25 @@
+stages: [lint, test, deploy]
+default:
+  image: alpine:3.20
+variables:
+  APP_ENV: test
+  CACHE_DIR: .cache
+lint:
+  stage: lint
+  script:
+    - make lint
+test:
+  stage: test
+  needs: [lint]
+  parallel:
+    matrix:
+      - AWK: [mawk, busybox]
+  script:
+    - make test
+deploy:
+  stage: deploy
+  needs: [test]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - ./deploy.sh

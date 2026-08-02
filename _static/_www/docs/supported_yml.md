@@ -59,6 +59,7 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Multiple documents using `---` and `...`.
 - Empty explicit documents represented as null.
 - Source lines retained on nodes.
+- Anchor, alias, scalar/flow style, and line-comment metadata available to queries.
 
 ## Intentional limitations
 
@@ -68,11 +69,12 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Collection-valued mapping keys are rejected. Explicit scalar keys are supported.
 - Tags and anchors before scalar keys are accepted, but mapping keys remain text in the graph.
 - Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.
-- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, and merge edges where representable, but not comments or original presentation style.
+- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded line comments, and supported scalar/flow styles where representable. It does not reconstruct original spacing or head/foot comments.
 - Common in-place replacements, direct block inserts/deletes, and pure sequence reorders preserve comments, whitespace, quoting, block/flow style, anchors, tags, and directives. Other structural changes fall back to semantic YAML.
 - Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
-- Sequence slices, scalar interpolation, grouping, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
-- The expression language does not implement ireduce, comment/style query operators, file-loading operators, date operators, or yq's non-YAML codecs.
+- Sequence slices, scalar interpolation, grouping, `ireduce`, computed object keys, `setpath`/`delpaths`, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
+- `style` can inspect all recognized styles and set plain/single/double scalar or flow collection styles. `line_comment` can inspect and set line comments. Literal/folded conversion and head/foot comment operators remain outside the writer.
+- The expression language does not implement file-loading operators, date operators, dynamic evaluation, or yq's non-YAML codecs.
 
 YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond this contract is required.
 
@@ -80,13 +82,14 @@ YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth 
 
 Pinned release gates:
 
-| Gate | v1.7 |
+| Gate | v1.8 |
 | --- | ---: |
 | YAML Test Suite expected outcomes | 282/282 |
 | YAML Test Suite strict-invalid inputs rejected | 91/91 |
 | Categorized programs matching yq v4.53.3 | 2,610/2,610 |
+| Real-world workflow programs matching yq v4.53.3 | 35/35 |
 | Cross-file programs matching yq v4.53.3 | 8/8 |
-| Behavioral tests | 84 |
+| Behavioral tests | 90 |
 | Grammar-guided generated properties | 12,000/12,000 |
 | Exact presentation mutations | 400/400 |
 | Scale contract | 125,000 payload nodes; 1,500 documents; at most 224 MiB RSS |
@@ -95,6 +98,6 @@ Three YAML Test Suite cases contain partial-event JSON but are marked errors; YA
 
 ## Fixtures
 
-The advanced fixture covers anchors, collection aliases, merge precedence, block merge lists, directives, expanded tags, scalar types, explicit keys, empty collections, punctuated keys, and document scoping. The expression fixture covers streams, filters, slices, interpolation, regexes, construction, arithmetic, assignments, variables, reducers, deep merge, round-tripping, multi-document updates, and presentation preservation. Rejection tests cover boundaries that could otherwise be misread as supported syntax.
+The focused fixtures cover parser syntax, graph semantics, query behavior, presentation preservation, and rejection boundaries. A separate workflow corpus exercises Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays against yq.
 
 See [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh), [`test/conformance.sh`](https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh), [`test/differential.sh`](https://github.com/azohra/yaml.sh/blob/main/test/differential.sh), [`test/fuzz.sh`](https://github.com/azohra/yaml.sh/blob/main/test/fuzz.sh), and [`bench/scale.sh`](https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh).
