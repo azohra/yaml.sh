@@ -321,6 +321,26 @@ testInplacePreservesStructuralPresentation() {
     rm -f "$inplace_file"
 }
 
+testInplacePreservesReorderedSequenceComments() {
+    inplace_file=test/.tmp-inplace-reorder-$$.yml
+    printf '%s\n' '# queue order' 'workers: # keep the header' '  # first worker' '  - first' '  # second worker' '  - second' 'footer: kept' > "$inplace_file"
+    ./ysh -i '.workers |= reverse' "$inplace_file"
+    assertEquals 0 $?
+    expected=$(printf '%s\n' '# queue order' 'workers: # keep the header' '  # second worker' '  - second' '  # first worker' '  - first' 'footer: kept')
+    assertEquals "$expected" "$(cat "$inplace_file")"
+    rm -f "$inplace_file"
+}
+
+testInplacePreservesSortedSequenceBlocks() {
+    inplace_file=test/.tmp-inplace-sort-$$.yml
+    printf '%s\n' 'services:' '  # slow path' '  - name: worker' '    port: 9000' '  # fast path' '  - name: api' '    port: 80' 'tail: kept' > "$inplace_file"
+    ./ysh -i '.services |= sort_by(.port)' "$inplace_file"
+    assertEquals 0 $?
+    expected=$(printf '%s\n' 'services:' '  # fast path' '  - name: api' '    port: 80' '  # slow path' '  - name: worker' '    port: 9000' 'tail: kept')
+    assertEquals "$expected" "$(cat "$inplace_file")"
+    rm -f "$inplace_file"
+}
+
 testExpressionErrors() {
     result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
     assertNotEquals 0 $?
