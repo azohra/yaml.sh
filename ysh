@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.0.0
+YSH_VERSION=1.1.0
 
 # Replaced by the build with the embedded AWK engine.
 YAML_AWK_PARSER='
@@ -940,110 +940,331 @@ function mapping_lookup(mapping, key) {
     return mapping_lookup_internal(mapping, key, ++lookup_serial)
 }
 
-function parse_query(query,    i, start, char, content, quote, escaped, end, segment) {
-    query_segment_count = 0
-    if (query == ".") {
-        return
+function expression_token_name(type) {
+    if (type == "end") {
+        return "end of expression"
     }
-    if (substr(query, 1, 1) != ".") {
-        fail("query must start with .")
+    if (expression_token_value != "") {
+        return expression_token_value
     }
-
-    i = 2
-    while (i <= length(query)) {
-        char = substr(query, i, 1)
-        if (char == ".") {
-            i++
-            if (i > length(query)) {
-                fail("query cannot end with .")
-            }
-            char = substr(query, i, 1)
-        }
-
-        if (char == "[") {
-            start = i + 1
-            quote = substr(query, start, 1)
-            escaped = 0
-            end = 0
-            for (i = start; i <= length(query); i++) {
-                char = substr(query, i, 1)
-                if (escaped) {
-                    escaped = 0
-                    continue
-                }
-                if (quote == "\"" && char == "\\") {
-                    escaped = 1
-                    continue
-                }
-                if ((quote == "\"" || quote == sprintf("%c", 39)) && i > start && char == quote && substr(query, i + 1, 1) == "]") {
-                    end = i + 1
-                    content = substr(query, start, i - start + 1)
-                    break
-                }
-                if (quote != "\"" && quote != sprintf("%c", 39) && char == "]") {
-                    end = i
-                    content = substr(query, start, i - start)
-                    break
-                }
-            }
-            if (!end) {
-                fail("unclosed query bracket")
-            }
-            segment = ++query_segment_count
-            if ((substr(content, 1, 1) == "\"" && substr(content, length(content), 1) == "\"") ||
-                (substr(content, 1, 1) == sprintf("%c", 39) && substr(content, length(content), 1) == sprintf("%c", 39))) {
-                query_segment_kind[segment] = "key"
-                query_segment_value[segment] = scalar_value(content)
-            } else if (content ~ /^[0-9]+$/) {
-                query_segment_kind[segment] = "index"
-                query_segment_value[segment] = content + 0
-            } else {
-                fail("query brackets require an index or quoted key")
-            }
-            i = end + 1
-            continue
-        }
-
-        start = i
-        while (i <= length(query) && substr(query, i, 1) != "." && substr(query, i, 1) != "[") {
-            i++
-        }
-        content = substr(query, start, i - start)
-        if (content == "") {
-            fail("empty query segment")
-        }
-        segment = ++query_segment_count
-        query_segment_kind[segment] = "key"
-        query_segment_value[segment] = content
-    }
+    return type
 }
 
-function query_node(root, query,    node, resolved, i, item_index, child) {
-    parse_query(query)
-    node = root
-    for (i = 1; i <= query_segment_count; i++) {
-        resolved = resolve_alias(node)
-        if (query_segment_kind[i] == "key") {
-            if (node_kind[resolved] != "mapping") {
-                fail("cannot select key " query_segment_value[i] " from " node_kind[resolved])
+function expression_is_word_char(char) {
+    return char ~ /^[A-Za-z0-9_-]$/
+}
+
+function expression_token_is_key() {
+    return expression_token_type == "identifier" || expression_token_type == "and" ||
+        expression_token_type == "or" || expression_token_type == "not" ||
+        expression_token_type == "literal_true" || expression_token_type == "literal_false" ||
+        expression_token_type == "literal_null"
+}
+
+function expression_lex_next(    char, next_char, start, quote, escaped, word, lowered) {
+    while (expression_position <= length(expression_source) && substr(expression_source, expression_position, 1) ~ /[[:space:]]/) {
+        expression_position++
+    }
+    expression_token_value = ""
+    if (expression_position > length(expression_source)) {
+        expression_token_type = "end"
+        return
+    }
+
+    char = substr(expression_source, expression_position, 1)
+    next_char = substr(expression_source, expression_position + 1, 1)
+    if (char next_char == "//") {
+        expression_token_type = "alternative"
+        expression_token_value = "//"
+        expression_position += 2
+        return
+    }
+    if (char next_char == "==" || char next_char == "!=" || char next_char == ">=" || char next_char == "<=") {
+        expression_token_type = "compare"
+        expression_token_value = char next_char
+        expression_position += 2
+        return
+    }
+    if (char == ">" || char == "<") {
+        expression_token_type = "compare"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == ".") {
+        expression_token_type = "dot"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "|") {
+        expression_token_type = "pipe"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "(") {
+        expression_token_type = "left_parenthesis"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == ")") {
+        expression_token_type = "right_parenthesis"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "[") {
+        expression_token_type = "left_bracket"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == "]") {
+        expression_token_type = "right_bracket"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+    if (char == ",") {
+        expression_token_type = "comma"
+        expression_token_value = char
+        expression_position++
+        return
+    }
+
+    quote = sprintf("%c", 39)
+    if (char == "\"" || char == quote) {
+        start = expression_position
+        quote = char
+        escaped = 0
+        expression_position++
+        while (expression_position <= length(expression_source)) {
+            char = substr(expression_source, expression_position, 1)
+            if (escaped) {
+                escaped = 0
+            } else if (quote == "\"" && char == "\\") {
+                escaped = 1
+            } else if (char == quote) {
+                expression_position++
+                expression_token_type = "string"
+                expression_token_value = scalar_value(substr(expression_source, start, expression_position - start))
+                return
             }
-            child = mapping_lookup(resolved, query_segment_value[i])
-            if (!child) {
-                fail("query key not found: " query_segment_value[i])
-            }
-            node = child
+            expression_position++
+        }
+        fail("unterminated string in expression")
+    }
+
+    if (char ~ /^[0-9]$/ || (char == "-" && next_char ~ /^[0-9]$/)) {
+        start = expression_position
+        expression_position++
+        while (expression_position <= length(expression_source) && substr(expression_source, expression_position, 1) ~ /^[0-9.eE_+-]$/) {
+            expression_position++
+        }
+        expression_token_type = "number"
+        expression_token_value = substr(expression_source, start, expression_position - start)
+        return
+    }
+
+    if (expression_is_word_char(char)) {
+        start = expression_position
+        while (expression_position <= length(expression_source) && expression_is_word_char(substr(expression_source, expression_position, 1))) {
+            expression_position++
+        }
+        word = substr(expression_source, start, expression_position - start)
+        lowered = tolower(word)
+        if (lowered == "and" || lowered == "or" || lowered == "not") {
+            expression_token_type = lowered
+        } else if (lowered == "true" || lowered == "false" || lowered == "null") {
+            expression_token_type = "literal_" lowered
         } else {
-            if (node_kind[resolved] != "sequence") {
-                fail("cannot select an index from " node_kind[resolved])
+            expression_token_type = "identifier"
+        }
+        expression_token_value = word
+        return
+    }
+    fail("unexpected character in expression: " char)
+}
+
+function expression_new(kind, left, right, value,    expression) {
+    expression = ++expression_count
+    expression_kind[expression] = kind
+    expression_left[expression] = left
+    expression_right[expression] = right
+    expression_value[expression] = value
+    return expression
+}
+
+function expression_expect(type,    actual) {
+    if (expression_token_type != type) {
+        actual = expression_token_name(expression_token_type)
+        fail("expected " type " but found " actual)
+    }
+    expression_lex_next()
+}
+
+function expression_parse_primary(    expression, name, step, argument, value, value_type) {
+    if (expression_token_type == "dot") {
+        expression = expression_new("identity", 0, 0, "")
+        expression_lex_next()
+        if (expression_token_is_key()) {
+            expression = expression_new("key", expression, 0, expression_token_value)
+            expression_lex_next()
+        }
+    } else if (expression_token_type == "string") {
+        expression = expression_new("literal", 0, 0, expression_token_value)
+        expression_literal_type[expression] = "string"
+        expression_lex_next()
+    } else if (expression_token_type == "number") {
+        value = expression_token_value
+        value_type = scalar_type(value, "", value)
+        if (value_type != "int" && value_type != "float") {
+            fail("invalid numeric literal: " value)
+        }
+        expression = expression_new("literal", 0, 0, value)
+        expression_literal_type[expression] = value_type
+        expression_lex_next()
+    } else if (expression_token_type == "literal_true" || expression_token_type == "literal_false") {
+        expression = expression_new("literal", 0, 0, tolower(expression_token_value))
+        expression_literal_type[expression] = "bool"
+        expression_lex_next()
+    } else if (expression_token_type == "literal_null") {
+        expression = expression_new("literal", 0, 0, "")
+        expression_literal_type[expression] = "null"
+        expression_lex_next()
+    } else if (expression_token_type == "left_parenthesis") {
+        expression_lex_next()
+        expression = expression_parse_pipe()
+        expression_expect("right_parenthesis")
+    } else if (expression_token_type == "identifier") {
+        name = tolower(expression_token_value)
+        expression_lex_next()
+        if (name == "select" || name == "has") {
+            expression_expect("left_parenthesis")
+            argument = expression_parse_pipe()
+            expression_expect("right_parenthesis")
+            expression = expression_new(name, argument, 0, "")
+        } else if (name == "length" || name == "keys" || name == "kind" || name == "type") {
+            if (expression_token_type == "left_parenthesis") {
+                expression_lex_next()
+                expression_expect("right_parenthesis")
             }
-            item_index = query_segment_value[i]
-            if (item_index < 0 || item_index >= sequence_count[resolved]) {
-                fail("query index out of range: " item_index)
+            expression = expression_new(name, 0, 0, "")
+        } else {
+            fail("unknown expression operator: " name)
+        }
+    } else {
+        fail("expected expression but found " expression_token_name(expression_token_type))
+    }
+
+    while (1) {
+        if (expression_token_type == "dot") {
+            expression_lex_next()
+            if (!expression_token_is_key()) {
+                fail("expected a key after .")
             }
-            node = sequence_child[resolved, item_index + 1]
+            expression = expression_new("key", expression, 0, expression_token_value)
+            expression_lex_next()
+        } else if (expression_token_type == "left_bracket") {
+            expression_lex_next()
+            if (expression_token_type == "right_bracket") {
+                expression = expression_new("each", expression, 0, "")
+                expression_lex_next()
+            } else if (expression_token_type == "number") {
+                if (expression_token_value !~ /^[0-9]+$/) {
+                    fail("sequence indexes must be non-negative integers")
+                }
+                step = expression_token_value + 0
+                expression_lex_next()
+                expression_expect("right_bracket")
+                expression = expression_new("index", expression, 0, step)
+            } else if (expression_token_type == "string") {
+                step = expression_token_value
+                expression_lex_next()
+                expression_expect("right_bracket")
+                expression = expression_new("key", expression, 0, step)
+            } else {
+                fail("brackets require an index, quoted key, or empty iterator")
+            }
+        } else {
+            break
         }
     }
-    return node
+    return expression
+}
+
+function expression_parse_unary(    operand) {
+    if (expression_token_type == "not") {
+        expression_lex_next()
+        operand = expression_new("identity", 0, 0, "")
+        return expression_new("not", operand, 0, "")
+    }
+    return expression_parse_primary()
+}
+
+function expression_parse_compare(    left, operator, right) {
+    left = expression_parse_unary()
+    while (expression_token_type == "compare") {
+        operator = expression_token_value
+        expression_lex_next()
+        right = expression_parse_unary()
+        left = expression_new("compare", left, right, operator)
+    }
+    return left
+}
+
+function expression_parse_and(    left, right) {
+    left = expression_parse_compare()
+    while (expression_token_type == "and") {
+        expression_lex_next()
+        right = expression_parse_compare()
+        left = expression_new("and", left, right, "")
+    }
+    return left
+}
+
+function expression_parse_or(    left, right) {
+    left = expression_parse_and()
+    while (expression_token_type == "or") {
+        expression_lex_next()
+        right = expression_parse_and()
+        left = expression_new("or", left, right, "")
+    }
+    return left
+}
+
+function expression_parse_alternative(    left, right) {
+    left = expression_parse_or()
+    while (expression_token_type == "alternative") {
+        expression_lex_next()
+        right = expression_parse_or()
+        left = expression_new("alternative", left, right, "")
+    }
+    return left
+}
+
+function expression_parse_pipe(    left, right) {
+    left = expression_parse_alternative()
+    while (expression_token_type == "pipe") {
+        expression_lex_next()
+        right = expression_parse_alternative()
+        left = expression_new("pipe", left, right, "")
+    }
+    return left
+}
+
+function expression_parse(source,    expression) {
+    expression_source = source
+    expression_position = 1
+    expression_count = 0
+    expression_lex_next()
+    expression = expression_parse_pipe()
+    if (expression_token_type != "end") {
+        fail("unexpected token after expression: " expression_token_name(expression_token_type))
+    }
+    return expression
 }
 
 function collect_keys_from_source(source, collection,    resolved, i) {
@@ -1081,6 +1302,347 @@ function collect_mapping_keys(mapping, collection,    stack_key, seen_key, i, ke
         }
     }
     delete collection_stack[stack_key]
+}
+
+function expression_stream_new() {
+    return ++expression_stream_serial
+}
+
+function expression_stream_push(stream, node) {
+    expression_stream_node[stream, ++expression_stream_count[stream]] = node
+}
+
+function expression_stream_single(node,    stream) {
+    stream = expression_stream_new()
+    expression_stream_push(stream, node)
+    return stream
+}
+
+function expression_stream_append(target, source,    i) {
+    for (i = 1; i <= expression_stream_count[source]; i++) {
+        expression_stream_push(target, expression_stream_node[source, i])
+    }
+}
+
+function expression_scalar(value, value_type) {
+    return new_node("scalar", 0, value, value_type, "")
+}
+
+function expression_boolean(value) {
+    if (value) {
+        return expression_scalar("true", "bool")
+    }
+    return expression_scalar("false", "bool")
+}
+
+function expression_null() {
+    return expression_scalar("", "null")
+}
+
+function expression_truthy(node,    resolved, lowered) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "scalar") {
+        return 1
+    }
+    if (node_type[resolved] == "null") {
+        return 0
+    }
+    if (node_type[resolved] == "bool") {
+        lowered = tolower(node_value[resolved])
+        return lowered != "false"
+    }
+    return 1
+}
+
+function expression_numeric(node,    resolved, value) {
+    resolved = resolve_alias(node)
+    if (node_type[resolved] == "int") {
+        return json_integer(node_value[resolved]) + 0
+    }
+    value = node_value[resolved]
+    gsub(/_/, "", value)
+    if (tolower(value) ~ /\.(inf|nan)$/) {
+        fail("non-finite numbers cannot be compared")
+    }
+    return value + 0
+}
+
+function expression_nodes_equal(left, right,    left_node, right_node) {
+    left_node = resolve_alias(left)
+    right_node = resolve_alias(right)
+    if (node_kind[left_node] != "scalar" || node_kind[right_node] != "scalar") {
+        return 0
+    }
+    if (node_type[left_node] == "null" || node_type[right_node] == "null") {
+        return node_type[left_node] == "null" && node_type[right_node] == "null"
+    }
+    if ((node_type[left_node] == "int" || node_type[left_node] == "float") &&
+        (node_type[right_node] == "int" || node_type[right_node] == "float")) {
+        return expression_numeric(left_node) == expression_numeric(right_node)
+    }
+    if (node_type[left_node] == "bool" && node_type[right_node] == "bool") {
+        return tolower(node_value[left_node]) == tolower(node_value[right_node])
+    }
+    return node_value[left_node] == node_value[right_node]
+}
+
+function expression_compare(left, right, operator,    left_node, right_node, left_value, right_value, equal) {
+    equal = expression_nodes_equal(left, right)
+    if (operator == "==") {
+        return equal
+    }
+    if (operator == "!=") {
+        return !equal
+    }
+    left_node = resolve_alias(left)
+    right_node = resolve_alias(right)
+    if (node_kind[left_node] != "scalar" || node_kind[right_node] != "scalar") {
+        fail("ordering comparisons require scalar values")
+    }
+    if ((node_type[left_node] == "int" || node_type[left_node] == "float") &&
+        (node_type[right_node] == "int" || node_type[right_node] == "float")) {
+        left_value = expression_numeric(left_node)
+        right_value = expression_numeric(right_node)
+    } else if (node_type[left_node] == "string" && node_type[right_node] == "string") {
+        left_value = node_value[left_node]
+        right_value = node_value[right_node]
+    } else {
+        fail("ordering comparisons require two numbers or two strings")
+    }
+    if (operator == ">") {
+        return left_value > right_value
+    }
+    if (operator == ">=") {
+        return left_value >= right_value
+    }
+    if (operator == "<") {
+        return left_value < right_value
+    }
+    return left_value <= right_value
+}
+
+function expression_mapping_length(node,    collection) {
+    collection = ++collection_serial
+    collect_mapping_keys(node, collection)
+    return collection_count[collection]
+}
+
+function expression_kind_name(node,    resolved) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "mapping") {
+        return "map"
+    }
+    if (node_kind[resolved] == "sequence") {
+        return "seq"
+    }
+    return "scalar"
+}
+
+function expression_type_name(node,    resolved) {
+    resolved = resolve_alias(node)
+    if (node_tag[resolved] != "") {
+        if (node_tag[resolved] ~ /^tag:yaml.org,2002:/) {
+            return "!!" substr(node_tag[resolved], length("tag:yaml.org,2002:") + 1)
+        }
+        return node_tag[resolved]
+    }
+    if (node_kind[resolved] == "mapping") {
+        return "!!map"
+    }
+    if (node_kind[resolved] == "sequence") {
+        return "!!seq"
+    }
+    if (node_type[resolved] == "string") {
+        return "!!str"
+    }
+    if (node_type[resolved] == "tagged") {
+        return "!"
+    }
+    return "!!" node_type[resolved]
+}
+
+function expression_evaluate(expression, input,    output, middle, left_stream, right_stream, single, kind, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node) {
+    output = expression_stream_new()
+    kind = expression_kind[expression]
+
+    if (kind == "identity") {
+        expression_stream_append(output, input)
+        return output
+    }
+    if (kind == "literal") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            expression_stream_push(output, expression_scalar(expression_value[expression], expression_literal_type[expression]))
+        }
+        return output
+    }
+    if (kind == "pipe") {
+        middle = expression_evaluate(expression_left[expression], input)
+        return expression_evaluate(expression_right[expression], middle)
+    }
+    if (kind == "key" || kind == "index" || kind == "each") {
+        middle = expression_evaluate(expression_left[expression], input)
+        for (i = 1; i <= expression_stream_count[middle]; i++) {
+            node = expression_stream_node[middle, i]
+            resolved = resolve_alias(node)
+            if (kind == "key") {
+                if (node_kind[resolved] == "mapping") {
+                    child = mapping_lookup(resolved, expression_value[expression])
+                } else {
+                    child = 0
+                }
+                expression_stream_push(output, child ? child : expression_null())
+            } else if (kind == "index") {
+                if (node_kind[resolved] == "sequence" && expression_value[expression] < sequence_count[resolved]) {
+                    child = sequence_child[resolved, expression_value[expression] + 1]
+                } else {
+                    child = 0
+                }
+                expression_stream_push(output, child ? child : expression_null())
+            } else if (node_kind[resolved] == "sequence") {
+                for (j = 1; j <= sequence_count[resolved]; j++) {
+                    expression_stream_push(output, sequence_child[resolved, j])
+                }
+            } else if (node_kind[resolved] == "mapping") {
+                collection = ++collection_serial
+                collect_mapping_keys(resolved, collection)
+                for (j = 1; j <= collection_count[collection]; j++) {
+                    key = collection_key[collection, j]
+                    expression_stream_push(output, mapping_lookup(resolved, key))
+                }
+            } else {
+                if (node_kind[resolved] == "scalar") {
+                    fail("cannot iterate over " node_type[resolved])
+                }
+                fail("cannot iterate over " node_kind[resolved])
+            }
+        }
+        return output
+    }
+    if (kind == "select") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            node = expression_stream_node[input, i]
+            single = expression_stream_single(node)
+            predicate = expression_evaluate(expression_left[expression], single)
+            matched = 0
+            for (j = 1; j <= expression_stream_count[predicate]; j++) {
+                if (expression_truthy(expression_stream_node[predicate, j])) {
+                    matched = 1
+                    break
+                }
+            }
+            if (matched) {
+                expression_stream_push(output, node)
+            }
+        }
+        return output
+    }
+    if (kind == "compare" || kind == "and" || kind == "or") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            single = expression_stream_single(expression_stream_node[input, i])
+            left_stream = expression_evaluate(expression_left[expression], single)
+            right_stream = expression_evaluate(expression_right[expression], single)
+            for (j = 1; j <= expression_stream_count[left_stream]; j++) {
+                for (collection = 1; collection <= expression_stream_count[right_stream]; collection++) {
+                    node = expression_stream_node[left_stream, j]
+                    child = expression_stream_node[right_stream, collection]
+                    if (kind == "compare") {
+                        matched = expression_compare(node, child, expression_value[expression])
+                    } else if (kind == "and") {
+                        matched = expression_truthy(node) && expression_truthy(child)
+                    } else {
+                        matched = expression_truthy(node) || expression_truthy(child)
+                    }
+                    expression_stream_push(output, expression_boolean(matched))
+                }
+            }
+        }
+        return output
+    }
+    if (kind == "not") {
+        middle = expression_evaluate(expression_left[expression], input)
+        for (i = 1; i <= expression_stream_count[middle]; i++) {
+            expression_stream_push(output, expression_boolean(!expression_truthy(expression_stream_node[middle, i])))
+        }
+        return output
+    }
+    if (kind == "alternative") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            single = expression_stream_single(expression_stream_node[input, i])
+            left_stream = expression_evaluate(expression_left[expression], single)
+            matched = 0
+            for (j = 1; j <= expression_stream_count[left_stream]; j++) {
+                node = expression_stream_node[left_stream, j]
+                if (expression_truthy(node)) {
+                    expression_stream_push(output, node)
+                    matched = 1
+                }
+            }
+            if (!matched) {
+                right_stream = expression_evaluate(expression_right[expression], single)
+                expression_stream_append(output, right_stream)
+            }
+        }
+        return output
+    }
+    if (kind == "length" || kind == "keys" || kind == "kind" || kind == "type" || kind == "has") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            node = expression_stream_node[input, i]
+            resolved = resolve_alias(node)
+            if (kind == "length") {
+                if (node_kind[resolved] == "mapping") {
+                    matched = expression_mapping_length(resolved)
+                } else if (node_kind[resolved] == "sequence") {
+                    matched = sequence_count[resolved]
+                } else if (node_type[resolved] == "null") {
+                    matched = 0
+                } else {
+                    matched = length(node_value[resolved])
+                }
+                expression_stream_push(output, expression_scalar(matched "", "int"))
+            } else if (kind == "kind") {
+                expression_stream_push(output, expression_scalar(expression_kind_name(resolved), "string"))
+            } else if (kind == "type") {
+                expression_stream_push(output, expression_scalar(expression_type_name(resolved), "string"))
+            } else if (kind == "keys") {
+                result_node = new_node("sequence", 0, "", "", "")
+                if (node_kind[resolved] == "mapping") {
+                    collection = ++collection_serial
+                    collect_mapping_keys(resolved, collection)
+                    for (j = 1; j <= collection_count[collection]; j++) {
+                        add_sequence(result_node, expression_scalar(collection_key[collection, j], "string"), 0)
+                    }
+                } else if (node_kind[resolved] == "sequence") {
+                    for (j = 0; j < sequence_count[resolved]; j++) {
+                        add_sequence(result_node, expression_scalar(j "", "int"), 0)
+                    }
+                } else {
+                    fail("keys requires a mapping or sequence")
+                }
+                expression_stream_push(output, result_node)
+            } else {
+                single = expression_stream_single(node)
+                argument_stream = expression_evaluate(expression_left[expression], single)
+                if (expression_stream_count[argument_stream] < 1) {
+                    expression_stream_push(output, expression_boolean(0))
+                    continue
+                }
+                argument = resolve_alias(expression_stream_node[argument_stream, 1])
+                if (node_kind[argument] != "scalar") {
+                    fail("has requires a scalar key or index")
+                }
+                if (node_kind[resolved] == "mapping") {
+                    matched = mapping_lookup(resolved, node_value[argument]) != 0
+                } else if (node_kind[resolved] == "sequence" && node_type[argument] == "int") {
+                    matched = (node_value[argument] + 0) >= 0 && (node_value[argument] + 0) < sequence_count[resolved]
+                } else {
+                    matched = 0
+                }
+                expression_stream_push(output, expression_boolean(matched))
+            }
+        }
+        return output
+    }
+    fail("cannot evaluate expression kind " kind)
 }
 
 function base_integer(value, base,    result, i, char, digit) {
@@ -1271,23 +1833,8 @@ function output_events(document) {
     print "STREAM_END"
 }
 
-function output_result(document, query, output_mode,    root, target, resolved) {
-    if (!(document in document_root)) {
-        fail("document index not found: " document)
-    }
-    if (output_mode == "ast") {
-        output_ast(document)
-        return
-    }
-    if (output_mode == "events") {
-        output_events(document)
-        return
-    }
-
-    root = document_root[document]
-    target = query_node(root, query)
+function output_expression_node(target, output_mode,    resolved) {
     resolved = resolve_alias(target)
-
     if (output_mode == "line") {
         print node_line[target]
     } else if (output_mode == "type") {
@@ -1306,6 +1853,28 @@ function output_result(document, query, output_mode,    root, target, resolved) 
     } else {
         emit_json(target)
         printf "\n"
+    }
+}
+
+function output_result(document, query, output_mode,    root, expression, input, results, i) {
+    if (!(document in document_root)) {
+        fail("document index not found: " document)
+    }
+    if (output_mode == "ast") {
+        output_ast(document)
+        return
+    }
+    if (output_mode == "events") {
+        output_events(document)
+        return
+    }
+
+    root = document_root[document]
+    expression = expression_parse(query)
+    input = expression_stream_single(root)
+    results = expression_evaluate(expression, input)
+    for (i = 1; i <= expression_stream_count[results]; i++) {
+        output_expression_node(expression_stream_node[results, i], output_mode)
     }
 }
 
@@ -1367,7 +1936,9 @@ Usage:
 
 Examples:
   ysh ".server.host" config.yml
-  ysh ".services[0]" config.yml --json
+  ysh ".services[] | select(.enabled) | .name" config.yml
+  ysh ".services | length" config.yml
+  ysh ".missing // \"fallback\"" config.yml
   ysh ".[\"key.with.dots\"]" config.yml
   printf "%s\\n" "answer: 42" | ysh ".answer"
 
@@ -1388,8 +1959,9 @@ Other:
   -V, --version           print the version
   -h, --help              print this help
 
-QUERY uses yq-style paths such as .server.host, .items[0], and
-.["key.with.dots"]. Collections are emitted as JSON by default.
+QUERY supports yq-style paths, [], pipes, select, comparisons, boolean
+operators, // defaults, length, keys, has, kind, and type. Collections
+are emitted as JSON by default; streams emit one result per line.
 EOF
 }
 
@@ -1539,16 +2111,20 @@ ysh_main() {
                 YSH_INPUT_FILE=$YSH_POSITIONAL_ONE
                 YSH_QUERY=$YSH_POSITIONAL_TWO
             else
-                ysh_error "query must start with ."
-                return 2
+                YSH_QUERY=$YSH_POSITIONAL_ONE
+                YSH_INPUT_FILE=$YSH_POSITIONAL_TWO
             fi
             ;;
         esac
     elif [ "$YSH_POSITIONAL_COUNT" -eq 1 ]; then
-        case "$YSH_POSITIONAL_ONE" in
-        .*) YSH_QUERY=$YSH_POSITIONAL_ONE ;;
-        *) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
-        esac
+        if [ -f "$YSH_POSITIONAL_ONE" ] || [ "$YSH_POSITIONAL_ONE" = "-" ]; then
+            YSH_INPUT_FILE=$YSH_POSITIONAL_ONE
+        else
+            case "$YSH_POSITIONAL_ONE" in
+            *.yml|*.yaml|*.json) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
+            *) YSH_QUERY=$YSH_POSITIONAL_ONE ;;
+            esac
+        fi
     fi
 
     if [ -n "$YSH_INPUT_FILE" ] && [ "$YSH_INPUT_FILE" != "-" ] && [ ! -f "$YSH_INPUT_FILE" ]; then

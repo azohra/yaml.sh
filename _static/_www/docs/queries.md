@@ -1,73 +1,109 @@
 # Queries
 
-Version 1 uses one deliberately small, yq-shaped path language. Queries select a node from the parsed document rather than filtering flattened text.
+Version 1.1 evaluates a focused, read-only yq-style expression language over streams of node references. Paths still select exact nodes; iteration and pipes let one input become many results without flattening the YAML graph.
 
-## Root
+## Paths
 
-`.` selects the document root:
+`.` selects the document root. Mapping keys and zero-based sequence indexes compose naturally:
 
 ```sh
 ysh '.' config.yml
-```
-
-Root mappings and sequences are emitted as JSON by default. A root scalar is printed as text.
-
-## Mapping keys
-
-Append a bare key after `.`:
-
-```sh
-ysh '.server' config.yml
 ysh '.server.host' config.yml
-ysh '.server.tls.enabled' config.yml
-```
-
-Bare keys continue until the next `.` or `[`. For keys containing query punctuation, use bracket notation.
-
-## Sequence indexes
-
-Indexes are zero-based:
-
-```sh
-ysh '.ports[0]' config.yml
 ysh '.services[2].name' config.yml
+ysh '.["key.with.dots"]' config.yml
 ```
 
-An out-of-range index is an error rather than an empty result.
+Quoted bracket keys are required when query punctuation belongs to the key.
 
-## Quoted keys
-
-Bracket notation makes the key boundary explicit:
+Missing keys and out-of-range indexes produce null, matching yq traversal semantics:
 
 ```sh
-ysh '.["key.with.dots"]' config.yml
-ysh '.metadata["build[number]"]' config.yml
-ysh '.["a key with spaces"]' config.yml
+ysh --json '.missing' config.yml
+# null
 ```
 
-This is possible because v1 retains mapping identity. The old flattened representation could not distinguish a literal dot in a key from a query separator.
+## Iterate
+
+Empty brackets stream every sequence item or mapping value:
+
+```sh
+ysh '.services[].name' config.yml
+ysh '.metadata[]' config.yml
+```
+
+Each result retains its node identity, type, tag, source line, parent, aliases, and resolved merge behavior.
+
+## Pipe
+
+The pipe passes every result on its left into the expression on its right:
+
+```sh
+ysh '.services[] | .name' config.yml
+```
+
+Streams print one scalar or compact JSON collection per line.
+
+## Select
+
+`select(EXPRESSION)` keeps the current node when its predicate is truthy:
+
+```sh
+ysh '.services[] | select(.enabled) | .name' config.yml
+ysh '.services[] | select(.port >= 8000) | .name' config.yml
+```
+
+Null and false are falsey. Every other scalar and collection is truthy.
+
+## Comparisons and booleans
+
+Version 1.1 supports:
+
+- Equality: `==` and `!=`.
+- Ordering: `>`, `>=`, `<`, and `<=` for two numbers or two strings.
+- Boolean composition: `and`, `or`, and the `not` filter.
+
+```sh
+ysh '.services[] | select(.enabled and .tier == "backend") | .name' config.yml
+ysh '.services[] | .enabled | not' config.yml
+```
+
+Numeric comparisons normalize integers and finite floats. Like yq, equality comparisons operate on scalar values rather than treating whole collections as identical values.
+
+## Defaults
+
+The alternative operator `//` returns its right side when the left side is absent, null, or false:
+
+```sh
+ysh '.release.channel // "stable"' config.yml
+```
+
+## Collection helpers
+
+```sh
+ysh '.services | length' config.yml
+ysh '.metadata | keys' config.yml
+ysh '.metadata | has("owner")' config.yml
+ysh '.services | has(2)' config.yml
+```
+
+- `length` counts mapping entries, sequence items, or scalar characters; null has length zero.
+- `keys` returns mapping keys or sequence indexes.
+- `has(KEY)` checks a mapping key or sequence index.
+- `kind` returns `map`, `seq`, or `scalar`.
+- `type` returns a yq-style tag such as `!!map`, `!!seq`, `!!str`, or `!!int`.
+
+Filters can begin an expression when they operate on the root:
+
+```sh
+ysh 'length' config.yml
+```
 
 ## Merged and aliased nodes
 
-Queries follow aliases and mapping merge sources automatically:
+Expressions follow aliases and mapping merge sources automatically. Explicit entries override merged entries; in a merge sequence, the first source containing a key wins.
 
-```yaml
-defaults: &defaults
-  retries: 3
-production:
-  <<: *defaults
-  endpoint: api.example.com
-```
+## Current expression boundary
 
-```sh
-ysh '.production.retries' config.yml
-# 3
-```
+Version 1.1 is deliberately read-only. It does not yet implement recursive descent, optional traversal, arithmetic, string interpolation, variables, construction, assignment, deletion, YAML serialization, or in-place editing.
 
-Explicit mapping entries override merged entries. In a merge sequence, the first source containing a key wins.
-
-## Current query boundary
-
-Version 1 focuses on deterministic node selection. It does not yet implement pipes, wildcards, recursive descent, predicates, arithmetic, assignment, or in-place editing.
-
-Those are query-language features—not parser shortcuts—and can now be added without changing the YAML graph underneath.
+Those features require a writable reference evaluator and a YAML emitter. They can now be added above the same node-stream architecture without replacing the parser.

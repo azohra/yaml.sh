@@ -67,12 +67,12 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Flow collections must fit on one line.
 - The complete YAML Unicode escape repertoire and every block-folding edge case are not implemented.
 - Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.
-- The query language does not yet provide pipes, wildcards, filters, assignments, or in-place updates.
+- The expression language is read-only. It does not yet provide recursive descent, optional traversal, arithmetic, variables, construction, assignments, deletion, YAML serialization, or in-place updates.
 
 YAML.sh does not evaluate YAML as shell code, but it is not a complete specification validator. Use a maintained full YAML library when exact conformance for arbitrary or hostile input is a hard requirement.
 
 ## Conformance fixture
 
-The advanced fixture covers anchors, collection aliases, merge precedence, block merge lists, directives, expanded tags, scalar types, explicit keys, empty collections, punctuated keys, and document scoping. Rejection tests cover every limitation that could otherwise be misread as supported syntax.
+The advanced fixture covers anchors, collection aliases, merge precedence, block merge lists, directives, expanded tags, scalar types, explicit keys, empty collections, punctuated keys, and document scoping. The expression fixture covers node streams, iteration, pipes, filters, comparisons, booleans, defaults, and collection helpers. Rejection tests cover every limitation that could otherwise be misread as supported syntax.
 
 See [`test/advanced.yml`](https://github.com/azohra/yaml.sh/blob/main/test/advanced.yml) and [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh).

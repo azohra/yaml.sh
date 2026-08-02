@@ -11,14 +11,16 @@ YAML node graph
     ↓
 alias + merge resolver
     ↓
-query evaluator
+expression parser
+    ↓
+node-stream evaluator
     ↓
 raw / JSON / type / tag / line / AST / events
 ```
 
 ## The shell layer
 
-The `/bin/sh` launcher handles arguments, input selection, document selection, and output mode. It passes the YAML stream and query to the embedded AWK program.
+The `/bin/sh` launcher handles arguments, input selection, document selection, and output mode. It passes the YAML stream and expression to the embedded AWK program.
 
 The development sources remain separate:
 
@@ -48,6 +50,12 @@ This representation makes empty collections possible and removes ambiguity betwe
 ## Merge resolution
 
 Merge entries remain marked edges in the graph. Lookup checks explicit entries first, then merge sources in declaration order. A collection pass produces the effective mapping keys for JSON output while preserving the same precedence.
+
+## Expression streams
+
+The v1.1 expression parser builds a small operator tree with explicit precedence for pipes, alternatives, booleans, and comparisons. Evaluation passes numbered streams of node references between operators. `[]` can expand one collection into many references; `select` tests each reference while returning the original node when its predicate succeeds.
+
+Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Computed booleans, strings, numbers, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
 
 ## Diagnostics
 

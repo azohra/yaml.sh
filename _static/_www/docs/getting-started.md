@@ -5,7 +5,7 @@ YAML.sh ships as one executable text file. The released file contains both the p
 ## Install the pinned release
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.0.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.1.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -63,6 +63,20 @@ ysh '.services[0]' config.yml
 # {"name":"api","enabled":true}
 ```
 
+Stream and filter nodes:
+
+```sh
+ysh '.services[] | select(.enabled) | .name' config.yml
+# api
+```
+
+Use a default when a path is missing, null, or false:
+
+```sh
+ysh '.release.channel // "stable"' config.yml
+# stable
+```
+
 ## Standard input
 
 Omit the file to read YAML from standard input:
@@ -79,6 +93,6 @@ generate-config | ysh '.release.version' -
 
 ## Next steps
 
-- [Query quoted and punctuated keys](queries.md)
+- [Learn paths, streams, filters, and defaults](queries.md)
 - [Choose JSON, type, tag, or line output](output.md)
 - [Read the YAML support contract](supported_yml.md)

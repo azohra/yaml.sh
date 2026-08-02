@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.0.0
+YSH_VERSION=1.1.0
 
 # Replaced by the build with the embedded AWK engine.
 YAML_AWK_PARSER=$(cat src/ysh.awk)
@@ -20,7 +20,9 @@ Usage:
 
 Examples:
   ysh ".server.host" config.yml
-  ysh ".services[0]" config.yml --json
+  ysh ".services[] | select(.enabled) | .name" config.yml
+  ysh ".services | length" config.yml
+  ysh ".missing // \"fallback\"" config.yml
   ysh ".[\"key.with.dots\"]" config.yml
   printf "%s\\n" "answer: 42" | ysh ".answer"
 
@@ -41,8 +43,9 @@ Other:
   -V, --version           print the version
   -h, --help              print this help
 
-QUERY uses yq-style paths such as .server.host, .items[0], and
-.["key.with.dots"]. Collections are emitted as JSON by default.
+QUERY supports yq-style paths, [], pipes, select, comparisons, boolean
+operators, // defaults, length, keys, has, kind, and type. Collections
+are emitted as JSON by default; streams emit one result per line.
 EOF
 }
 
@@ -192,16 +195,20 @@ ysh_main() {
                 YSH_INPUT_FILE=$YSH_POSITIONAL_ONE
                 YSH_QUERY=$YSH_POSITIONAL_TWO
             else
-                ysh_error "query must start with ."
-                return 2
+                YSH_QUERY=$YSH_POSITIONAL_ONE
+                YSH_INPUT_FILE=$YSH_POSITIONAL_TWO
             fi
             ;;
         esac
     elif [ "$YSH_POSITIONAL_COUNT" -eq 1 ]; then
-        case "$YSH_POSITIONAL_ONE" in
-        .*) YSH_QUERY=$YSH_POSITIONAL_ONE ;;
-        *) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
-        esac
+        if [ -f "$YSH_POSITIONAL_ONE" ] || [ "$YSH_POSITIONAL_ONE" = "-" ]; then
+            YSH_INPUT_FILE=$YSH_POSITIONAL_ONE
+        else
+            case "$YSH_POSITIONAL_ONE" in
+            *.yml|*.yaml|*.json) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
+            *) YSH_QUERY=$YSH_POSITIONAL_ONE ;;
+            esac
+        fi
     fi
 
     if [ -n "$YSH_INPUT_FILE" ] && [ "$YSH_INPUT_FILE" != "-" ] && [ ! -f "$YSH_INPUT_FILE" ]; then

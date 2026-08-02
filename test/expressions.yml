@@ -1,0 +1,19 @@
+services:
+  - name: api
+    enabled: true
+    port: 8080
+    tier: backend
+  - name: worker
+    enabled: false
+    port: 9090
+    tier: backend
+  - name: web
+    enabled: true
+    port: 3000
+    tier: frontend
+metadata:
+  owner: platform
+  region: west
+empty: []
+unset: null
+disabled: false
