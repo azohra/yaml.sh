@@ -50,6 +50,6 @@ Expression operators must preserve node references unless they intentionally com
 
 ## Portability
 
-Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`.
+Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly as drift detection.
 
 Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.
