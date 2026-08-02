@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.1.0
+YSH_VERSION=1.2.0
 
 # Replaced by the build with the embedded AWK engine.
 YAML_AWK_PARSER=$(cat src/ysh.awk)
@@ -21,15 +21,19 @@ Usage:
 Examples:
   ysh ".server.host" config.yml
   ysh ".services[] | select(.enabled) | .name" config.yml
+  ysh -o yaml '.release.channel = "stable"' config.yml
+  ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
+  ysh -n -o yaml '{name: "api", enabled: true}'
   ysh ".services | length" config.yml
   ysh ".missing // \"fallback\"" config.yml
   ysh ".[\"key.with.dots\"]" config.yml
   printf "%s\\n" "answer: 42" | ysh ".answer"
 
 Output:
-  -o, --output FORMAT      value, raw, or json
+  -o, --output FORMAT      value, raw, json, or yaml
   -r, --raw-output        print scalar values without JSON quoting
       --json              emit JSON
+  -y, --yaml-output       emit YAML
       --type              print the selected node type
       --tag               print the selected node tag
       --line              print the selected node source line
@@ -38,14 +42,17 @@ Output:
 
 Documents:
   -d, --document INDEX    select a zero-based YAML document
+  -n, --null-input        build output without reading input
+  -i, --inplace           update a YAML file in place
 
 Other:
   -V, --version           print the version
   -h, --help              print this help
 
-QUERY supports yq-style paths, [], pipes, select, comparisons, boolean
-operators, // defaults, length, keys, has, kind, and type. Collections
-are emitted as JSON by default; streams emit one result per line.
+QUERY supports yq-style paths, [], .., ?, pipes, select, comparisons,
+boolean operators, // defaults, construction, =, |=, del, length, keys,
+has, kind, and type. Collections are emitted as JSON by default; streams
+emit one result per line. In-place updates are serialized as YAML.
 EOF
 }
 
@@ -53,6 +60,7 @@ ysh_set_output_mode() {
     case "$1" in
     value|raw) YSH_OUTPUT_MODE="value" ;;
     json) YSH_OUTPUT_MODE="json" ;;
+    yaml|yml) YSH_OUTPUT_MODE="yaml" ;;
     *)
         ysh_error "unsupported output format: $1"
         return 2
@@ -61,20 +69,50 @@ ysh_set_output_mode() {
 }
 
 ysh_run_awk() {
-    if [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
+    if [ "$YSH_NULL_INPUT" -eq 1 ]; then
         awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v inplace_mode="$YSH_INPLACE" \
+            "$YAML_AWK_PARSER" \
+            /dev/null
+    elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
+        awk \
+            -v query="$YSH_QUERY" \
+            -v output_mode="$YSH_OUTPUT_MODE" \
+            -v selected_document="$YSH_DOCUMENT" \
+            -v inplace_mode="$YSH_INPLACE" \
             "$YAML_AWK_PARSER"
     else
         awk \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
+            -v inplace_mode="$YSH_INPLACE" \
             "$YAML_AWK_PARSER" \
             "$YSH_INPUT_FILE"
     fi
+}
+
+ysh_run_inplace() {
+    YSH_TEMP_FILE=${YSH_INPUT_FILE}.ysh.$$
+    if ! (umask 077 && set -C && : > "$YSH_TEMP_FILE") 2>/dev/null; then
+        ysh_error "could not create temporary file beside: $YSH_INPUT_FILE"
+        return 1
+    fi
+    trap 'rm -f "$YSH_TEMP_FILE"' 0
+    trap 'exit 1' 1 2 3 15
+    YSH_OUTPUT_MODE=yaml
+    if ! ysh_run_awk > "$YSH_TEMP_FILE"; then
+        return 1
+    fi
+    if ! cp "$YSH_TEMP_FILE" "$YSH_INPUT_FILE"; then
+        ysh_error "could not replace input file: $YSH_INPUT_FILE"
+        return 1
+    fi
+    rm -f "$YSH_TEMP_FILE"
+    trap - 0 1 2 3 15
 }
 
 ysh_main() {
@@ -82,6 +120,8 @@ ysh_main() {
     YSH_DOCUMENT=0
     YSH_QUERY=.
     YSH_INPUT_FILE=
+    YSH_NULL_INPUT=0
+    YSH_INPLACE=0
     YSH_POSITIONAL_COUNT=0
     YSH_POSITIONAL_ONE=
     YSH_POSITIONAL_TWO=
@@ -108,6 +148,10 @@ ysh_main() {
             YSH_OUTPUT_MODE="json"
             shift
             ;;
+        -y|--yaml-output)
+            YSH_OUTPUT_MODE="yaml"
+            shift
+            ;;
         --type)
             YSH_OUTPUT_MODE="type"
             shift
@@ -126,6 +170,14 @@ ysh_main() {
             ;;
         --events)
             YSH_OUTPUT_MODE="events"
+            shift
+            ;;
+        -n|--null-input)
+            YSH_NULL_INPUT=1
+            shift
+            ;;
+        -i|--inplace|--in-place)
+            YSH_INPLACE=1
             shift
             ;;
         -d|--document)
@@ -214,6 +266,19 @@ ysh_main() {
     if [ -n "$YSH_INPUT_FILE" ] && [ "$YSH_INPUT_FILE" != "-" ] && [ ! -f "$YSH_INPUT_FILE" ]; then
         ysh_error "input file does not exist: $YSH_INPUT_FILE"
         return 1
+    fi
+
+    if [ "$YSH_INPLACE" -eq 1 ]; then
+        if [ "$YSH_NULL_INPUT" -eq 1 ]; then
+            ysh_error "--inplace cannot be combined with --null-input"
+            return 2
+        fi
+        if [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
+            ysh_error "--inplace requires an input file"
+            return 2
+        fi
+        ysh_run_inplace
+        return $?
     fi
 
     ysh_run_awk

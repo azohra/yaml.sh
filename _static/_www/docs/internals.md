@@ -15,12 +15,12 @@ expression parser
     ↓
 node-stream evaluator
     ↓
-raw / JSON / type / tag / line / AST / events
+value / JSON / YAML / type / tag / line / AST / events
 ```
 
 ## The shell layer
 
-The `/bin/sh` launcher handles arguments, input selection, document selection, and output mode. It passes the YAML stream and expression to the embedded AWK program.
+The `/bin/sh` launcher handles arguments, input selection, document selection, output mode, null input, and safe in-place replacement. It passes the YAML stream and expression to the embedded AWK program.
 
 The development sources remain separate:
 
@@ -53,9 +53,11 @@ Merge entries remain marked edges in the graph. Lookup checks explicit entries f
 
 ## Expression streams
 
-The v1.1 expression parser builds a small operator tree with explicit precedence for pipes, alternatives, booleans, and comparisons. Evaluation passes numbered streams of node references between operators. `[]` can expand one collection into many references; `select` tests each reference while returning the original node when its predicate succeeds.
+The expression parser builds a small operator tree with explicit precedence for pipes, assignment, alternatives, booleans, comparisons, arithmetic, and traversal. Evaluation passes numbered streams of node references between operators. `[]` and `..` can expand one node into many references; `select` tests each reference while returning the original node when its predicate succeeds.
 
-Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Computed booleans, strings, numbers, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
+Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Assignments replace the selected graph nodes; missing mapping paths use attachable placeholders. Computed booleans, strings, numbers, constructed collections, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
+
+The YAML emitter walks that graph directly. It preserves semantic structure and graph properties where possible, while deliberately normalizing presentation into a stable quoted block style.
 
 ## Diagnostics
 

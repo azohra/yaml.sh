@@ -1,6 +1,6 @@
 # Output & metadata
 
-The same query can return a value, JSON, a node type, its expanded tag, or its source line.
+The same query can return a value, JSON, YAML, a node type, its expanded tag, or its source line.
 
 ## Default value output
 
@@ -35,6 +35,20 @@ ysh -o=json '.service' config.yml
 ```
 
 Recognized nulls, booleans, integers, and finite floats become native JSON values. Strings, timestamps, and application-tagged scalars are JSON strings. Non-finite YAML floats are quoted because JSON has no equivalent value.
+
+## YAML
+
+Use `-y`, `-o=yaml`, or `--output-format=yaml` to serialize selected or transformed nodes:
+
+```sh
+ysh -o=yaml '.release.channel = "stable"' config.yml
+```
+
+Multiple results are separated with `---`, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.
+
+The emitter is semantic, not presentation-preserving. It deliberately uses a stable block layout and quotes string values and ordinary mapping keys. Comments, blank lines, original quote choices, flow-vs-block style, directive spelling, and exact scalar formatting are not retained.
+
+`-i` always uses this YAML emitter. It parses and transforms into a sibling temporary file first, copies the successful result over the requested file, and preserves the destination's existing permission bits. Version 1.2 rejects multi-document in-place updates before replacement so an unselected document cannot be lost.
 
 ## Type
 

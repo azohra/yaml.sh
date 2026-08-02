@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.1.0" "$(./ysh --version)"
+    assertEquals "v1.2.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -159,6 +159,80 @@ testExpressionJsonStreams() {
     assertEquals "$(printf '%s\n' '{"name":"api","enabled":true,"port":8080,"tier":"backend"}' '{"name":"web","enabled":true,"port":3000,"tier":"frontend"}')" "$(./ysh --json '.services[] | select(.enabled)' test/expressions.yml)"
 }
 
+testExpressionRecursiveAndOptionalTraversal() {
+    assertEquals "$(printf '%s\n' api worker web)" "$(./ysh '.. | select(has("name")) | .name' test/expressions.yml)"
+    assertEquals "" "$(./ysh '.metadata.owner[]?' test/expressions.yml)"
+    assertEquals "" "$(./ysh '.missing?' test/expressions.yml)"
+}
+
+testExpressionArrayAndObjectConstruction() {
+    assertEquals '["platform","api","worker","web"]' "$(./ysh --json '[.metadata.owner, .services[].name]' test/expressions.yml)"
+    assertEquals '{"owner":"platform","count":3}' "$(./ysh --json '{owner: .metadata.owner, count: (.services | length)}' test/expressions.yml)"
+    assertEquals '{"name":"api","enabled":true}' "$(./ysh -n --json '{name: "api", enabled: true}')"
+}
+
+testExpressionArithmetic() {
+    assertEquals "14" "$(./ysh -n --json '2 + 3 * 4')"
+    assertEquals "2.5" "$(./ysh -n --json '5 / 2')"
+    assertEquals '"yaml.sh"' "$(./ysh -n --json '"yaml" + ".sh"')"
+    assertEquals '[1,2,3]' "$(./ysh -n --json '[1, 2] + [3]')"
+    assertEquals '{"a":1,"b":3,"c":4}' "$(./ysh -n --json '{left: {a: 1, b: 2}, right: {b: 3, c: 4}} | .left + .right')"
+}
+
+testExpressionAssignmentAndCreation() {
+    assertEquals '{"owner":"core","region":"west"}' "$(./ysh --json '.metadata.owner = "core" | .metadata' test/expressions.yml)"
+    assertEquals '"stable"' "$(./ysh --json '.release.channel = "stable" | .release.channel' test/expressions.yml)"
+    assertEquals "$(printf '%s\n' active backend active)" "$(./ysh '(.services[] | select(.enabled) | .tier) = "active" | .services[].tier' test/expressions.yml)"
+}
+
+testExpressionRelativeAndCompoundUpdates() {
+    assertEquals "$(printf '%s\n' false true false)" "$(./ysh --json '.services[].enabled |= not | .services[].enabled' test/expressions.yml)"
+    assertEquals "8100" "$(./ysh --json '.services[0].port += 20 | .services[0].port' test/expressions.yml)"
+    assertEquals '"platform-team"' "$(./ysh --json '.metadata.owner += "-team" | .metadata.owner' test/expressions.yml)"
+}
+
+testExpressionDeletion() {
+    assertEquals '{"owner":"platform"}' "$(./ysh --json 'del(.metadata.region) | .metadata' test/expressions.yml)"
+    assertEquals "$(printf '%s\n' api web)" "$(./ysh 'del(.services[1]) | .services[].name' test/expressions.yml)"
+    assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json 'del(.missing) | .metadata' test/expressions.yml)"
+}
+
+testYamlOutputRoundTrips() {
+    assertEquals '"core"' "$(./ysh -o=yaml '.metadata.owner = "core"' test/expressions.yml | ./ysh --json '.metadata.owner')"
+    assertEquals '"web"' "$(./ysh -o=yaml '.' test/expressions.yml | ./ysh --json '.services[2].name')"
+    assertEquals '{"color":"red","size":"large","shape":"square"}' "$(./ysh -o=yaml '.' test/advanced.yml | ./ysh --json '.merged')"
+    assertEquals 'tag:example.com,2026:widget' "$(./ysh -o=yaml '.' test/advanced.yml | ./ysh --tag '.types.custom')"
+}
+
+testYamlOutputSeparatesStreams() {
+    assertEquals "$(printf '%s\n' '"api"' '---' '"worker"' '---' '"web"')" "$(./ysh -o=yaml '.services[].name' test/expressions.yml)"
+}
+
+testInplaceUpdate() {
+    inplace_file=test/.tmp-inplace-$$.yml
+    cp test/expressions.yml "$inplace_file"
+    chmod 640 "$inplace_file"
+    mode_before=$(find "$inplace_file" -prune -exec ls -ld {} \; | cut -c2-10)
+    ./ysh -i '.metadata.owner = "core"' "$inplace_file"
+    assertEquals 0 $?
+    assertEquals '"core"' "$(./ysh --json '.metadata.owner' "$inplace_file")"
+    assertEquals "$mode_before" "$(find "$inplace_file" -prune -exec ls -ld {} \; | cut -c2-10)"
+    rm -f "$inplace_file"
+}
+
+testInplaceRejectsMultiDocumentStreamsWithoutChanges() {
+    inplace_file=test/.tmp-inplace-multi-$$.yml
+    original_file=test/.tmp-inplace-original-$$.yml
+    cp test/test.yml "$inplace_file"
+    cp test/test.yml "$original_file"
+    result=$(./ysh -i '.key = "changed"' "$inplace_file" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "does not yet support multi-document streams"
+    cmp "$original_file" "$inplace_file"
+    assertEquals 0 $?
+    rm -f "$inplace_file" "$original_file"
+}
+
 testExpressionErrors() {
     result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
     assertNotEquals 0 $?
@@ -171,6 +245,10 @@ testExpressionErrors() {
     result=$(./ysh '.services | mystery' test/expressions.yml 2>&1)
     assertNotEquals 0 $?
     assertContains "$result" "unknown expression operator"
+
+    result=$(./ysh -n '1 / 0' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "division by zero"
 }
 
 testScalarAndCollectionTypes() {
@@ -305,6 +383,10 @@ testCliErrors() {
     assertEquals 2 $?
     ./ysh --unknown ".key" test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
+    ./ysh -i '.key = "value"' </dev/null >/dev/null 2>&1
+    assertEquals 2 $?
+    ./ysh -i -n '.key = "value"' test/test.yml >/dev/null 2>&1
+    assertEquals 2 $?
 }
 
 testRunsWithPosixShell() {
@@ -312,12 +394,12 @@ testRunsWithPosixShell() {
 }
 
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.1.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.1.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.1.0/ysh"
+    assertContains "$(cat README.md)" "v1.2.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.2.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.2.0/ysh"
     assertContains "$(cat _static/_www/index.html)" "Install v1"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.1.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.1.0"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.2.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.2.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
     assertTrue "social preview image must exist" "[ -s _static/_www/og.png ]"
 }

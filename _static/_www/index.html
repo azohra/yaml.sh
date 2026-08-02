@@ -12,14 +12,14 @@
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="YAML.sh v1.1 — yq energy, zero baggage">
+  <meta property="og:image:alt" content="YAML.sh v1.2 — yq energy, zero baggage">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="YAML.sh v1 — yq energy. zero baggage.">
   <meta name="twitter:description" content="A yq-like YAML query tool in one portable shell script.">
   <meta name="twitter:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com">
   <link rel="icon" href="favicon.ico">
-  <link rel="stylesheet" href="css/style.css?v=1.1.0">
+  <link rel="stylesheet" href="css/style.css?v=1.2.0">
   <title>YAML.sh v1 — yq energy. zero baggage.</title>
 </head>
 <body>
@@ -41,7 +41,7 @@
   <main id="main">
     <section class="hero section-shell">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-dot"></span> Version 1.1 · now the nodes can flow</p>
+        <p class="eyebrow"><span class="status-dot"></span> Version 1.2 · the tiny parser writes back</p>
         <h1>yq energy.<br><span>zero baggage.</span></h1>
         <p class="hero-lede">Query YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a surprising amount of ambition.</p>
         <div class="hero-actions">
@@ -51,7 +51,7 @@
         <ul class="hero-facts" aria-label="YAML.sh highlights">
           <li><strong>1</strong> file</li>
           <li><strong>0</strong> extra packages</li>
-          <li><strong>47</strong> behavioral tests</li>
+          <li><strong>57</strong> behavioral tests</li>
         </ul>
       </div>
 
@@ -85,6 +85,7 @@
 
     <section class="ticker" aria-label="Core capabilities">
       <div>
+        <span>QUERY + UPDATE</span><b>◆</b>
         <span>PIPES + SELECT</span><b>◆</b>
         <span>ANCHORS + ALIASES</span><b>◆</b>
         <span>MERGE KEYS</span><b>◆</b>
@@ -116,7 +117,7 @@
         <article>
           <span class="step">03</span>
           <h3>Query</h3>
-          <p>Paths, iteration, pipes, filters, comparisons, and defaults stream real node references without flattening them.</p>
+          <p>Paths, filters, construction, arithmetic, and assignments operate on real node references without flattening them.</p>
         </article>
       </div>
     </section>
@@ -130,7 +131,7 @@
         <div class="demo-tabs" role="tablist" aria-label="CLI examples">
           <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Query</button>
           <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">JSON</button>
-          <button id="tab-merge" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge">Merge</button>
+          <button id="tab-merge" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge">Update</button>
           <button id="tab-inspect" role="tab" aria-selected="false" aria-controls="panel-inspect" data-demo="inspect">Inspect</button>
         </div>
         <div class="demo-panel" id="panel-query" role="tabpanel" aria-labelledby="tab-query">
@@ -145,9 +146,13 @@ web</code></pre>
 {"name":"api","enabled":true,"port":8080}</code></pre>
         </div>
         <div class="demo-panel" id="panel-merge" role="tabpanel" aria-labelledby="tab-merge" hidden>
-          <p class="demo-label">Aliases and merge precedence resolve before querying.</p>
-          <pre><code><span class="prompt">$</span> ysh '.production.retries' config.yml
-3</code></pre>
+          <p class="demo-label">Change a real file in place—no temporary runtime required.</p>
+          <pre><code><span class="prompt">$</span> ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
+
+<span class="prompt">$</span> ysh '.services[].tier' config.yml
+active
+backend
+active</code></pre>
         </div>
         <div class="demo-panel" id="panel-inspect" role="tabpanel" aria-labelledby="tab-inspect" hidden>
           <p class="demo-label">Open the hood whenever the YAML gets weird.</p>
@@ -199,7 +204,7 @@ node  1  mapping  line=1</code></pre>
         <p>The installer downloads a pinned release and places <code>ysh</code> in <code>/usr/local/bin</code>. Set <code>YSH_INSTALL_DIR</code> to choose another location.</p>
       </div>
       <div class="install-command">
-        <div class="install-command-label"><span>Terminal</span><span>v1.1.0</span></div>
+        <div class="install-command-label"><span>Terminal</span><span>v1.2.0</span></div>
         <pre><code id="install-code">curl -fsSL https://yaml.azohra.com/install | sh</code></pre>
         <button class="copy-button" type="button" data-copy="install-code"><span>Copy command</span><b aria-hidden="true">⌘</b></button>
         <p class="install-note">Prefer to inspect first? <a href="/install">Read the installer source.</a></p>

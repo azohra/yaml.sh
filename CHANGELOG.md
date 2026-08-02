@@ -2,6 +2,34 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [1.2.0] - 2026-08-01
+
+Version 1.2 turns the expression stream into a writable graph and adds a semantic YAML emitter. YAML.sh can now construct, transform, and safely rewrite documents while keeping its one-file `/bin/sh` + AWK runtime.
+
+### Added
+
+- Recursive descent with `..` and optional traversal with `?`.
+- Array and object construction, including streamed values inside array literals.
+- Arithmetic with `+`, `-`, `*`, `/`, and `%`; `+` also concatenates strings and sequences, shallow-merges mappings, and treats null as an identity value.
+- Direct assignment with `=`, relative update with `|=`, and compound `+=`, `-=`, `*=`, `/=`, and `%=` updates.
+- Missing mapping-path creation, multi-node streamed assignments, and `del(...)` for mappings and sequences.
+- Semantic YAML output through `-y` and `-o=yaml`, with valid document separators for multi-result streams.
+- Null-input construction with `-n` and permission-preserving in-place file updates with `-i`.
+- Transformation, round-trip, arithmetic, error, and in-place coverage, bringing the behavioral suite to 57 tests.
+
+### Changed
+
+- Assignment binds before a following pipe, matching yq transformation flow such as `.value = 2 | .value`.
+- Help, README, website, and docs now distinguish semantic YAML preservation from presentation preservation.
+- The generated YAML emitter uses deterministic block collections and quoted string/key output.
+
+### Known boundaries
+
+- YAML emission does not preserve comments, blank lines, original scalar quoting, flow-vs-block style, directive spelling, or exact presentation.
+- Variables, interpolation, regexes, reducers, dynamic keys, slices, deep-merge operators, style/comment operators, file operators, and yq's non-YAML codecs are not implemented.
+- Aliases are shared graph references. Updating through an alias or inherited merge key may update its anchor or merge source.
+- In-place mode requires a real single-document file, rejects multi-document streams before replacement, and uses the POSIX `cp` and `rm` utilities in addition to the normal `/bin/sh` + AWK runtime.
+
 ## [1.1.0] - 2026-08-01
 
 Version 1.1 moves beyond exact paths with a read-only expression engine modeled on the highest-value parts of yq.
@@ -113,6 +141,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.2.0]: https://github.com/azohra/yaml.sh/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/azohra/yaml.sh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/azohra/yaml.sh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/azohra/yaml.sh/compare/v0.3.0...v0.4.0
