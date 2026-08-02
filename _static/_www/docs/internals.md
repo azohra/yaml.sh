@@ -1,6 +1,6 @@
 # Parser internals
 
-Version 2 is still one shell script, with a semantic graph and a source-presentation layer working together.
+Version 1.3 is still one shell script, with a semantic graph and a source-presentation layer working together.
 
 ```text
 /bin/sh CLI
@@ -57,7 +57,7 @@ The expression parser builds an operator tree with explicit precedence for strea
 
 Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Assignments replace the selected graph nodes; missing mapping paths use attachable placeholders. Computed booleans, strings, numbers, constructed collections, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
 
-The semantic YAML emitter walks that graph directly and normalizes presentation into a stable quoted block style. Separately, the v2 presentation tracker records safe scalar replacements by source line. In-place mode patches those tokens into the original lines when possible; any structural mutation flips the operation to the semantic emitter for the complete document stream.
+The semantic YAML emitter walks that graph directly and normalizes presentation into a stable quoted block style. Separately, the v1.3 presentation tracker records safe scalar replacements by source line. In-place mode patches those tokens into the original lines when possible; any structural mutation flips the operation to the semantic emitter for the complete document stream.
 
 ## Diagnostics
 

@@ -2,9 +2,11 @@
 
 All notable changes to YAML.sh are documented here.
 
-## [2.0.0] - 2026-08-02
+## [1.3.0] - 2026-08-02
 
-Version 2 completes the journey from a path reader to a compact YAML programming tool. It adds collection programming, lexical variables, reducers, broader YAML syntax, multi-document updates, and a hybrid presentation-preserving in-place editor while remaining one portable `/bin/sh` + AWK file.
+Version 1.3 completes the journey from a path reader to a compact YAML programming tool. It adds collection programming, lexical variables, reducers, broader YAML syntax, multi-document updates, and a hybrid presentation-preserving in-place editor while remaining one portable `/bin/sh` + AWK file.
+
+This compatible feature release was briefly tagged `v2.0.0`. The tag and release were withdrawn before wider adoption because the public v1 contract did not break; the preserved code history is identical, and `v1.3.0` is the canonical release.
 
 ### Added
 
@@ -18,7 +20,7 @@ Version 2 completes the journey from a path reader to a compact YAML programming
 - Unicode `\u` and `\U` escapes, multiline flow collections, and explicit block-scalar indentation indicators.
 - Multi-document in-place transformations evaluated independently against every document.
 - Hybrid presentation preservation: safe scalar replacements retain comments, blank lines, layout, and plain/single/double quote style.
-- Seven new behavioral groups covering the v2 evaluator, parser, multi-document writer, and presentation layer, bringing the suite to 64 tests.
+- Seven new behavioral groups covering the evaluator, parser, multi-document writer, and presentation layer, bringing the suite to 64 tests.
 
 ### Changed
 
@@ -172,7 +174,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
-[2.0.0]: https://github.com/azohra/yaml.sh/compare/v1.2.0...v2.0.0
+[1.3.0]: https://github.com/azohra/yaml.sh/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/azohra/yaml.sh/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/azohra/yaml.sh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/azohra/yaml.sh/compare/v0.4.0...v1.0.0
