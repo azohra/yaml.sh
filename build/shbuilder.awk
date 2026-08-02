@@ -1,16 +1,18 @@
 #!/usr/bin/awk -f
 
-/^YAML_AWK_PARSER=/ {
-    print "YAML_AWK_PARSER='"
+/^# YSH_AWK_PROGRAM$/ {
+    print "ysh_awk_program() {"
+    print "    LC_ALL=C awk -f - \"$@\" <<'YSH_AWK_EOF'"
     while ((getline parser_line < "src/ysh.awk") > 0) {
-        if (index(parser_line, sprintf("%c", 39))) {
-            print "The AWK parser cannot contain a single quote" > "/dev/stderr"
+        if (parser_line == "YSH_AWK_EOF") {
+            print "The AWK parser contains the heredoc terminator" > "/dev/stderr"
             exit 1
         }
         print parser_line
     }
     close("src/ysh.awk")
-    print "'"
+    print "YSH_AWK_EOF"
+    print "}"
     next
 }
 

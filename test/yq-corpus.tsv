@@ -1,0 +1,111 @@
+# fixture<TAB>query
+expressions.yml	.
+expressions.yml	.services
+expressions.yml	.services[0]
+expressions.yml	.services[1].name
+expressions.yml	.services[-1].name
+expressions.yml	.metadata.owner
+expressions.yml	.metadata["region"]
+expressions.yml	.empty
+expressions.yml	.unset
+expressions.yml	.disabled
+expressions.yml	.missing
+expressions.yml	.missing // "fallback"
+expressions.yml	.disabled // "fallback"
+expressions.yml	.metadata.owner // "fallback"
+expressions.yml	.services[].name
+expressions.yml	.services[] | .port
+expressions.yml	.metadata[]
+expressions.yml	.services[] | select(.enabled) | .name
+expressions.yml	.services[] | select(.port >= 8000) | .name
+expressions.yml	.services[] | select(.port < 9000) | .name
+expressions.yml	.services[] | select(.tier == "backend") | .name
+expressions.yml	.services[] | select(.tier != "backend") | .name
+expressions.yml	.services[] | select(.enabled and .tier == "backend") | .name
+expressions.yml	.services[] | select(.enabled or .port == 9090) | .name
+expressions.yml	.services[] | .enabled | not
+expressions.yml	.services | length
+expressions.yml	.metadata | length
+expressions.yml	.metadata.owner | length
+expressions.yml	.unset | length
+expressions.yml	.metadata | keys
+expressions.yml	.services | keys
+expressions.yml	.metadata | has("owner")
+expressions.yml	.metadata | has("missing")
+expressions.yml	.services | has(2)
+expressions.yml	.services | has(3)
+expressions.yml	.services | map(.name)
+expressions.yml	.services | map(.port)
+expressions.yml	.services | map(select(.enabled) | .name)
+expressions.yml	.metadata | map_values(upcase)
+expressions.yml	.services | map_values(.name)
+expressions.yml	.metadata | to_entries
+expressions.yml	.metadata | to_entries | from_entries
+expressions.yml	.metadata | with_entries(.value |= upcase)
+expressions.yml	.metadata | with_entries(.key |= upcase)
+expressions.yml	[3, 1, 2, 1] | sort
+expressions.yml	[3, 1, 2, 1] | unique
+expressions.yml	[1, 2, 3] | reverse
+expressions.yml	[[1, 2], [3, [4]]] | flatten
+expressions.yml	.services | sort_by(.port) | map(.name)
+expressions.yml	.services | sort_by(.name) | map(.name)
+expressions.yml	.services | group_by(.tier) | map(map(.name))
+expressions.yml	.services | unique_by(.tier) | map(.name)
+expressions.yml	[3, 1, 2] | min
+expressions.yml	[3, 1, 2] | max
+expressions.yml	[true, false] | any
+expressions.yml	[true, true] | all
+expressions.yml	.services | any_c(.enabled)
+expressions.yml	.services | all_c(.enabled)
+expressions.yml	.metadata.owner | upcase
+expressions.yml	.metadata.owner | downcase
+expressions.yml	.metadata.owner | contains("form")
+expressions.yml	"yaml.sh" | split(".")
+expressions.yml	["yaml", "sh"] | join(".")
+expressions.yml	.metadata.owner, .metadata.region
+expressions.yml	[.services[].name]
+expressions.yml	{"name": .services[0].name, "port": .services[0].port}
+expressions.yml	{"owner": .metadata.owner, "count": (.services | length)}
+expressions.yml	.metadata as $meta | {"owner": $meta.owner, "region": $meta.region}
+expressions.yml	.services[0].name as $name | $name
+expressions.yml	.services[0].port + 1
+expressions.yml	.services[1].port - 90
+expressions.yml	.services[2].port * 2
+expressions.yml	.services[0].port / 2
+expressions.yml	.services[0].port % 7
+expressions.yml	2 + 3 * 4
+expressions.yml	(2 + 3) * 4
+expressions.yml	"yaml" + ".sh"
+expressions.yml	[1, 2] + [3]
+expressions.yml	.metadata + {"channel": "stable"}
+expressions.yml	.metadata * {"nested": {"enabled": true}}
+expressions.yml	.metadata.owner == "platform"
+expressions.yml	.metadata.owner != "other"
+expressions.yml	.services[0].port > .services[2].port
+expressions.yml	.services[0].port <= 8080
+expressions.yml	.services[0] | type
+expressions.yml	.services | type
+expressions.yml	.metadata | type
+expressions.yml	.services[0].name | type
+expressions.yml	.services[0] | .name = "gateway"
+expressions.yml	.services[0] | .port += 20
+expressions.yml	.services[0] | .enabled |= not
+expressions.yml	.metadata | .channel = "stable"
+expressions.yml	.metadata | del(.region)
+expressions.yml	.services | del(.[1]) | map(.name)
+expressions.yml	.. | select(type == "!!str")
+advanced.yml	.scalar
+advanced.yml	.scalar_alias
+advanced.yml	.mapping_alias.color
+advanced.yml	.list_alias[1]
+advanced.yml	.flow.y[1]
+advanced.yml	.merged.color
+advanced.yml	.merged.shape
+advanced.yml	.merged.size
+advanced.yml	.inline_merge.color
+advanced.yml	.empty_mapping
+advanced.yml	.empty_sequence
+advanced.yml	.["key.with.dots"]
+advanced.yml	.types.integer
+advanced.yml	.types.float
+advanced.yml	.types.timestamp

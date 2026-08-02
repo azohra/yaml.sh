@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.3.0" "$(./ysh --version)"
+    assertEquals "v1.4.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -57,6 +57,7 @@ testFlowCollections() {
     assertEquals "request" "$(./ysh ".complex.details.type" test/issues.yml)"
     assertEquals "three, four" "$(./ysh ".inline[2]" test/issues.yml)"
     assertEquals "item" "$(./ysh ".inline[3].name" test/issues.yml)"
+    assertEquals '[{"name":"api"},{"name":"worker"}]' "$(printf '%s\n' 'items: [name: api, "name": worker,]' | ./ysh --json '.items')"
 }
 
 testBlockScalars() {
@@ -68,6 +69,7 @@ testBlockAndIndentlessSequences() {
     assertEquals '["item1","item2"]' "$(./ysh ".indented" test/issues.yml)"
     assertEquals '["item1","item2"]' "$(./ysh ".indentless" test/issues.yml)"
     assertEquals "ten" "$(./ysh ".long_list[10]" test/issues.yml)"
+    assertEquals '[["one","two"],[["three"]]]' "$(printf '%s\n' '- - one' '  - two' '- - - three' | ./ysh --json '.')"
 }
 
 testScalarAndCollectionAliases() {
@@ -76,6 +78,8 @@ testScalarAndCollectionAliases() {
     assertEquals '["first","second"]' "$(./ysh ".list_alias" test/advanced.yml)"
     assertEquals "b" "$(./ysh ".flow_alias.y[1]" test/advanced.yml)"
     assertEquals "1" "$(./ysh ".sequence_aliases[1].x" test/advanced.yml)"
+    assertEquals '"unicode anchor"' "$(printf '%s\n' '- &😁 unicode anchor' | ./ysh --json '.[0]')"
+    assertEquals '"value"' "$(printf '%s\n' 'key: &an:chor value' 'copy: *an:chor' | ./ysh --json '.copy')"
 }
 
 testMergeKeysAndPrecedence() {
@@ -216,9 +220,26 @@ testExpressionSequenceAndStringHelpers() {
     assertEquals '["yaml","sh"]' "$(./ysh -n --json '"yaml.sh" | split(".")')"
     assertEquals '"yaml.sh"' "$(./ysh -n --json '["yaml", "sh"] | join(".")')"
     assertEquals 'true' "$(./ysh -n --json '"yaml.sh" | startswith("yaml") and endswith(".sh")')"
+    assertEquals '6' "$(./ysh -n --json '[1, 2, 3] | add')"
+    assertEquals '"yaml.sh"' "$(./ysh -n --json '["yaml", ".", "sh"] | add')"
+}
+
+testExpressionProjectedCollectionsAndQuantifiers() {
+    assertEquals '[{"name":"api","port":80},{"name":"worker","port":443},{"name":"admin","port":443}]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | sort_by(.port)')"
+    assertEquals '[[{"name":"worker","port":443},{"name":"admin","port":443}],[{"name":"api","port":80}]]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | group_by(.port)')"
+    assertEquals '[{"name":"worker","port":443},{"name":"api","port":80}]' "$(./ysh -n --json '[{name: "worker", port: 443}, {name: "api", port: 80}, {name: "admin", port: 443}] | unique_by(.port)')"
+    assertEquals '1' "$(./ysh -n --json '[3, 1, 2] | min')"
+    assertEquals '3' "$(./ysh -n --json '[3, 1, 2] | max')"
+    assertEquals '"web"' "$(./ysh --json '.services | min_by(.port) | .name' test/expressions.yml)"
+    assertEquals '"worker"' "$(./ysh --json '.services | max_by(.port) | .name' test/expressions.yml)"
+    assertEquals 'true' "$(./ysh -n --json '[false, true] | any')"
+    assertEquals 'false' "$(./ysh -n --json '[true, false] | all')"
+    assertEquals 'true' "$(./ysh -n --json '[1, 2, 3] | any_c(. == 2)')"
+    assertEquals 'true' "$(./ysh -n --json '[1, 2, 3] | all_c(. > 0)')"
 }
 
 testExpressionVariablesAndDynamicIndexes() {
+    assertEquals '"web"' "$(./ysh --json '.services[-1].name' test/expressions.yml)"
     assertEquals '"platform"' "$(./ysh -n --json '{key: "owner", data: {owner: "platform"}} | .key as $key | .data[$key]')"
     assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' test/expressions.yml)"
 }
@@ -257,6 +278,30 @@ testInplaceUpdate() {
     rm -f "$inplace_file"
 }
 
+testInplaceFailureIsAtomic() {
+    inplace_file=test/.tmp-inplace-atomic-$$.yml
+    backup_file=test/.tmp-inplace-atomic-backup-$$.yml
+    link_file=test/.tmp-inplace-atomic-link-$$.yml
+    printf '%s\n' 'service:' '  name: api' > "$inplace_file"
+    cp "$inplace_file" "$backup_file"
+
+    ./ysh -i '.service.name = ' "$inplace_file" >/dev/null 2>&1
+    assertNotEquals 0 $?
+    cmp -s "$backup_file" "$inplace_file"
+    assertEquals 0 $?
+
+    ln -s "$(basename "$inplace_file")" "$link_file"
+    result=$(./ysh -i '.service.name = "worker"' "$link_file" 2>&1)
+    assertEquals 2 $?
+    assertContains "$result" 'refuses symbolic links'
+    cmp -s "$backup_file" "$inplace_file"
+    assertEquals 0 $?
+
+    set -- "test/.$(basename "$inplace_file").ysh."*
+    assertFalse "temporary file must be removed" "[ -e \"$1\" ]"
+    rm -f "$link_file" "$backup_file" "$inplace_file"
+}
+
 testInplaceTransformsAllDocuments() {
     inplace_file=test/.tmp-inplace-multi-$$.yml
     cp test/test.yml "$inplace_file"
@@ -279,6 +324,44 @@ testInplacePreservesScalarPresentation() {
     assertContains "$result" 'label: "Worker service"'
     assertContains "$result" "owner: 'core team'"
     assertContains "$result" 'enabled: false'
+    rm -f "$inplace_file"
+}
+
+testInplacePreservesStructuralPresentation() {
+    inplace_file=test/.tmp-inplace-structure-$$.yml
+    printf '%s\n' '# deployment settings' 'service:' '  name: api      # public name' '  port: 8080     # remove this' '' '# worker stays documented' 'workers:' '  - first' '  - second' 'footer: kept    # untouched' > "$inplace_file"
+    ./ysh -i 'del(.service.port) | del(.workers[0]) | .service.protocol = "http" | .region = "west"' "$inplace_file"
+    assertEquals 0 $?
+    result=$(cat "$inplace_file")
+    assertContains "$result" '# deployment settings'
+    assertContains "$result" 'name: api      # public name'
+    assertNotContains "$result" 'port: 8080'
+    assertContains "$result" '# worker stays documented'
+    assertNotContains "$result" '  - first'
+    assertContains "$result" '  - second'
+    assertContains "$result" '  protocol: "http"'
+    assertContains "$result" 'footer: kept    # untouched'
+    assertContains "$result" 'region: "west"'
+    rm -f "$inplace_file"
+}
+
+testInplacePreservesReorderedSequenceComments() {
+    inplace_file=test/.tmp-inplace-reorder-$$.yml
+    printf '%s\n' '# queue order' 'workers: # keep the header' '  # first worker' '  - first' '  # second worker' '  - second' 'footer: kept' > "$inplace_file"
+    ./ysh -i '.workers |= reverse' "$inplace_file"
+    assertEquals 0 $?
+    expected=$(printf '%s\n' '# queue order' 'workers: # keep the header' '  # second worker' '  - second' '  # first worker' '  - first' 'footer: kept')
+    assertEquals "$expected" "$(cat "$inplace_file")"
+    rm -f "$inplace_file"
+}
+
+testInplacePreservesSortedSequenceBlocks() {
+    inplace_file=test/.tmp-inplace-sort-$$.yml
+    printf '%s\n' 'services:' '  # slow path' '  - name: worker' '    port: 9000' '  # fast path' '  - name: api' '    port: 80' 'tail: kept' > "$inplace_file"
+    ./ysh -i '.services |= sort_by(.port)' "$inplace_file"
+    assertEquals 0 $?
+    expected=$(printf '%s\n' 'services:' '  # fast path' '  - name: api' '    port: 80' '  # slow path' '  - name: worker' '    port: 9000' 'tail: kept')
+    assertEquals "$expected" "$(cat "$inplace_file")"
     rm -f "$inplace_file"
 }
 
@@ -327,6 +410,7 @@ testMultipleDocuments() {
     assertEquals "block_2_value" "$(./ysh -d 1 ".key" test/test.yml)"
     assertEquals "block_3_value" "$(./ysh --document 2 ".key" test/test.yml)"
     assertEquals "second" "$(./ysh -d 1 ".fresh_alias" test/advanced.yml)"
+    assertEquals '"inline"' "$(printf '%s\n' '%YAML 1.2' '--- inline' | ./ysh --json '.')"
 }
 
 testExplicitScalarKeys() {
@@ -377,6 +461,13 @@ testCommentsQuotesAndCrLf() {
     assertEquals "https://yaml.sh" "$(./ysh ".urls[0]" test/issues.yml)"
 }
 
+testMultilinePlainScalars() {
+    assertEquals '"a b\nc"' "$(printf '%s\n' 'plain: a' ' b' '' ' c' | ./ysh --json '.plain')"
+    assertEquals '"not yaml another root"' "$(printf '%s\n' 'not yaml' 'another root' | ./ysh --json '.')"
+    assertEquals '"flow in block"' "$(printf '%s\n' '-' '  "flow in block"' | ./ysh --json '.[0]')"
+    assertEquals '"value"' "$(printf '%s\n' 'key: # comment' '  value' | ./ysh --json '.key')"
+}
+
 testDuplicateKeysAreRejected() {
     result=$(printf "%s\n" "key: first" "key: second" | ./ysh ".key" 2>&1)
     assertNotEquals 0 $?
@@ -408,10 +499,6 @@ testUnsupportedComplexKeysAreRejected() {
 }
 
 testMalformedYamlIsRejected() {
-    result=$(printf "%s\n" "not yaml" "another root" | ./ysh "." 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "unknown syntax"
-
     result=$(printf "%s\n" "items: [one," "  two" | ./ysh ".items" 2>&1)
     assertNotEquals 0 $?
     assertContains "$result" "unclosed multiline flow collection"
@@ -443,16 +530,19 @@ testRunsWithPosixShell() {
 }
 
 testReleaseArtifactsStayInSync() {
-    assertContains "$(cat README.md)" "v1.3.0/ysh"
-    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.3.0/ysh"
-    assertContains "$(cat _static/_www/install)" "v1.3.0/ysh"
-    assertContains "$(cat _static/_www/index.html)" "Install v1.3"
-    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.3.0"
-    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.3.0"
+    assertContains "$(cat README.md)" "v1.4.0/ysh"
+    assertContains "$(cat _static/_www/docs/getting-started.md)" "v1.4.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.4.0/ysh"
+    assertContains "$(cat _static/_www/index.html)" "Install v1.4"
+    assertContains "$(cat _static/_www/index.html)" "style.css?v=1.4.0"
+    assertContains "$(cat _static/_www/docs/index.html)" "theme.css?v=1.4.0"
     assertContains "$(cat _static/_www/docs/index.html)" "docsify@4/lib/themes/vue.css"
-    assertContains "$(cat README.md)" "og-v1.3.png"
-    assertContains "$(cat _static/_www/index.html)" "og-v1.3.png"
-    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.3.png ]"
+    assertContains "$(cat README.md)" "og-v1.4.png"
+    assertContains "$(cat _static/_www/index.html)" "og-v1.4.png"
+    assertTrue "versioned social preview image must exist" "[ -s _static/_www/og-v1.4.png ]"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "245/282"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "56/91"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "110/110"
 }
 
 # shellcheck source=/dev/null

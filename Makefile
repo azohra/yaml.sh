@@ -1,7 +1,7 @@
 BUILDERS = $(shell find build/*)
 INSTALL_DIR=/usr/local/bin
 
-.PHONY: lint test all install uninstall docs clean
+.PHONY: lint test conformance differential all install uninstall docs clean
 
 all: ysh lint test
 
@@ -12,11 +12,19 @@ ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh test/test.sh _static/_www/install
+	@shellcheck -e SC2016 ysh test/test.sh test/conformance.sh test/differential.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
 	@./test/test.sh
+
+conformance: ysh
+	@echo "🧭 Measuring YAML conformance"
+	@./test/conformance.sh
+
+differential: ysh
+	@echo "⚖️  Comparing with yq"
+	@./test/differential.sh
 
 install: ysh
 	@echo "📦 Installing ysh"

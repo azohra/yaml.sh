@@ -1,9 +1,9 @@
 #!/bin/sh
 
-YSH_VERSION=1.3.0
+YSH_VERSION=1.4.0
 
 # Replaced by the build with the embedded AWK engine.
-YAML_AWK_PARSER=$(cat src/ysh.awk)
+# YSH_AWK_PROGRAM
 
 ysh_error() {
     printf "Error: %s\n" "$*" >&2
@@ -52,8 +52,8 @@ Other:
 
 QUERY supports yq-style paths, streams, variables, dynamic indexes, maps,
 entries, reducers, sorting, strings, arithmetic, construction, assignment,
-deletion, and deep merge. Collections emit JSON by default. In-place scalar
-updates preserve comments and presentation; structural edits emit stable YAML.
+deletion, and deep merge. Collections emit JSON by default. Safe in-place
+edits preserve comments; other structural edits emit stable YAML.
 EOF
 }
 
@@ -71,48 +71,60 @@ ysh_set_output_mode() {
 
 ysh_run_awk() {
     if [ "$YSH_NULL_INPUT" -eq 1 ]; then
-        LC_ALL=C awk \
+        ysh_awk_program \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v inplace_mode="$YSH_INPLACE" \
-            "$YAML_AWK_PARSER" \
             /dev/null
     elif [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
-        LC_ALL=C awk \
+        ysh_awk_program \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v inplace_mode="$YSH_INPLACE" \
-            "$YAML_AWK_PARSER"
+            /dev/fd/3 3<&0
     else
-        LC_ALL=C awk \
+        ysh_awk_program \
             -v query="$YSH_QUERY" \
             -v output_mode="$YSH_OUTPUT_MODE" \
             -v selected_document="$YSH_DOCUMENT" \
             -v inplace_mode="$YSH_INPLACE" \
-            "$YAML_AWK_PARSER" \
             "$YSH_INPUT_FILE"
     fi
 }
 
 ysh_run_inplace() {
-    YSH_TEMP_FILE=${YSH_INPUT_FILE}.ysh.$$
-    if ! (umask 077 && set -C && : > "$YSH_TEMP_FILE") 2>/dev/null; then
+    case "$YSH_INPUT_FILE" in
+    */*)
+        YSH_INPUT_DIR=${YSH_INPUT_FILE%/*}
+        YSH_INPUT_NAME=${YSH_INPUT_FILE##*/}
+        ;;
+    *)
+        YSH_INPUT_DIR=.
+        YSH_INPUT_NAME=$YSH_INPUT_FILE
+        YSH_INPUT_FILE=./$YSH_INPUT_FILE
+        ;;
+    esac
+    if ! YSH_TEMP_FILE=$(umask 077 && mktemp "${YSH_INPUT_DIR}/.${YSH_INPUT_NAME}.ysh.XXXXXX") 2>/dev/null; then
         ysh_error "could not create temporary file beside: $YSH_INPUT_FILE"
         return 1
     fi
     trap 'rm -f "$YSH_TEMP_FILE"' 0
     trap 'exit 1' 1 2 3 15
+    if ! cp -p "$YSH_INPUT_FILE" "$YSH_TEMP_FILE"; then
+        ysh_error "could not preserve input metadata: $YSH_INPUT_FILE"
+        return 1
+    fi
     YSH_OUTPUT_MODE=yaml
     if ! ysh_run_awk > "$YSH_TEMP_FILE"; then
         return 1
     fi
-    if ! cp "$YSH_TEMP_FILE" "$YSH_INPUT_FILE"; then
+    if ! mv -f "$YSH_TEMP_FILE" "$YSH_INPUT_FILE"; then
         ysh_error "could not replace input file: $YSH_INPUT_FILE"
         return 1
     fi
-    rm -f "$YSH_TEMP_FILE"
+    YSH_TEMP_FILE=
     trap - 0 1 2 3 15
 }
 
@@ -276,6 +288,10 @@ ysh_main() {
         fi
         if [ -z "$YSH_INPUT_FILE" ] || [ "$YSH_INPUT_FILE" = "-" ]; then
             ysh_error "--inplace requires an input file"
+            return 2
+        fi
+        if [ -L "$YSH_INPUT_FILE" ]; then
+            ysh_error "--inplace refuses symbolic links"
             return 2
         fi
         ysh_run_inplace

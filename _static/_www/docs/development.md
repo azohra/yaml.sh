@@ -14,6 +14,8 @@ The default workflow rebuilds `ysh`, validates the shell with ShellCheck, and ru
 src/ysh.sh              POSIX shell CLI
 src/ysh.awk             YAML engine
 test/test.sh            behavioral suite
+test/conformance.sh     pinned YAML Test Suite gate
+test/differential.sh    pinned yq comparison gate
 test/advanced.yml       v1 conformance fixture
 test/expressions.yml    v1 expression and transformation fixture
 _static/_www            unified Cloudflare Pages site
@@ -32,6 +34,8 @@ For every supported feature:
 5. Update the support contract.
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
+
+Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available.
 
 ## Add expression behavior
 

@@ -2,6 +2,23 @@
 
 All notable changes to YAML.sh are documented here.
 
+## [1.4.0] - 2026-08-02
+
+Version 1.4 is a measured compatibility release: more YAML, more yq-shaped programs, safer writes, same one-file runtime.
+
+### Added
+
+- Negative indexes; `sort_by`, `group_by`, `unique_by`, `min`/`max`, `min_by`/`max_by`, `any`/`all`, `any_c`/`all_c`, and `add`.
+- Broader multiline scalars and flows, escapes, properties, directives, explicit entries, block sequences, anchors, and invalid-input checks.
+- Comment-preserving direct inserts/deletes and pure sequence reorders.
+- Pinned YAML Test Suite and yq differential gates.
+
+### Changed
+
+- In-place writes now use an atomic sibling replacement, preserve permissions, clean up failures, and refuse symlinks.
+- The embedded AWK program is fed through a here-document, avoiding small argument limits on BusyBox systems.
+- Measured gates: 70 behavioral tests, 245/282 valid YAML fixtures, 56/91 invalid fixtures rejected, and 110/110 programs matching yq v4.53.3.
+
 ## [1.3.0] - 2026-08-02
 
 Version 1.3 completes the journey from a path reader to a compact YAML programming tool. It adds collection programming, lexical variables, reducers, broader YAML syntax, multi-document updates, and a hybrid presentation-preserving in-place editor while remaining one portable `/bin/sh` + AWK file.
@@ -174,6 +191,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.4.0]: https://github.com/azohra/yaml.sh/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/azohra/yaml.sh/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/azohra/yaml.sh/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/azohra/yaml.sh/compare/v1.0.0...v1.1.0

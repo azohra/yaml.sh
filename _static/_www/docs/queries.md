@@ -1,6 +1,6 @@
 # Queries
 
-Version 1.3 evaluates a focused yq-style programming language over streams of writable node references. Paths select exact nodes; pipes and comma expressions shape streams; assignments change the graph those references belong to.
+Version 1.4 evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
 
 ## Paths
 
@@ -10,6 +10,7 @@ Version 1.3 evaluates a focused yq-style programming language over streams of wr
 ysh '.' config.yml
 ysh '.server.host' config.yml
 ysh '.services[2].name' config.yml
+ysh '.services[-1].name' config.yml
 ysh '.["key.with.dots"]' config.yml
 ```
 
@@ -136,7 +137,7 @@ ysh --json '.metadata | with_entries(.value |= upcase)' config.yml
 ysh --json '.metadata | to_entries | from_entries' config.yml
 ```
 
-Sequence helpers include `sort`, stable first-occurrence `unique`, `reverse`, and recursive `flatten`. String helpers include `upcase`, `downcase`, `contains(...)`, `startswith(...)`, `endswith(...)`, `split(...)`, and `join(...)`.
+Sequence helpers include `sort`, `sort_by`, `group_by`, `unique`, `unique_by`, `reverse`, `flatten`, `min`/`max`, `min_by`/`max_by`, and `add`. Quantifiers include `any`, `all`, `any_c`, and `all_c`. String helpers include `upcase`, `downcase`, `contains`, `startswith`, `endswith`, `split`, and `join`.
 
 ```sh
 ysh -n --json '[3, 1, 2, 1] | unique'
@@ -190,7 +191,7 @@ The compound forms `+=`, `-=`, `*=`, `/=`, and `%=` are relative arithmetic upda
 ysh -o=yaml '(.services[] | select(.enabled) | .tier) = "active"' config.yml
 ```
 
-Use `-i` to replace a real input file after every document transforms successfully. It cannot be combined with standard input or `-n`. Scalar-only edits preserve the original presentation; structural edits use stable semantic YAML. Multi-document files are evaluated document by document.
+Use `-i` to atomically replace a real, non-symlink input file after every document transforms successfully. Safe scalar edits, direct inserts/deletes, and pure sequence reorders preserve presentation; other structural edits use stable semantic YAML.
 
 ## Merged and aliased nodes
 
@@ -200,6 +201,6 @@ Aliases are genuine shared graph references. Updating through an alias or an inh
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. Version 1.3 does not implement string interpolation, regular expressions, slices, grouping, ireduce, date operators, file-loading operators, XML/CSV/TOML codecs, comment/style mutation operators, or yq's complete cross-document and flag surface.
+This is a useful yq-shaped language, not the complete yq language. Version 1.4 does not implement interpolation, regular expressions, slices, ireduce, date or file operators, non-YAML codecs, comment/style operators, or yq's complete cross-document and flag surface.
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.
