@@ -25,14 +25,15 @@ YSH_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-ysh.XXXXXX")
 YQ_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-yq.XXXXXX")
 YSH_RAW=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-ysh-raw.XXXXXX")
 YQ_RAW=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-yq-raw.XXXXXX")
-trap 'rm -f "$YSH_OUTPUT" "$YQ_OUTPUT" "$YSH_RAW" "$YQ_RAW"' 0 1 2 3 15
+RESULTS=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-results.XXXXXX")
+trap 'rm -f "$YSH_OUTPUT" "$YQ_OUTPUT" "$YSH_RAW" "$YQ_RAW" "$RESULTS"' 0 1 2 3 15
 
 total=0
 passed=0
 mismatched=0
 tab=$(printf '\t')
-while IFS="$tab" read -r fixture query; do
-    case "$fixture" in
+while IFS="$tab" read -r family fixture query; do
+    case "$family" in
     ''|'#'*) continue ;;
     esac
     total=$((total + 1))
@@ -41,26 +42,39 @@ while IFS="$tab" read -r fixture query; do
 
     if ! "$YQ_BINARY" --yaml-fix-merge-anchor-to-spec -o=json -I=0 "$oracle_query" "$input" > "$YQ_RAW" 2>/dev/null ||
         ! jq -cS . "$YQ_RAW" > "$YQ_OUTPUT"; then
-        printf 'yq failed differential case %s: %s\n' "$total" "$query" >&2
+        printf 'yq failed differential case %s [%s]: %s\n' "$total" "$family" "$query" >&2
         exit 1
     fi
     if ! "$YSH_BINARY" --json "$query" "$input" > "$YSH_RAW" 2>/dev/null ||
         ! jq -cS . "$YSH_RAW" > "$YSH_OUTPUT"; then
-        printf 'YAML.sh failed differential case %s (%s): %s\n' "$total" "$fixture" "$query" >&2
+        printf 'YAML.sh failed differential case %s [%s] (%s): %s\n' "$total" "$family" "$fixture" "$query" >&2
         mismatched=$((mismatched + 1))
+        printf '%s\tfail\n' "$family" >> "$RESULTS"
         continue
     fi
     if ! cmp -s "$YSH_OUTPUT" "$YQ_OUTPUT"; then
-        printf 'Differential mismatch %s (%s): %s\n' "$total" "$fixture" "$query" >&2
+        printf 'Differential mismatch %s [%s] (%s): %s\n' "$total" "$family" "$fixture" "$query" >&2
         mismatched=$((mismatched + 1))
+        printf '%s\tfail\n' "$family" >> "$RESULTS"
         continue
     fi
     passed=$((passed + 1))
+    printf '%s\tpass\n' "$family" >> "$RESULTS"
 done < "$CORPUS"
 
 printf 'yq v4.53.3 differential results: %s/%s pass\n' "$passed" "$total"
-if [ "$total" -lt 300 ]; then
-    printf 'Differential corpus must contain at least 300 cases; found %s\n' "$total" >&2
+awk -F '\t' '
+    !seen[$1]++ { order[++families] = $1 }
+    { total[$1]++; if ($2 == "pass") passed[$1]++ }
+    END {
+        for (i = 1; i <= families; i++) {
+            family = order[i]
+            printf "  %-14s %d/%d\n", family, passed[family], total[family]
+        }
+    }
+' "$RESULTS"
+if [ "$total" -lt 1000 ]; then
+    printf 'Differential corpus must contain at least 1000 cases; found %s\n' "$total" >&2
     exit 1
 fi
 if [ $((passed * 100)) -lt $((total * 98)) ]; then

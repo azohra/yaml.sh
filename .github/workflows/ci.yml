@@ -16,12 +16,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-22.04, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - name: Install ShellCheck on Linux
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk shellcheck
+        run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk shellcheck time
       - name: Install ShellCheck on macOS
         if: runner.os == 'macOS'
         run: brew install shellcheck
@@ -82,7 +82,13 @@ jobs:
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make differential
       - name: Run deterministic and adversarial suites
         if: runner.os == 'Linux'
+        env:
+          YSH_FUZZ_CASES: ${{ matrix.os == 'ubuntu-latest' && '10000' || '1000' }}
         run: |
           make fuzz
+          make presentation
           make adversarial
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" YSH_FUZZ_CASES=50 make fuzz
+      - name: Verify scale contract
+        if: matrix.os == 'ubuntu-latest'
+        run: make scale

@@ -1,0 +1,340 @@
+# fixture<TAB>query
+expressions.yml	.
+expressions.yml	.services
+expressions.yml	.services[0]
+expressions.yml	.services[1].name
+expressions.yml	.services[-1].name
+expressions.yml	.metadata.owner
+expressions.yml	.metadata["region"]
+expressions.yml	.empty
+expressions.yml	.unset
+expressions.yml	.disabled
+expressions.yml	.missing
+expressions.yml	.missing // "fallback"
+expressions.yml	.disabled // "fallback"
+expressions.yml	.metadata.owner // "fallback"
+expressions.yml	.services[].name
+expressions.yml	.services[] | .port
+expressions.yml	.metadata[]
+expressions.yml	.services[] | select(.enabled) | .name
+expressions.yml	.services[] | select(.port >= 8000) | .name
+expressions.yml	.services[] | select(.port < 9000) | .name
+expressions.yml	.services[] | select(.tier == "backend") | .name
+expressions.yml	.services[] | select(.tier != "backend") | .name
+expressions.yml	.services[] | select(.enabled and .tier == "backend") | .name
+expressions.yml	.services[] | select(.enabled or .port == 9090) | .name
+expressions.yml	.services[] | .enabled | not
+expressions.yml	.services | length
+expressions.yml	.metadata | length
+expressions.yml	.metadata.owner | length
+expressions.yml	.unset | length
+expressions.yml	.metadata | keys
+expressions.yml	.services | keys
+expressions.yml	.metadata | has("owner")
+expressions.yml	.metadata | has("missing")
+expressions.yml	.services | has(2)
+expressions.yml	.services | has(3)
+expressions.yml	.services | map(.name)
+expressions.yml	.services | map(.port)
+expressions.yml	.services | map(select(.enabled) | .name)
+expressions.yml	.metadata | map_values(upcase)
+expressions.yml	.services | map_values(.name)
+expressions.yml	.metadata | to_entries
+expressions.yml	.metadata | to_entries | from_entries
+expressions.yml	.metadata | with_entries(.value |= upcase)
+expressions.yml	.metadata | with_entries(.key |= upcase)
+expressions.yml	[3, 1, 2, 1] | sort
+expressions.yml	[3, 1, 2, 1] | unique
+expressions.yml	[1, 2, 3] | reverse
+expressions.yml	[[1, 2], [3, [4]]] | flatten
+expressions.yml	.services | sort_by(.port) | map(.name)
+expressions.yml	.services | sort_by(.name) | map(.name)
+expressions.yml	.services | group_by(.tier) | map(map(.name))
+expressions.yml	.services | unique_by(.tier) | map(.name)
+expressions.yml	[3, 1, 2] | min
+expressions.yml	[3, 1, 2] | max
+expressions.yml	[true, false] | any
+expressions.yml	[true, true] | all
+expressions.yml	.services | any_c(.enabled)
+expressions.yml	.services | all_c(.enabled)
+expressions.yml	.metadata.owner | upcase
+expressions.yml	.metadata.owner | downcase
+expressions.yml	.metadata.owner | contains("form")
+expressions.yml	"yaml.sh" | split(".")
+expressions.yml	["yaml", "sh"] | join(".")
+expressions.yml	.metadata.owner, .metadata.region
+expressions.yml	[.services[].name]
+expressions.yml	{"name": .services[0].name, "port": .services[0].port}
+expressions.yml	{"owner": .metadata.owner, "count": (.services | length)}
+expressions.yml	.metadata as $meta | {"owner": $meta.owner, "region": $meta.region}
+expressions.yml	.services[0].name as $name | $name
+expressions.yml	.services[0].port + 1
+expressions.yml	.services[1].port - 90
+expressions.yml	.services[2].port * 2
+expressions.yml	.services[0].port / 2
+expressions.yml	.services[0].port % 7
+expressions.yml	2 + 3 * 4
+expressions.yml	(2 + 3) * 4
+expressions.yml	"yaml" + ".sh"
+expressions.yml	[1, 2] + [3]
+expressions.yml	.metadata + {"channel": "stable"}
+expressions.yml	.metadata * {"nested": {"enabled": true}}
+expressions.yml	.metadata.owner == "platform"
+expressions.yml	.metadata.owner != "other"
+expressions.yml	.services[0].port > .services[2].port
+expressions.yml	.services[0].port <= 8080
+expressions.yml	.services[0] | type
+expressions.yml	.services | type
+expressions.yml	.metadata | type
+expressions.yml	.services[0].name | type
+expressions.yml	.services[0] | .name = "gateway"
+expressions.yml	.services[0] | .port += 20
+expressions.yml	.services[0] | .enabled |= not
+expressions.yml	.metadata | .channel = "stable"
+expressions.yml	.metadata | del(.region)
+expressions.yml	.services | del(.[1]) | map(.name)
+expressions.yml	.. | select(type == "!!str")
+advanced.yml	.scalar
+advanced.yml	.scalar_alias
+advanced.yml	.mapping_alias.color
+advanced.yml	.list_alias[1]
+advanced.yml	.flow.y[1]
+advanced.yml	.merged.color
+advanced.yml	.merged.shape
+advanced.yml	.merged.size
+advanced.yml	.inline_merge.color
+advanced.yml	.empty_mapping
+advanced.yml	.empty_sequence
+advanced.yml	.["key.with.dots"]
+advanced.yml	.types.integer
+advanced.yml	.types.float
+advanced.yml	.types.timestamp
+# Extended path and traversal coverage
+expressions.yml	.services[0].enabled
+expressions.yml	.services[0].tier
+expressions.yml	.services[1].enabled
+expressions.yml	.services[1].port
+expressions.yml	.services[1].tier
+expressions.yml	.services[2].enabled
+expressions.yml	.services[2].port
+expressions.yml	.services[2].tier
+expressions.yml	.services[-2].name
+expressions.yml	.services[-3].port
+expressions.yml	.services[99]
+expressions.yml	.services[0].missing
+expressions.yml	.services[]
+expressions.yml	.services[].enabled
+expressions.yml	.services[].tier
+expressions.yml	.services[] | .name, .port
+expressions.yml	.metadata.owner, .metadata.region, .missing
+expressions.yml	.metadata.owner?
+expressions.yml	.metadata.missing?
+expressions.yml	.services[0]?
+expressions.yml	.services[99]?
+expressions.yml	.services[] | .missing?
+expressions.yml	.. | select(has("port")) | .port
+expressions.yml	.. | select(has("enabled")) | .enabled
+expressions.yml	.. | select(type == "!!map") | length
+expressions.yml	[.services[0], .services[2]]
+expressions.yml	[.services[].port]
+expressions.yml	[.metadata[]]
+expressions.yml	{"services": .services, "metadata": .metadata}
+expressions.yml	{"first": .services[0], "last": .services[-1]}
+# Filters, booleans, and comparisons
+expressions.yml	.services[] | select(.name == "api") | .port
+expressions.yml	.services[] | select(.name == "worker") | .enabled
+expressions.yml	.services[] | select(.name == "web") | .tier
+expressions.yml	.services[] | select(.port > 3000) | .name
+expressions.yml	.services[] | select(.port <= 8080) | .name
+expressions.yml	.services[] | select(.port != 8080) | .name
+expressions.yml	.services[] | select(.tier == "backend" and .enabled) | .name
+expressions.yml	.services[] | select(.tier == "backend" and (.port > 8500)) | .name
+expressions.yml	.services[] | select(.tier == "frontend" or .enabled == false) | .name
+expressions.yml	.services[] | select((.port < 4000) or (.port > 9000)) | .name
+expressions.yml	.services[] | select(.enabled != false) | .name
+expressions.yml	.services[] | .name == "api"
+expressions.yml	.services[] | .port != 3000
+expressions.yml	.services[] | .port > 5000
+expressions.yml	.services[] | .port <= 9090
+expressions.yml	.metadata.owner == .metadata.region
+expressions.yml	.metadata.owner != .metadata.region
+expressions.yml	.unset == null
+expressions.yml	.disabled == false
+expressions.yml	.empty == []
+expressions.yml	.metadata == {"owner": "platform", "region": "west"}
+expressions.yml	true and true
+expressions.yml	true and false
+expressions.yml	false or true
+expressions.yml	false or false
+expressions.yml	(true and false) or true
+expressions.yml	.disabled | not
+expressions.yml	.unset // .metadata.owner
+expressions.yml	.missing // .disabled // "fallback"
+expressions.yml	.metadata.missing // .metadata.region
+# Collection helpers and projections
+expressions.yml	.services | map(.name) | length
+expressions.yml	.services | map(.enabled)
+expressions.yml	.services | map(.tier)
+expressions.yml	.services | map(.port + 1)
+expressions.yml	.services | map(select(.tier == "backend")) | length
+expressions.yml	.services | map(select(.enabled)) | map(.name)
+expressions.yml	.services | map_values(.port)
+expressions.yml	.services | map_values(.enabled)
+expressions.yml	.metadata | map_values(length)
+expressions.yml	.metadata | map_values(downcase)
+expressions.yml	.metadata | keys | reverse
+expressions.yml	.services | keys | reverse
+expressions.yml	.metadata | has("region")
+expressions.yml	.services | has(0)
+expressions.yml	.services | has(-1)
+expressions.yml	.empty | length
+expressions.yml	.empty | keys
+expressions.yml	.empty | any
+expressions.yml	.empty | all
+expressions.yml	.services | any_c(.port == 9090)
+expressions.yml	.services | any_c(.name == "missing")
+expressions.yml	.services | all_c(.port > 0)
+expressions.yml	.services | all_c(.enabled)
+expressions.yml	.services | sort_by(.enabled) | map(.name)
+expressions.yml	.services | sort_by(.tier) | map(.name)
+expressions.yml	.services | group_by(.enabled) | map(map(.name))
+expressions.yml	.services | unique_by(.enabled) | map(.name)
+expressions.yml	.services | map(.port) | min
+expressions.yml	.services | map(.port) | max
+expressions.yml	[[1], [2, 3], [[4, 5]]] | flatten
+expressions.yml	[[1, 2], [], [3]] | flatten | reverse
+expressions.yml	[3, 2, 3, 1, 2] | sort | unique
+expressions.yml	["b", "a", "b"] | sort | unique
+# Entry transforms
+expressions.yml	.metadata | to_entries | length
+expressions.yml	.metadata | to_entries | map(.key)
+expressions.yml	.metadata | to_entries | map(.value)
+expressions.yml	.metadata | to_entries | reverse | from_entries
+expressions.yml	.metadata | with_entries(.value |= downcase)
+expressions.yml	.metadata | with_entries(.value += "!")
+expressions.yml	.metadata | with_entries(.key |= downcase)
+expressions.yml	.services[0] | to_entries
+expressions.yml	.services[0] | to_entries | from_entries
+expressions.yml	.services[0] | with_entries(.key |= upcase)
+expressions.yml	.services[0] | with_entries(.value |= .)
+expressions.yml	{"a": 1, "b": 2} | to_entries | reverse | from_entries
+expressions.yml	[{"key": "a", "value": 1}, {"key": "b", "value": 2}] | from_entries
+expressions.yml	{"a": "x", "b": "y"} | map_values(upcase)
+expressions.yml	{"a": 1, "b": 2} | map_values(. + 10)
+# String helpers
+expressions.yml	.metadata.owner | contains("atf")
+expressions.yml	.metadata.owner | contains("yaml")
+expressions.yml	.metadata.owner | split("t")
+expressions.yml	.metadata.region | split("e")
+expressions.yml	"a,b,c" | split(",")
+expressions.yml	"abc" | split("")
+expressions.yml	["a", "b", "c"] | join("-")
+expressions.yml	[1, 2, 3] | join(":")
+expressions.yml	[] | join(",")
+expressions.yml	.metadata.owner | upcase | downcase
+expressions.yml	.metadata.region | downcase | upcase
+expressions.yml	[.metadata.owner, .metadata.region] | join("/")
+expressions.yml	[.services[].name] | join(",")
+expressions.yml	"yaml.sh" | length
+expressions.yml	"" | length
+expressions.yml	"yaml" + "." + "sh"
+# Arithmetic and construction
+expressions.yml	1 + 2
+expressions.yml	10 - 3
+expressions.yml	6 * 7
+expressions.yml	9 / 2
+expressions.yml	10 % 3
+expressions.yml	2 * (3 + 4)
+expressions.yml	(10 - 2) / 4
+expressions.yml	.services[0].port + .services[2].port
+expressions.yml	.services[1].port - .services[0].port
+expressions.yml	.services[2].port * 3
+expressions.yml	.services[1].port / 10
+expressions.yml	.services[0].port % 100
+expressions.yml	[.services[].port] + [443]
+expressions.yml	.metadata + {"channel": "stable", "owner": "core"}
+expressions.yml	{"a": {"x": 1}} * {"a": {"y": 2}}
+expressions.yml	{"a": 1} + {"b": 2}
+expressions.yml	{"names": [.services[].name]}
+expressions.yml	{"ports": [.services[].port], "total": (.services | length)}
+expressions.yml	{"backend": [.services[] | select(.tier == "backend") | .name]}
+expressions.yml	[.metadata.region, .metadata.owner]
+expressions.yml	.metadata as $m | $m.owner
+expressions.yml	.services as $s | $s[1].name
+expressions.yml	.services[0] as $s | {"service": $s.name}
+expressions.yml	.metadata.owner as $owner | [$owner, ($owner | upcase)]
+# Updates and deletion
+expressions.yml	.metadata | .owner = "core"
+expressions.yml	.metadata | .region = "north"
+expressions.yml	.metadata | .channel = "stable" | .channel
+expressions.yml	.metadata | .owner += " team"
+expressions.yml	.services[0] | .port -= 80
+expressions.yml	.services[0] | .port *= 2
+expressions.yml	.services[0] | .name += "-v2"
+expressions.yml	.services[0] | .enabled |= not
+expressions.yml	.services | .[0].name = "gateway"
+expressions.yml	.services | .[-1].port += 1
+expressions.yml	.metadata | del(.owner)
+expressions.yml	.metadata | del(.missing)
+expressions.yml	.services[0] | del(.tier)
+expressions.yml	.services | del(.[0]) | map(.name)
+expressions.yml	.services | del(.[-1]) | map(.name)
+expressions.yml	.metadata.owner = "core" | .metadata.owner
+expressions.yml	.release.channel = "stable" | .release
+expressions.yml	.services[].enabled |= not | [.services[].enabled]
+# Advanced YAML structures and types
+advanced.yml	.mapping_alias
+advanced.yml	.mapping_alias.nested.enabled
+advanced.yml	.mapping_alias.values
+advanced.yml	.mapping_alias.values[]
+advanced.yml	.shared_list
+advanced.yml	.shared_list[0]
+advanced.yml	.flow
+advanced.yml	.flow.x
+advanced.yml	.flow.y
+advanced.yml	.flow_alias.x
+advanced.yml	.sequence_aliases
+advanced.yml	.sequence_aliases[0]
+advanced.yml	.sequence_aliases[1].x
+advanced.yml	.first
+advanced.yml	.second
+advanced.yml	.merged
+advanced.yml	.inline_merge
+advanced.yml	.literal_merge
+advanced.yml	.block_merge
+advanced.yml	.quoted_merge_key
+advanced.yml	.tagged_mapping.item
+advanced.yml	.types.string
+advanced.yml	.types.quoted_number
+advanced.yml	.types.null
+advanced.yml	.types.boolean
+advanced.yml	.types.octal
+advanced.yml	.types.hex
+advanced.yml	.types.trailing_float
+advanced.yml	.types.exponent
+advanced.yml	.types.forced_string
+advanced.yml	.["explicit key"]
+advanced.yml	.shared_list | length
+advanced.yml	.flow.y | map(upcase)
+advanced.yml	.merged + {"extra": true}
+# Legacy fixture shapes
+test.yml	.key_value
+test.yml	.loose_query.level1.top_key
+test.yml	.subtree.lower1
+test.yml	.subtree.lower3.upper1
+test.yml	.subtree.lower3.upper2
+test.yml	.subtree.lower3.upper2[]
+test.yml	.simple_list.list
+test.yml	.simple_list.list[0]
+test.yml	.simple_list.list[-1]
+test.yml	.simple_list.list[]
+test.yml	.object_list.list | map(.name)
+test.yml	.object_list.list | map(.value)
+test.yml	.object_list.list | sort_by(.value) | reverse | map(.name)
+test.yml	.expanded_list.list | map(.name)
+test.yml	.expanded_list.list | sort_by(.value) | reverse | .[0].name
+test.yml	.top_values.lower2.upper1.upper_upper1
+test.yml	.top_values.lower3 | join("-")
+test.yml	.simple_list.list | length
+test.yml	.object_list.list | length
+test.yml	.object_list.list | any_c(.value == 2)

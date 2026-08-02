@@ -71,7 +71,8 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, and merge edges where representable, but not comments or original presentation style.
 - Common in-place replacements, direct block inserts/deletes, and pure sequence reorders preserve comments, whitespace, quoting, block/flow style, anchors, tags, and directives. Other structural changes fall back to semantic YAML.
 - Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
-- The expression language does not implement interpolation, regular expressions, slices, grouping, ireduce, comment/style mutation operators, file-loading operators, or yq's non-YAML codecs.
+- Sequence slices, scalar interpolation, grouping, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
+- The expression language does not implement ireduce, comment/style mutation operators, file-loading operators, date operators, or yq's non-YAML codecs.
 
 YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond this contract is required.
 
@@ -79,18 +80,20 @@ YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth 
 
 Pinned release gates:
 
-| Gate | v1.5 |
+| Gate | v1.6 |
 | --- | ---: |
 | YAML Test Suite expected outcomes | 282/282 |
 | YAML Test Suite strict-invalid inputs rejected | 91/91 |
-| Shared programs matching yq v4.53.3 | 330/330 |
-| Behavioral tests | 73 |
-| Deterministic generated properties | 250/250 |
+| Categorized programs matching yq v4.53.3 | 1,110/1,110 |
+| Behavioral tests | 75 |
+| Grammar-guided generated properties | 10,000/10,000 |
+| Exact presentation mutations | 250/250 |
+| Scale contract | 100,000 payload nodes; 1,000 documents |
 
 Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh correctly counts their rejection rather than imitating a partial AST. These measurements are not a claim of universal YAML or yq compliance. CI spans macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and multiple POSIX shells.
 
 ## Fixtures
 
-The advanced fixture covers anchors, collection aliases, merge precedence, block merge lists, directives, expanded tags, scalar types, explicit keys, empty collections, punctuated keys, and document scoping. The expression fixture covers streams, filters, construction, arithmetic, recursion, assignments, maps, entries, variables, dynamic indexes, reducers, deep merge, YAML round-tripping, multi-document updates, and presentation preservation. Rejection tests cover boundaries that could otherwise be misread as supported syntax.
+The advanced fixture covers anchors, collection aliases, merge precedence, block merge lists, directives, expanded tags, scalar types, explicit keys, empty collections, punctuated keys, and document scoping. The expression fixture covers streams, filters, slices, interpolation, regexes, construction, arithmetic, assignments, variables, reducers, deep merge, round-tripping, multi-document updates, and presentation preservation. Rejection tests cover boundaries that could otherwise be misread as supported syntax.
 
-See [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh), [`test/conformance.sh`](https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh), [`test/differential.sh`](https://github.com/azohra/yaml.sh/blob/main/test/differential.sh), and [`test/fuzz.sh`](https://github.com/azohra/yaml.sh/blob/main/test/fuzz.sh).
+See [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh), [`test/conformance.sh`](https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh), [`test/differential.sh`](https://github.com/azohra/yaml.sh/blob/main/test/differential.sh), [`test/fuzz.sh`](https://github.com/azohra/yaml.sh/blob/main/test/fuzz.sh), and [`bench/scale.sh`](https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh).

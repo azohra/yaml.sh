@@ -6,7 +6,7 @@ Thanks for improving YAML.sh. Keep changes compatible with POSIX `/bin/sh` and t
 
 1. Add or update a test in `test/test.sh`. Parser fixtures belong in `test/`.
 2. Edit the readable sources in `src/`. Do not edit the generated `ysh` executable by hand.
-3. Run `make all` to rebuild, lint, and test the project. Parser and evaluator changes should also run `make fuzz` and the pinned conformance/differential gates.
+3. Run `make all` to rebuild, lint, and test the project. Parser and evaluator changes should also run `make fuzz`, `make presentation`, `make scale`, and the pinned conformance/differential gates.
 4. Update the documentation and changelog for user-visible changes.
 
 Release numbers follow [Semantic Versioning](VERSIONING.md). Compatible additions belong in a minor release, compatible fixes in a patch release, and a new major requires an intentional, documented compatibility break.

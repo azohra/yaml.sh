@@ -16,9 +16,13 @@ src/ysh.awk             YAML engine
 test/test.sh            behavioral suite
 test/conformance.sh     pinned YAML Test Suite gate
 test/differential.sh    pinned yq comparison gate
-test/fuzz.sh            deterministic generated properties
+test/yq-corpus-base.tsv hand-written differential cases
+test/generate-yq-corpus.sh reproducible categorized expansion
+test/fuzz.sh            grammar-guided replayable properties
+test/presentation-matrix.sh exact compound-edit matrix
 test/adversarial.sh     resource and recursion guards
 bench/benchmark.sh      repeatable throughput sample
+bench/scale.sh          100,000-node resource contract
 test/advanced.yml       v1 conformance fixture
 test/expressions.yml    v1 expression and transformation fixture
 _static/_www            unified Cloudflare Pages site
@@ -38,7 +42,7 @@ For every supported feature:
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 
-Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available. `make fuzz`, `make adversarial`, and `make benchmark` cover generated structure, hostile shapes, and throughput.
+Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover generated grammar, exact source retention, hostile shapes, and bounded scale.
 
 ## Add expression behavior
 

@@ -1,6 +1,6 @@
 # Parser internals
 
-Version 1.5 is still one shell script, with a semantic graph and source-presentation layer working together.
+Version 1.6 is still one shell script, with a semantic graph and source-presentation layer working together.
 
 ```text
 /bin/sh CLI
@@ -20,7 +20,7 @@ presentation patcher or value / JSON / YAML / metadata / AST / events
 
 ## The shell layer
 
-The `/bin/sh` launcher handles arguments, input, output mode, and atomic in-place replacement. It feeds the embedded program to AWK through a here-document, avoiding small `ARG_MAX` limits in minimal systems.
+The `/bin/sh` launcher handles arguments, input, output mode, and atomic in-place replacement. It feeds the embedded program to AWK through a here-document, avoiding small `ARG_MAX` limits in minimal systems. Query text travels through the POSIX environment so AWK never rewrites backslashes before lexing interpolation or regex syntax.
 
 The development sources remain separate:
 
@@ -57,7 +57,7 @@ The expression parser builds an operator tree with explicit precedence for strea
 
 Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Assignments replace the selected graph nodes; missing mapping paths use attachable placeholders. Computed booleans, strings, numbers, constructed collections, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
 
-The semantic emitter walks the graph and produces stable block YAML. Separately, the v1.5 presentation tracker patches common replacements, block inserts/deletes, and sequence reorders into original source spans while retaining properties and attached comments. Other mutations use the semantic emitter.
+The semantic emitter walks the graph and produces stable block YAML. Separately, the v1.6 presentation tracker patches common replacements, block inserts/deletes, and sequence reorders into original source spans while retaining properties and attached comments. Other mutations use the semantic emitter.
 
 ## Diagnostics
 

@@ -5,7 +5,7 @@ YAML.sh ships as one executable text file. The released file contains both the p
 ## Install the pinned release
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.5.0/ysh -o ysh
+curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.6.0/ysh -o ysh
 chmod +x ysh
 sudo mv ysh /usr/local/bin/ysh
 ```
@@ -75,6 +75,13 @@ Use a default when a path is missing, null, or false:
 ```sh
 ysh '.release.channel // "stable"' config.yml
 # stable
+```
+
+Slice and label a result:
+
+```sh
+ysh '"\(.server.host):\(.server.ports[0:2] | length)"' config.yml
+# localhost:2
 ```
 
 Transform and emit YAML:
