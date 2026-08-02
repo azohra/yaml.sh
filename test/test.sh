@@ -531,6 +531,23 @@ testStrictGrammarAndEdgeSyntax() {
     assertNotEquals 0 $?
 }
 
+testResourceLimits() {
+    result=$(printf '%s\n' 'key: value' | ./ysh --max-input-bytes 4 --json '.' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "input size limit exceeded"
+
+    result=$(printf '%s\n' 'key: value' | ./ysh --max-nodes 2 --json '.' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "node limit exceeded"
+
+    result=$(printf '%s\n' 'one:' '  two:' '    three: value' | ./ysh --max-depth 1 --json '.' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "depth limit exceeded"
+
+    ./ysh --max-nodes nope '.' test/test.yml >/dev/null 2>&1
+    assertEquals 2 $?
+}
+
 testQueryErrors() {
     result=$(./ysh "missing" test/test.yml 2>&1)
     assertNotEquals 0 $?

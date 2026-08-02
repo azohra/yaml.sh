@@ -1,7 +1,7 @@
 BUILDERS = $(shell find build/*)
 INSTALL_DIR=/usr/local/bin
 
-.PHONY: lint test conformance differential all install uninstall docs clean
+.PHONY: lint test conformance differential fuzz adversarial benchmark all install uninstall docs clean
 
 all: ysh lint test
 
@@ -12,7 +12,7 @@ ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh test/test.sh test/conformance.sh test/differential.sh _static/_www/install
+	@shellcheck -e SC2016 ysh test/test.sh test/conformance.sh test/differential.sh test/fuzz.sh test/adversarial.sh bench/benchmark.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
@@ -25,6 +25,18 @@ conformance: ysh
 differential: ysh
 	@echo "⚖️  Comparing with yq"
 	@./test/differential.sh
+
+fuzz: ysh
+	@echo "🧬 Running deterministic properties"
+	@./test/fuzz.sh
+
+adversarial: ysh
+	@echo "🛡️  Exercising resource limits"
+	@./test/adversarial.sh
+
+benchmark: ysh
+	@echo "⏱️  Measuring parser and query throughput"
+	@./bench/benchmark.sh
 
 install: ysh
 	@echo "📦 Installing ysh"

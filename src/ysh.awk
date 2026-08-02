@@ -563,6 +563,9 @@ function parse_properties(value, source_line,    separator, token) {
 }
 
 function new_node(kind, source_line, value, value_type, tag,    node) {
+    if (max_nodes > 0 && node_count >= max_nodes) {
+        fail("node limit exceeded (max " max_nodes ")")
+    }
     node = ++node_count
     node_kind[node] = kind
     node_line[node] = source_line
@@ -631,6 +634,10 @@ function add_mapping(parent, key, child, source_line, is_merge,    seen_key, ent
     mapping_merge[parent, entry] = is_merge
     node_parent[child] = parent
     node_parent_edge[child] = "key " key
+    node_depth[child] = node_depth[parent] + 1
+    if (max_depth > 0 && node_depth[child] > max_depth) {
+        fail("collection depth limit exceeded (max " max_depth ")")
+    }
 }
 
 function add_sequence(parent, child, source_line,    entry) {
@@ -639,6 +646,10 @@ function add_sequence(parent, child, source_line,    entry) {
     sequence_child[parent, entry] = child
     node_parent[child] = parent
     node_parent_edge[child] = "index " (entry - 1)
+    node_depth[child] = node_depth[parent] + 1
+    if (max_depth > 0 && node_depth[child] > max_depth) {
+        fail("collection depth limit exceeded (max " max_depth ")")
+    }
 }
 
 function alias_node(name, source_line,    key, node) {
@@ -4449,6 +4460,10 @@ BEGIN {
 }
 
 {
+    input_byte_count += length($0) + 1
+    if (max_input_bytes > 0 && input_byte_count > max_input_bytes) {
+        fail("input size limit exceeded (max " max_input_bytes " bytes)")
+    }
     raw_input_line[NR] = $0
     if (block_active) {
         process_line($0, NR)
