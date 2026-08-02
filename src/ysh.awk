@@ -408,7 +408,10 @@ function find_top_level_colon(value, require_space,    i, char, next_char, previ
 }
 
 function find_mapping_separator(value, require_space,    offset, remainder, space, separator) {
-    if (value ~ /^\*[^[:space:]\[\]{},]+:$/) {
+    if (value ~ /^\*[^[:space:]]+:$/ &&
+        index(value, "[") == 0 && index(value, "]") == 0 &&
+        index(value, "{") == 0 && index(value, "}") == 0 &&
+        index(value, ",") == 0) {
         return 0
     }
     offset = 1
@@ -4490,7 +4493,9 @@ BEGIN {
         flow_line_prefix = $0
         sub(/[^ ].*$/, "", flow_line_prefix)
         flow_line_trimmed = trim($0)
-        if (flow_line_trimmed != "" && flow_line_trimmed !~ /^#/ && flow_line_trimmed !~ /^[}\]]/ &&
+        flow_line_first = substr(flow_line_trimmed, 1, 1)
+        if (flow_line_trimmed != "" && flow_line_trimmed !~ /^#/ &&
+            flow_line_first != "}" && flow_line_first != "]" &&
             length(flow_line_prefix) < multiline_flow_min_indent) {
             fail("invalid flow collection indentation on line " NR)
         }
@@ -4510,7 +4515,8 @@ BEGIN {
         if (multiline_flow_comment_break) {
             flow_previous = trim(multiline_flow_text)
             flow_previous = substr(flow_previous, length(flow_previous), 1)
-            if (flow_previous != "," && flow_line_trimmed !~ /^[,}\]]/) {
+            if (flow_previous != "," && flow_line_first != "," &&
+                flow_line_first != "}" && flow_line_first != "]") {
                 fail("flow entries separated by a comment require a comma on line " NR)
             }
             multiline_flow_comment_break = 0
