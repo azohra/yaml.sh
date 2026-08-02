@@ -1,50 +1,72 @@
 # YAML without the luggage
 
-YAML.sh is a yq-like query tool delivered as one portable shell script. It runs with the system `/bin/sh` and AWK, making it useful in bootstrap scripts, minimal containers, CI jobs, old machines, and every awkward environment where installing a language runtime feels absurd.
-
-> Version 1.7 matches 2,610 categorized yq programs plus cross-file cases, while keeping the runtime to one shell file and AWK.
+YAML.sh is a focused, yq-like tool delivered as one readable shell file. It runs anywhere with `/bin/sh` and AWK: bootstrap scripts, minimal containers, old machines, and recovery environments where installing the better-known tool is the problem.
 
 ```sh
-ysh '.server.host' config.yml
-# localhost
-
-ysh -o=json '.services[0]' config.yml
-# {"name":"api","enabled":true}
-
 ysh '.services[] | select(.enabled) | .name' config.yml
-# api
-# web
-
 ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 ```
 
-## Why it exists
+## Start with the task
 
-Sometimes `yq` is exactly the right answer. Sometimes you are writing the script that would install `yq`.
+- [Install one file and run the first query](getting-started.md).
+- [Copy a recipe for filtering, updates, environment, or file merging](recipes.md).
+- [Learn the query language](queries.md).
+- [Choose value, JSON, YAML, metadata, AST, or events](output.md).
+- [Work across files and document streams](documents.md).
 
-YAML.sh aims for the useful middle: familiar yq-style paths, streams, filters, construction, and updates; serious handling of common YAML structures; one auditable file; and no additional packages. It does not pretend that YAML is simple or claim complete specification compliance.
+## The tiny idea
 
-## What changed in v1
+Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.
 
-| Before | Version 1 |
-| --- | --- |
-| Flattened `path="value"` records | A real mapping, sequence, scalar, and alias graph |
-| Chainable query flags | One yq-style query expression |
-| Bash runtime | Portable `/bin/sh` launcher |
-| Collection identity lost | Empty mappings and sequences preserved |
-| Tag syntax mostly discarded | Expanded tags attached to nodes |
-| Inline merge subset | Alias lists, flow mappings, and block merge sequences |
+YAML.sh lives in that second moment. It keeps the useful configuration workflow while protecting the premise:
 
-Version 1 made the graph writable. Version 1.7 adds environment composition, context operators, focused collections, multiple inputs, and practical `eval-all`.
+- one auditable text executable;
+- a portable POSIX shell launcher and AWK engine;
+- real mappings, sequences, tags, anchors, aliases, and merge behavior;
+- a writable expression stream rather than chained query flags;
+- no package manager, runtime, plugin system, or hidden binary.
 
-## Pick a path
+## Real structure
 
-- [Install YAML.sh and run the first query](getting-started.md)
-- [Learn the query grammar](queries.md)
-- [See exactly which YAML features work](supported_yml.md)
-- [Compare the focused surface with yq](yq-compatibility.md)
-- [Migrate a v0.x command](migration.md)
-- [Open the parser hood](internals.md)
-- [See how releases are versioned](versioning.md)
+```text
+YAML source
+    ↓
+tokens and parser events
+    ↓
+mapping / sequence / scalar / alias graph
+    ↓
+merge resolution and expression streams
+    ↓
+value / JSON / YAML / metadata
+```
 
-YAML.sh is built for fun, but the support contract is serious.
+The graph is why empty collections survive, punctuated keys behave, aliases retain identity, and in-place changes can preserve source presentation.
+
+## Honest boundaries
+
+The useful overlap with yq is large, but deliberate. YAML.sh does not implement non-YAML codecs, dates, file-loading operators, dynamic evaluation, system execution, or yq's complete operator and flag surface.
+
+The project publishes two contracts instead of a compatibility percentage:
+
+- [YAML support](supported_yml.md) records parser behavior and measured evidence.
+- [yq compatibility](yq-compatibility.md) records the useful overlap and intentional omissions.
+
+Unsupported neighboring syntax should fail explicitly, not produce a plausible lie.
+
+## Trust it appropriately
+
+Input bytes, graph nodes, and nesting depth have configurable ceilings. Environment access can be disabled. In-place writes reject symlinks and only replace a file after the full transformation succeeds.
+
+Read [security and limits](security.md) before handling untrusted documents or expressions.
+
+## Open the hood
+
+```sh
+ysh --events config.yml
+ysh --ast config.yml
+```
+
+The [internals guide](internals.md) follows a document through the parser. The [development guide](development.md) explains how each new promise earns fixtures, differential cases, rejection tests, and portability evidence.
+
+YAML.sh is built for fun. The support contract is serious.

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Choose value, JSON, YAML, metadata, AST, or events.">
+  <meta name="theme-color" content="#101410">
+  <meta property="og:title" content="Output &amp; metadata · YAML.sh">
+  <meta property="og:description" content="Choose value, JSON, YAML, metadata, AST, or events.">
+  <meta property="og:image" content="https://yaml.azohra.com/og.png">
+  <link rel="canonical" href="https://yaml.azohra.com/docs/output/">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/docs/docs.css">
+  <script src="/docs/docs.js" defer></script>
+  <title>Output &amp; metadata · YAML.sh docs</title>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="/" aria-label="YAML.sh home"><span class="mark" aria-hidden="true">Y</span><span>YAML<em>.sh</em></span></a>
+    <nav aria-label="Primary">
+      <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
+      <a aria-current="page" href="/docs/">Docs</a>
+      <a href="https://github.com/azohra/yaml.sh">GitHub</a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.7.0</span></a>
+    </nav>
+  </header>
+  <details class="mobile-docs"><summary>Browse documentation</summary><nav>
+          <section class="nav-group">
+            <p class="nav-title">Start</p>
+            <ul>
+              <li><a href="/docs/">Overview</a></li>
+              <li><a href="/docs/getting-started/">Install & quick start</a></li>
+              <li><a href="/docs/recipes/">Recipes</a></li>
+            </ul>
+          </section>
+          <section class="nav-group">
+            <p class="nav-title">Use</p>
+            <ul>
+              <li><a href="/docs/queries/">Query language</a></li>
+              <li><a href="/docs/documents/">Files & documents</a></li>
+              <li><a href="/docs/output/" aria-current="page">Output & metadata</a></li>
+              <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
+            </ul>
+          </section>
+          <section class="nav-group">
+            <p class="nav-title">Trust</p>
+            <ul>
+              <li><a href="/docs/supported_yml/">YAML support</a></li>
+              <li><a href="/docs/security/">Security & limits</a></li>
+              <li><a href="/docs/internals/">How it works</a></li>
+              <li><a href="/docs/development/">Development</a></li>
+            </ul>
+          </section>
+          <section class="nav-group">
+            <p class="nav-title">Project</p>
+            <ul>
+              <li><a href="/docs/versioning/">Versioning</a></li>
+            </ul>
+          </section>
+  </nav></details>
+  <div class="docs-shell">
+    <aside class="docs-nav" aria-label="Documentation">
+      <button class="search-trigger" type="button" data-search-open><span>Search docs</span><kbd>/</kbd></button>
+      <nav>
+          <section class="nav-group">
+            <p class="nav-title">Start</p>
+            <ul>
+              <li><a href="/docs/">Overview</a></li>
+              <li><a href="/docs/getting-started/">Install & quick start</a></li>
+              <li><a href="/docs/recipes/">Recipes</a></li>
+            </ul>
+          </section>
+          <section class="nav-group">
+            <p class="nav-title">Use</p>
+            <ul>
+              <li><a href="/docs/queries/">Query language</a></li>
+              <li><a href="/docs/documents/">Files & documents</a></li>
+              <li><a href="/docs/output/" aria-current="page">Output & metadata</a></li>
+              <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
+            </ul>
+          </section>
+          <section class="nav-group">
+            <p class="nav-title">Trust</p>
+            <ul>
+              <li><a href="/docs/supported_yml/">YAML support</a></li>
+              <li><a href="/docs/security/">Security & limits</a></li>
+              <li><a href="/docs/internals/">How it works</a></li>
+              <li><a href="/docs/development/">Development</a></li>
+            </ul>
+          </section>
+          <section class="nav-group">
+            <p class="nav-title">Project</p>
+            <ul>
+              <li><a href="/docs/versioning/">Versioning</a></li>
+            </ul>
+          </section>
+      </nav>
+      <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
+    </aside>
+    <main id="content" class="doc-content">
+      <div class="eyebrow"><span>Documentation</span><span>v1.7.0</span></div>
+      <article>
+          <h1 id="output-metadata">Output &amp; metadata</h1>
+          <p>The same query can return a value, JSON, YAML, a node type, its expanded tag, or its source line.</p>
+          <h2 id="default-value-output"><a href="#default-value-output">Default value output<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Scalar nodes print decoded text:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh '.server.host' config.yml
+# localhost
+</code></pre>
+          </div>
+          <p>Mappings and sequences emit compact JSON because a collection cannot be represented safely as one unquoted shell value.</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh '.server.ports' config.yml
+# [8080,8443]
+</code></pre>
+          </div>
+          <p>Expressions may return more than one node. Each scalar or compact JSON collection is written on its own line:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh '.services[] | select(.enabled) | .name' config.yml
+# api
+# web
+</code></pre>
+          </div>
+          <h2 id="json"><a href="#json">JSON<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Use <code>--json</code>, <code>-o=json</code>, or <code>--output-format=json</code>:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh -o=json '.service' config.yml
+</code></pre>
+          </div>
+          <p>Recognized nulls, booleans, integers, and finite floats become native JSON values. Strings, timestamps, and application-tagged scalars are JSON strings. Non-finite YAML floats are quoted because JSON has no equivalent value.</p>
+          <h2 id="yaml"><a href="#yaml">YAML<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Use <code>-y</code>, <code>-o=yaml</code>, or <code>--output-format=yaml</code> to serialize selected or transformed nodes:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh -o=yaml '.release.channel = &quot;stable&quot;' config.yml
+</code></pre>
+          </div>
+          <p>Multiple results are separated with <code>---</code>, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.</p>
+          <p>The emitter is semantic. It deliberately uses a stable block layout and quotes string values and ordinary mapping keys. Comments, blank lines, original quote choices, flow-vs-block style, directive spelling, and exact scalar formatting are not retained when this emitter is selected directly.</p>
+          <p>Version 1.7 keeps the rich <code>-i</code> presentation layer. Common replacements, direct block inserts/deletes, and pure sequence reorders patch the original source, retaining comments, whitespace, quoting, flow/block style, anchors, tags, and directives. Other structural changes use the semantic emitter. Replacement is atomic through a sibling temporary file, preserves permission bits, and refuses symlinks.</p>
+          <h2 id="type"><a href="#type">Type<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh --type '.release.date' config.yml
+# timestamp
+</code></pre>
+          </div>
+          <p>Possible reports are:</p>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Node</th>
+              <th>Types</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td>Collections</td>
+                <td><code>mapping</code>, <code>sequence</code></td>
+              </tr>
+              <tr>
+                <td>Scalars</td>
+                <td><code>string</code>, <code>null</code>, <code>bool</code>, <code>int</code>, <code>float</code>, <code>timestamp</code>, <code>tagged</code></td>
+              </tr>
+            </tbody>
+          </table></div>
+          <p>Type recognition never changes the default text returned for a scalar.</p>
+          <h2 id="tag"><a href="#tag">Tag<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh --tag '.widget' config.yml
+# tag:example.com,2026:widget
+</code></pre>
+          </div>
+          <p>Standard <code>!!</code> tags and handles declared with <code>%TAG</code> are expanded. Application constructors are not executed.</p>
+          <h2 id="source-line"><a href="#source-line">Source line<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh --line '.server.host' config.yml
+# 3
+</code></pre>
+          </div>
+          <p>For an alias selection, the reported line is the alias occurrence. Type, tag, and value output resolve through the alias target.</p>
+          <p>Computed expression values such as comparison results, <code>length</code>, <code>keys</code>, <code>kind</code>, and literals have source line zero because they do not occur in the YAML stream.</p>
+          <h2 id="ast"><a href="#ast">AST<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p><code>--ast</code> prints the node table and its edges:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh --ast config.yml
+</code></pre>
+          </div>
+          <p>The output includes node IDs, kinds, scalar values and types, tags, anchors, alias targets, source lines, mapping keys, indexes, and merge markers.</p>
+          <h2 id="events"><a href="#events">Events<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p><code>--events</code> prints a parser-style view:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh --events config.yml
+</code></pre>
+          </div>
+          <p>This is useful while extending the parser or reducing an unexpected input to a minimal test case.</p>
+      </article>
+      <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Read the contract</span><strong>See exactly what works →</strong></a></nav>
+    </main>
+    <aside class="page-nav" aria-label="On this page">
+      <strong>On this page</strong>
+      <ol>
+        <li class="level-2"><a href="#default-value-output">Default value output</a></li>
+        <li class="level-2"><a href="#json">JSON</a></li>
+        <li class="level-2"><a href="#yaml">YAML</a></li>
+        <li class="level-2"><a href="#type">Type</a></li>
+        <li class="level-2"><a href="#tag">Tag</a></li>
+        <li class="level-2"><a href="#source-line">Source line</a></li>
+        <li class="level-2"><a href="#ast">AST</a></li>
+        <li class="level-2"><a href="#events">Events</a></li>
+      </ol>
+      <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/output.md">Edit this page</a>
+    </aside>
+  </div>
+  <dialog class="search-dialog" data-search-dialog>
+    <form method="dialog" class="search-box"><label for="docs-search">Search the docs</label><button value="close" aria-label="Close search">×</button><input id="docs-search" type="search" autocomplete="off" placeholder="Try “merge files” or “envsubst”"><div class="search-results" aria-live="polite"></div><p><kbd>↑</kbd><kbd>↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close</p></form>
+  </dialog>
+  <footer class="site-footer"><p>YAML.sh · yq energy, zero baggage.</p><p><a href="https://github.com/azohra/yaml.sh">Source</a> · <a href="/docs/development/">Contribute</a> · <a href="/docs/versioning/">Versioning</a></p></footer>
+</body>
+</html>

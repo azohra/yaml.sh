@@ -1,0 +1,65 @@
+# Security & limits
+
+YAML.sh parses data. It does not evaluate YAML as shell, load neighboring files, run commands, or execute application-specific tag constructors.
+
+## The small security model
+
+- No `load`, dynamic `eval`, system execution, network, or plugin operators.
+- No application-specific object construction from YAML tags.
+- Environment access is limited to explicit `env`, `strenv`, and `envsubst` operators.
+- In-place writes reject symlinks and replace a file only after a successful complete transformation.
+- Input bytes, graph nodes, and nesting depth have hard configurable ceilings.
+
+This is a narrower attack surface than a general automation language. It is not a sandbox for arbitrary expressions: a query can still consume CPU and memory up to the configured limits.
+
+## Bound input
+
+```sh
+ysh \
+  --max-input-bytes 1048576 \
+  --max-nodes 20000 \
+  --max-depth 80 \
+  '.metadata.name' untrusted.yml
+```
+
+| Limit | Protects against |
+| --- | --- |
+| `--max-input-bytes` | Oversized files and streams |
+| `--max-nodes` | Documents or expressions that create too many graph nodes |
+| `--max-depth` | Excessively nested collections and recursive traversal |
+
+The release scale gate parses 125,000 payload nodes and 1,500 documents under a 224 MiB RSS ceiling. That is evidence for the tested workload, not a universal resource guarantee.
+
+## Disable environment access
+
+Expressions only read environment variables when they use an environment operator. Disable those operators entirely when the expression comes from another trust boundary:
+
+```sh
+ysh --security-disable-env-ops "$UNTRUSTED_QUERY" config.yml
+```
+
+The flag makes `env`, `strenv`, and `envsubst` fail rather than returning an empty value.
+
+## Treat queries as programs
+
+Do not splice untrusted strings into a query. Pass data through YAML files or controlled environment variables instead.
+
+```sh
+# Avoid constructing syntax from data.
+ysh ".users.$UNTRUSTED_NAME" config.yml
+
+# Prefer a controlled variable value and a fixed expression.
+USER_NAME="$UNTRUSTED_NAME" ysh '.users[strenv(USER_NAME)]' config.yml
+```
+
+Use `--security-disable-env-ops` when even that environment read is inappropriate.
+
+## In-place writes
+
+`-i` requires one real file. YAML.sh creates a sibling temporary file, preserves permissions, transforms every document, and only then replaces the original. It refuses symlinks to avoid redirecting a write through an unexpected target.
+
+Keep normal backups and version control. Atomic replacement protects against partial output, not a logically wrong query.
+
+## Reporting a vulnerability
+
+Do not open a public issue for an undisclosed vulnerability. Follow the repository [security policy](https://github.com/azohra/yaml.sh/security/policy).

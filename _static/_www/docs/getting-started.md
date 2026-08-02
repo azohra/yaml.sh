@@ -2,15 +2,9 @@
 
 YAML.sh ships as one executable text file. The released file contains both the portable shell launcher and the AWK engine.
 
-## Install the pinned release
+## Install the release
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/azohra/yaml.sh/v1.7.0/ysh -o ysh
-chmod +x ysh
-sudo mv ysh /usr/local/bin/ysh
-```
-
-Or run the small installer:
+The hosted installer downloads the release artifact, verifies its pinned SHA-256 digest, then writes it to the install directory:
 
 ```sh
 curl -fsSL https://yaml.azohra.com/install | sh
@@ -125,7 +119,7 @@ generate-config | ysh '.release.version' -
 Environment values can stay strings or be parsed as YAML:
 
 ```sh
-IMAGE_TAG=v1.7 ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
+IMAGE_TAG=stable ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
 LIMITS='{cpu: 2, memory: 1Gi}' ysh '.resources = env(LIMITS)' deploy.yml
 ```
 
@@ -142,3 +136,5 @@ ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml prod
 - [Choose value, JSON, YAML, type, tag, or line output](output.md)
 - [Read the YAML support contract](supported_yml.md)
 - [Compare the focused surface with yq](yq-compatibility.md)
+
+Maintaining a script written for the original command interface? Use the focused [legacy migration guide](migration.md).

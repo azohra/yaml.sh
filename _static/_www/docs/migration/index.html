@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Install, query, transform, and understand YAML.sh.">
+  <meta name="description" content="Move scripts from the pre-v1 interface.">
   <meta name="theme-color" content="#101410">
-  <meta property="og:title" content="YAML without the luggage · YAML.sh">
-  <meta property="og:description" content="Install, query, transform, and understand YAML.sh.">
+  <meta property="og:title" content="Migrate from v0.x · YAML.sh">
+  <meta property="og:description" content="Move scripts from the pre-v1 interface.">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
-  <link rel="canonical" href="https://yaml.azohra.com/docs/">
+  <link rel="canonical" href="https://yaml.azohra.com/docs/migration/">
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/docs/docs.css">
   <script src="/docs/docs.js" defer></script>
-  <title>YAML without the luggage · YAML.sh docs</title>
+  <title>Migrate from v0.x · YAML.sh docs</title>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
@@ -29,7 +29,7 @@
           <section class="nav-group">
             <p class="nav-title">Start</p>
             <ul>
-              <li><a href="/docs/" aria-current="page">Overview</a></li>
+              <li><a href="/docs/">Overview</a></li>
               <li><a href="/docs/getting-started/">Install & quick start</a></li>
               <li><a href="/docs/recipes/">Recipes</a></li>
             </ul>
@@ -66,7 +66,7 @@
           <section class="nav-group">
             <p class="nav-title">Start</p>
             <ul>
-              <li><a href="/docs/" aria-current="page">Overview</a></li>
+              <li><a href="/docs/">Overview</a></li>
               <li><a href="/docs/getting-started/">Install & quick start</a></li>
               <li><a href="/docs/recipes/">Recipes</a></li>
             </ul>
@@ -101,81 +101,89 @@
     <main id="content" class="doc-content">
       <div class="eyebrow"><span>Documentation</span><span>v1.7.0</span></div>
       <article>
-          <h1 id="yaml-without-the-luggage">YAML without the luggage</h1>
-          <p>YAML.sh is a focused, yq-like tool delivered as one readable shell file. It runs anywhere with <code>/bin/sh</code> and AWK: bootstrap scripts, minimal containers, old machines, and recovery environments where installing the better-known tool is the problem.</p>
+          <h1 id="migrate-from-v0-x">Migrate from v0.x</h1>
+          <p>Version 1 intentionally breaks the old CLI. The public transpiled representation and chainable query operations were the architectural constraint preventing YAML.sh from preserving real YAML structure.</p>
+          <h2 id="file-queries"><a href="#file-queries">File queries<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh '.services[] | select(.enabled) | .name' config.yml
-ysh -i '.services[] | select(.enabled) | .tier = &quot;active&quot;' config.yml
+            <pre><code class="language-sh"># v0.x
+ysh -f config.yml -Q 'server.host'
+
+# v1
+ysh '.server.host' config.yml
 </code></pre>
           </div>
-          <h2 id="start-with-the-task"><a href="#start-with-the-task">Start with the task<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <ul>
-            <li><a href="/docs/getting-started/">Install one file and run the first query</a>.</li>
-            <li><a href="/docs/recipes/">Copy a recipe for filtering, updates, environment, or file merging</a>.</li>
-            <li><a href="/docs/queries/">Learn the query language</a>.</li>
-            <li><a href="/docs/output/">Choose value, JSON, YAML, metadata, AST, or events</a>.</li>
-            <li><a href="/docs/documents/">Work across files and document streams</a>.</li>
-          </ul>
-          <h2 id="the-tiny-idea"><a href="#the-tiny-idea">The tiny idea<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.</p>
-          <p>YAML.sh lives in that second moment. It keeps the useful configuration workflow while protecting the premise:</p>
-          <ul>
-            <li>one auditable text executable;</li>
-            <li>a portable POSIX shell launcher and AWK engine;</li>
-            <li>real mappings, sequences, tags, anchors, aliases, and merge behavior;</li>
-            <li>a writable expression stream rather than chained query flags;</li>
-            <li>no package manager, runtime, plugin system, or hidden binary.</li>
-          </ul>
-          <h2 id="real-structure"><a href="#real-structure">Real structure<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <div class="code-block">
-            <div class="code-head"><span>text</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-text">YAML source
-    ↓
-tokens and parser events
-    ↓
-mapping / sequence / scalar / alias graph
-    ↓
-merge resolution and expression streams
-    ↓
-value / JSON / YAML / metadata
-</code></pre>
-          </div>
-          <p>The graph is why empty collections survive, punctuated keys behave, aliases retain identity, and in-place changes can preserve source presentation.</p>
-          <h2 id="honest-boundaries"><a href="#honest-boundaries">Honest boundaries<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The useful overlap with yq is large, but deliberate. YAML.sh does not implement non-YAML codecs, dates, file-loading operators, dynamic evaluation, system execution, or yq's complete operator and flag surface.</p>
-          <p>The project publishes two contracts instead of a compatibility percentage:</p>
-          <ul>
-            <li><a href="/docs/supported_yml/">YAML support</a> records parser behavior and measured evidence.</li>
-            <li><a href="/docs/yq-compatibility/">yq compatibility</a> records the useful overlap and intentional omissions.</li>
-          </ul>
-          <p>Unsupported neighboring syntax should fail explicitly, not produce a plausible lie.</p>
-          <h2 id="trust-it-appropriately"><a href="#trust-it-appropriately">Trust it appropriately<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Input bytes, graph nodes, and nesting depth have configurable ceilings. Environment access can be disabled. In-place writes reject symlinks and only replace a file after the full transformation succeeds.</p>
-          <p>Read <a href="/docs/security/">security and limits</a> before handling untrusted documents or expressions.</p>
-          <h2 id="open-the-hood"><a href="#open-the-hood">Open the hood<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h2 id="standard-input"><a href="#standard-input">Standard input<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --events config.yml
-ysh --ast config.yml
+            <pre><code class="language-sh"># v0.x and v1 both accept standard input,
+# but v1 uses the query as the positional argument.
+generate-config | ysh '.server.host'
 </code></pre>
           </div>
-          <p>The <a href="/docs/internals/">internals guide</a> follows a document through the parser. The <a href="/docs/development/">development guide</a> explains how each new promise earns fixtures, differential cases, rejection tests, and portability evidence.</p>
-          <p>YAML.sh is built for fun. The support contract is serious.</p>
+          <h2 id="collections"><a href="#collections">Collections<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh"># v0.x
+ysh -f config.yml -l 'services'
+
+# v1
+ysh '.services' config.yml
+</code></pre>
+          </div>
+          <p>Version 1 emits a selected collection as compact JSON. Use <code>-o=json</code> to make scalar JSON encoding explicit as well.</p>
+          <h2 id="source-lines-and-types"><a href="#source-lines-and-types">Source lines and types<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh"># v0.x
+ysh -f config.yml --line 'server.host'
+
+# v1
+ysh --line '.server.host' config.yml
+</code></pre>
+          </div>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh --type '.server.port' config.yml
+</code></pre>
+          </div>
+          <h2 id="multiple-documents"><a href="#multiple-documents">Multiple documents<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>The chainable <code>--next</code> operation is replaced with direct indexing:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh"># v0.x
+data=$(ysh -f stream.yml)
+ysh -T &quot;$data&quot; --next -Q 'name'
+
+# v1
+ysh --document 1 '.name' stream.yml
+</code></pre>
+          </div>
+          <h2 id="removed-interface"><a href="#removed-interface">Removed interface<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>The following v0.x flags are not accepted in v1:</p>
+          <ul>
+            <li><code>-f</code>, because the input file is positional.</li>
+            <li><code>-T</code>, because the transpiled representation is gone.</li>
+            <li><code>-q</code> and <code>-Q</code>, because the positional query replaces them.</li>
+            <li><code>-s</code>, <code>-l</code>, <code>-L</code>, <code>-c</code>, and <code>-I</code>, because node selection uses one query grammar.</li>
+            <li>The v0.x meaning of <code>-i</code>. Modern YAML.sh uses <code>-i</code> for atomic yq-style file updates and preserves rich presentation for common edits.</li>
+            <li><code>--next</code>, because <code>--document N</code> addresses a document directly.</li>
+          </ul>
+          <p>If a script depends on v0.x behavior, pin <code>v0.4.0</code> while migrating.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Read the contract</span><strong>See exactly what works →</strong></a></nav>
     </main>
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
       <ol>
-        <li class="level-2"><a href="#start-with-the-task">Start with the task</a></li>
-        <li class="level-2"><a href="#the-tiny-idea">The tiny idea</a></li>
-        <li class="level-2"><a href="#real-structure">Real structure</a></li>
-        <li class="level-2"><a href="#honest-boundaries">Honest boundaries</a></li>
-        <li class="level-2"><a href="#trust-it-appropriately">Trust it appropriately</a></li>
-        <li class="level-2"><a href="#open-the-hood">Open the hood</a></li>
+        <li class="level-2"><a href="#file-queries">File queries</a></li>
+        <li class="level-2"><a href="#standard-input">Standard input</a></li>
+        <li class="level-2"><a href="#collections">Collections</a></li>
+        <li class="level-2"><a href="#source-lines-and-types">Source lines and types</a></li>
+        <li class="level-2"><a href="#multiple-documents">Multiple documents</a></li>
+        <li class="level-2"><a href="#removed-interface">Removed interface</a></li>
       </ol>
-      <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/README.md">Edit this page</a>
+      <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/migration.md">Edit this page</a>
     </aside>
   </div>
   <dialog class="search-dialog" data-search-dialog>

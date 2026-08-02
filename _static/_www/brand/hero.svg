@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">YAML.sh — yq energy, zero baggage</title>
+  <desc id="desc">A YAML.sh wordmark beside a small terminal query.</desc>
+  <defs>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#d8ff45" stroke-opacity=".055"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="420" rx="18" fill="#101410"/>
+  <rect width="1200" height="420" rx="18" fill="url(#grid)"/>
+  <path d="M62 73h92v92H62z" fill="#d8ff45"/>
+  <path d="M62 73h92v92H62z" fill="none" stroke="#101410" stroke-width="5" transform="translate(7 7)" opacity=".25"/>
+  <text x="108" y="139" text-anchor="middle" fill="#101410" font-family="ui-monospace,monospace" font-size="62" font-weight="900">Y</text>
+  <text x="61" y="249" fill="#f5f1e8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="106" font-weight="850" letter-spacing="-7">YAML<tspan fill="#d8ff45">.sh</tspan></text>
+  <path d="M64 280h470" stroke="#d8ff45" stroke-width="7"/>
+  <text x="64" y="330" fill="#a8b2a3" font-family="ui-monospace,monospace" font-size="27" font-weight="700">yq energy. zero baggage.</text>
+  <g transform="translate(640 73)">
+    <rect width="500" height="274" rx="12" fill="#1a211a" stroke="#445040" stroke-width="2"/>
+    <path d="M0 54h500" stroke="#445040"/>
+    <circle cx="27" cy="27" r="8" fill="#d8ff45"/>
+    <circle cx="54" cy="27" r="8" fill="#71806b"/>
+    <circle cx="81" cy="27" r="8" fill="#71806b"/>
+    <text x="27" y="112" fill="#d8ff45" font-family="ui-monospace,monospace" font-size="23" font-weight="800">$</text>
+    <text x="56" y="112" fill="#f5f1e8" font-family="ui-monospace,monospace" font-size="23">ysh '.server.port' config.yml</text>
+    <text x="27" y="170" fill="#d8ff45" font-family="ui-monospace,monospace" font-size="40" font-weight="850">8080</text>
+    <text x="27" y="229" fill="#8e9b89" font-family="ui-monospace,monospace" font-size="16">one file · /bin/sh + awk</text>
+  </g>
+</svg>

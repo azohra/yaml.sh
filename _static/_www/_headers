@@ -7,3 +7,9 @@
 
 /docs/*.css
   Cache-Control: public, max-age=0, must-revalidate
+
+/docs/*.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/docs/*.json
+  Cache-Control: public, max-age=0, must-revalidate
