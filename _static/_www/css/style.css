@@ -742,6 +742,11 @@ footer nav {
   46%, 100% { opacity: 0; }
 }
 
+@keyframes ticker-pan {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% + 100vw)); }
+}
+
 @media (max-width: 980px) {
   .hero {
     grid-template-columns: 1fr;
@@ -790,28 +795,65 @@ footer nav {
   }
 
   .site-header {
-    min-height: 68px;
+    min-height: 64px;
+  }
+
+  .site-header .brand {
+    flex-shrink: 0;
+    gap: 8px;
   }
 
   .site-header nav {
-    gap: 14px;
+    gap: 12px;
   }
 
-  .site-header nav a:first-child {
+  .site-header nav a:first-child,
+  .site-header nav a[href^="https://github.com"] {
     display: none;
+  }
+
+  .site-header .nav-cta {
+    padding: 8px 13px;
   }
 
   .hero {
     min-height: auto;
-    padding-block: 74px 64px;
-    gap: 56px;
+    padding-block: 52px 56px;
+    gap: 40px;
+  }
+
+  .eyebrow,
+  .kicker,
+  .feature-index {
+    margin-bottom: 16px;
+    font-size: 10px;
+    line-height: 1.55;
   }
 
   h1 {
-    font-size: clamp(58px, 19vw, 86px);
+    font-size: clamp(48px, 14.2vw, 58px);
+    line-height: .9;
+    letter-spacing: -.065em;
+  }
+
+  .hero-lede {
+    margin-top: 26px;
+    font-size: 16px;
+  }
+
+  .hero-actions {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .button {
+    padding-inline: 12px;
   }
 
   .hero-facts {
+    margin-top: 34px;
+    padding-top: 18px;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
@@ -829,13 +871,29 @@ footer nav {
   }
 
   .terminal-body {
-    padding: 18px;
+    padding: 16px;
     font-size: 11px;
     overflow-x: auto;
   }
 
   .terminal-command {
+    margin-top: 18px;
     white-space: normal;
+  }
+
+  .terminal-bar,
+  .terminal-footer {
+    padding-inline: 12px;
+  }
+
+  .terminal-footer {
+    gap: 8px;
+    font-size: 9px;
+  }
+
+  .ticker div {
+    justify-content: flex-start;
+    animation: ticker-pan 24s ease-in-out infinite alternate;
   }
 
   .architecture,
@@ -843,16 +901,74 @@ footer nav {
   .features,
   .story-callout,
   .install {
-    padding-block: 86px;
+    padding-block: 64px;
+  }
+
+  .architecture {
+    padding-bottom: 40px;
+  }
+
+  .playground {
+    padding-top: 56px;
+    padding-bottom: 48px;
+  }
+
+  .features {
+    padding-block: 0;
+  }
+
+  .section-heading.compact {
+    margin-bottom: 32px;
+  }
+
+  .section-heading > p:last-child {
+    margin-top: 20px;
+    font-size: 16px;
+  }
+
+  .pipeline {
+    margin-top: 44px;
+    gap: 0;
+  }
+
+  .pipeline article {
+    min-height: 0;
+    padding: 24px;
+  }
+
+  .pipeline h3 {
+    margin-top: 38px;
+  }
+
+  .pipeline-arrow {
+    height: 36px;
   }
 
   .demo-tabs {
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    overflow: visible;
+  }
+
+  .demo-tabs button {
+    padding-inline: 6px;
   }
 
   .demo-panel {
-    min-height: 240px;
-    padding: 28px 20px;
+    min-height: 220px;
+    padding: 24px 18px;
+  }
+
+  .demo-label {
+    margin-bottom: 20px;
+  }
+
+  .demo-panel pre {
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   .feature-grid {
@@ -861,8 +977,44 @@ footer nav {
 
   .feature,
   .feature-large {
-    min-height: 290px;
+    min-height: 0;
+    padding: 26px;
     grid-column: auto;
+  }
+
+  .feature h3 {
+    margin-top: 44px;
+  }
+
+  .feature-large h2,
+  .install h2 {
+    font-size: clamp(42px, 12.5vw, 54px);
+  }
+
+  .story-callout {
+    gap: 24px;
+  }
+
+  .story-callout h2 {
+    font-size: clamp(42px, 12.5vw, 54px);
+  }
+
+  .story-callout > div:last-child > p {
+    font-size: 16px;
+  }
+
+  .story-callout a {
+    margin-top: 20px;
+  }
+
+  .install {
+    gap: 38px;
+  }
+
+  .install-command pre {
+    padding: 24px 16px;
+    word-break: normal;
+    overflow-wrap: anywhere;
   }
 
   footer {
@@ -878,6 +1030,26 @@ footer nav {
 
   footer nav {
     justify-self: start;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 380px) {
+  .site-header .version-pill {
+    display: none;
+  }
+
+  .site-header nav {
+    gap: 10px;
+  }
+
+  .site-header .nav-cta {
+    padding-inline: 12px;
+  }
+
+  .demo-tabs button {
+    font-size: 11px;
   }
 }
 
