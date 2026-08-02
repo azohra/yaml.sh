@@ -7,6 +7,9 @@ PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 CORPUS=${YQ_DIFFERENTIAL_CORPUS:-$SCRIPT_DIR/yq-corpus.tsv}
 YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
 YQ_BINARY=${YQ_BINARY:-yq}
+YSH_DIFFERENTIAL_CONFIG='{base: 100}'
+YSH_DIFFERENTIAL_WORD=portable
+export YSH_DIFFERENTIAL_CONFIG YSH_DIFFERENTIAL_WORD
 
 if ! command -v "$YQ_BINARY" >/dev/null 2>&1; then
     printf '%s\n' "The differential harness requires mikefarah/yq v4.53.3." >&2
@@ -73,8 +76,42 @@ awk -F '\t' '
         }
     }
 ' "$RESULTS"
-if [ "$total" -lt 1000 ]; then
-    printf 'Differential corpus must contain at least 1000 cases; found %s\n' "$total" >&2
+
+eval_all_total=0
+eval_all_passed=0
+while IFS= read -r query; do
+    [ -n "$query" ] || continue
+    eval_all_total=$((eval_all_total + 1))
+    if ! "$YQ_BINARY" --yaml-fix-merge-anchor-to-spec eval-all -o=json -I=0 "$query" \
+            "$SCRIPT_DIR/expressions.yml" "$SCRIPT_DIR/test.yml" > "$YQ_RAW" 2>/dev/null ||
+        ! jq -cS . "$YQ_RAW" > "$YQ_OUTPUT"; then
+        printf 'yq failed eval-all differential case %s: %s\n' "$eval_all_total" "$query" >&2
+        exit 1
+    fi
+    if ! "$YSH_BINARY" eval-all --json "$query" \
+            "$SCRIPT_DIR/expressions.yml" "$SCRIPT_DIR/test.yml" > "$YSH_RAW" 2>/dev/null ||
+        ! jq -cS . "$YSH_RAW" > "$YSH_OUTPUT"; then
+        printf 'YAML.sh failed eval-all differential case %s: %s\n' "$eval_all_total" "$query" >&2
+        exit 1
+    fi
+    if ! cmp -s "$YSH_OUTPUT" "$YQ_OUTPUT"; then
+        printf 'Eval-all differential mismatch %s: %s\n' "$eval_all_total" "$query" >&2
+        exit 1
+    fi
+    eval_all_passed=$((eval_all_passed + 1))
+done <<'EOF'
+[.]
+[filename, fileIndex, documentIndex]
+select(fileIndex == 0), select(fileIndex == 1)
+[select(fileIndex == 0), select(fileIndex == 1)]
+select(fileIndex == 0) * select(fileIndex == 1)
+select(fileIndex == 0) | keys
+select(fileIndex == 1) | sort_keys(.)
+select(fileIndex == 1) | path
+EOF
+printf 'yq v4.53.3 eval-all results: %s/%s pass\n' "$eval_all_passed" "$eval_all_total"
+if [ "$total" -lt 2500 ]; then
+    printf 'Differential corpus must contain at least 2500 cases; found %s\n' "$total" >&2
     exit 1
 fi
 if [ $((passed * 100)) -lt $((total * 98)) ]; then

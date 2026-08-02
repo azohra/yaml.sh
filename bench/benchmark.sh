@@ -8,7 +8,8 @@ YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
 BENCH_REPEATS=${YSH_BENCH_REPEATS:-20}
 
 INPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-benchmark.XXXXXX")
-trap 'rm -f "$INPUT"' 0 1 2 3 15
+TIME_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-benchmark-time.XXXXXX")
+trap 'rm -f "$INPUT" "$TIME_OUTPUT"' 0 1 2 3 15
 
 printf 'items,bytes,repeats,seconds\n'
 for item_count in 100 1000 5000; do
@@ -21,12 +22,16 @@ for item_count in 100 1000 5000; do
         }
     }' > "$INPUT"
     byte_count=$(wc -c < "$INPUT" | tr -d ' ')
-    start=$(date +%s)
-    iteration=0
-    while [ "$iteration" -lt "$BENCH_REPEATS" ]; do
-        "$YSH_BINARY" --json '.items | map(select(.enabled) | .port) | length' "$INPUT" >/dev/null
-        iteration=$((iteration + 1))
-    done
-    finish=$(date +%s)
-    printf '%s,%s,%s,%s\n' "$item_count" "$byte_count" "$BENCH_REPEATS" "$((finish - start))"
+    YSH_BENCH_BINARY=$YSH_BINARY \
+    YSH_BENCH_INPUT=$INPUT \
+    YSH_BENCH_REPEATS=$BENCH_REPEATS \
+        /usr/bin/time -p sh -c '
+            iteration=0
+            while [ "$iteration" -lt "$YSH_BENCH_REPEATS" ]; do
+                "$YSH_BENCH_BINARY" --json ".items | map(select(.enabled) | .port) | length" "$YSH_BENCH_INPUT" >/dev/null
+                iteration=$((iteration + 1))
+            done
+        ' 2> "$TIME_OUTPUT"
+    seconds=$(awk '/^real / { print $2; exit }' "$TIME_OUTPUT")
+    printf '%s,%s,%s,%s\n' "$item_count" "$byte_count" "$BENCH_REPEATS" "$seconds"
 done

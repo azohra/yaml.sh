@@ -22,7 +22,7 @@ test/fuzz.sh            grammar-guided replayable properties
 test/presentation-matrix.sh exact compound-edit matrix
 test/adversarial.sh     resource and recursion guards
 bench/benchmark.sh      repeatable throughput sample
-bench/scale.sh          100,000-node resource contract
+bench/scale.sh          125,000-node resource contract
 test/advanced.yml       v1 conformance fixture
 test/expressions.yml    v1 expression and transformation fixture
 _static/_www            unified Cloudflare Pages site

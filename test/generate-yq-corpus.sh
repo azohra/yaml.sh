@@ -9,6 +9,9 @@ awk -F '\t' '
 function classify(query) {
     if (index(query, "\\(")) return "interpolation"
     if (query ~ /(^|[| ])(test|sub)\(/) return "regex"
+    if (query ~ /(env\(|strenv\(|envsubst)/) return "environment"
+    if (query ~ /(path|parent|fileIndex|documentIndex|filename)/) return "context"
+    if (query ~ /(sort_keys|to_number|with\(|filter\(|first|pick\(|omit\(|pivot)/) return "practical"
     if (query ~ /\[[^]]*:[^]]*\]/) return "slices"
     if (query ~ /(group_by|sort_by|unique_by|min_by|max_by)/) return "grouping"
     if (query ~ /(^|[ |])(del\(|[^=!<>][+*|]?=)/) return "mutation"
@@ -77,6 +80,59 @@ END {
         else if (mode == 3) query = sprintf("[%d,%d,%d] | length", a, a + 1, a + 2)
         else query = sprintf("[%d,%d,%d] | map(. + 1)", a, a + 1, a + 2)
         print "collections", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        query = sprintf("[{\"v\":%d},{\"v\":%d}] | .[1].v | path", i, i + 1)
+        print "context", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        query = sprintf("[{\"v\":%d},{\"v\":%d}] | .[1] | parent", i, i + 1)
+        print "context", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        query = sprintf("{\"z\":%d,\"a\":%d,\"m\":%d} | sort_keys(.)", i, i + 1, i + 2)
+        print "practical", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        if (i % 2) query = sprintf("\"%d\" | to_number", i * 17)
+        else query = sprintf("\"%d.5\" | to_number", i)
+        print "practical", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        query = sprintf("{\"a\":{\"x\":%d,\"y\":%d}} | with(.a; .x += %d)", i, i + 1, (i % 7) + 1)
+        print "practical", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        query = sprintf("[fileIndex, documentIndex, .meta.id + %d]", i)
+        print "context", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        query = sprintf("env(YSH_DIFFERENTIAL_CONFIG) | .base + %d", i)
+        print "environment", "expressions.yml", query
+    }
+    for (i = 1; i <= 125; i++) {
+        query = sprintf("\"case-%d-${YSH_DIFFERENTIAL_WORD}\" | envsubst", i)
+        print "environment", "expressions.yml", query
+    }
+    for (i = 1; i <= 100; i++) {
+        query = sprintf("[%d,%d,%d,%d] | first(. > %d)", i, i + 3, i + 1, i + 4, i + 1)
+        print "practical", "expressions.yml", query
+    }
+    for (i = 1; i <= 100; i++) {
+        query = sprintf("[%d,%d,%d,%d] | filter(. != %d)", i, i + 1, i, i + 2, i)
+        print "practical", "expressions.yml", query
+    }
+    for (i = 1; i <= 100; i++) {
+        query = sprintf("[%d,%d,%d,%d] | pick([2,0,9])", i, i + 1, i + 2, i + 3)
+        print "practical", "expressions.yml", query
+    }
+    for (i = 1; i <= 100; i++) {
+        query = sprintf("[%d,%d,%d,%d] | omit([1,9])", i, i + 1, i + 2, i + 3)
+        print "practical", "expressions.yml", query
+    }
+    for (i = 1; i <= 100; i++) {
+        query = sprintf("[[%d,%d],[%d]] | pivot", i, i + 1, i + 2)
+        print "practical", "expressions.yml", query
     }
 }
 ' "$BASE"
