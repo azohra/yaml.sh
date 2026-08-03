@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.11.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.12.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -87,7 +87,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.11.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.12.0</span></div>
       <article>
           <h1 id="parser-internals">Parser internals</h1>
           <p>The release remains one shell script, with a semantic graph, source-presentation layer, and repository transaction working together.</p>
@@ -109,7 +109,9 @@ presentation patcher or value / JSON / YAML / metadata / AST / events
 </code></pre>
           </div>
           <h2 id="the-shell-layer"><a href="#the-shell-layer">The shell layer<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The <code>/bin/sh</code> launcher handles arguments, input, output mode, and edit transactions. It prepares every transformed candidate once; <code>--check</code>, <code>--diff</code>, and <code>-i</code> inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement. A bounded embedded AWK renderer produces unified diffs without adding a runtime dependency. Rollback siblings remain until every replacement succeeds.</p>
+          <p>The <code>/bin/sh</code> launcher handles arguments, input, output mode, and edit transactions. It snapshots every source beside the original, evaluates those stable bytes, and prepares each transformed candidate once. <code>--check</code>, <code>--diff</code>, and <code>-i</code> inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement.</p>
+          <p>Live inputs are compared with their snapshots after evaluation and again before commit; each changed target is checked immediately before replacement. A mismatch aborts without overwriting the external change. The snapshots are also the rollback material, so a failed batch restores what the query actually read. Each sibling rename is atomic, but the complete multi-file sequence is not one globally atomic filesystem operation.</p>
+          <p>A bounded embedded AWK renderer produces unified diffs without adding a runtime dependency.</p>
           <p>Embedded AWK programs arrive through here-documents, avoiding small <code>ARG_MAX</code> limits in minimal systems. Query text travels through the POSIX environment so AWK never rewrites backslashes before lexing interpolation or regex syntax.</p>
           <p>The development sources remain separate:</p>
           <div class="code-block">

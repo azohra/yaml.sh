@@ -7,7 +7,7 @@ YAML.sh parses data. It does not evaluate YAML as shell, load neighboring files,
 - No `load`, dynamic `eval`, system execution, network, or plugin operators.
 - No application-specific object construction from YAML tags.
 - Environment access is limited to explicit `env`, `strenv`, and `envsubst` operators.
-- Check, diff, and in-place writes reject symlinks and duplicate inputs, then preflight the complete file set before replacement.
+- Check, diff, and in-place writes reject symlinks and duplicate inputs, evaluate source snapshots, then refuse detected live-file drift.
 - Input bytes, graph nodes, and nesting depth have hard configurable ceilings.
 
 This is a narrower attack surface than a general automation language. It is not a sandbox for arbitrary expressions: a query can still consume CPU and memory up to the configured limits.
@@ -56,11 +56,11 @@ Use `--security-disable-env-ops` when even that environment read is inappropriat
 
 ## In-place writes
 
-`--check`, `--diff`, and `-i` require one or more real files. YAML.sh transforms the complete set before replacing anything and creates candidates only for files that actually change. It preserves permissions and refuses symlinks and duplicate inputs. A commit failure or interrupt restores preserved originals.
+`--check`, `--diff`, and `-i` require one or more real files. YAML.sh snapshots and transforms the complete set before replacing anything and creates candidates only for files that actually change. It preserves permissions and refuses symlinks, duplicate paths, and newline-containing names. A changed live input aborts rather than being overwritten. A commit failure or interrupt restores the evaluated snapshots.
 
 `--diff` prints changed values; treat its output like file contents. Use `--explain=json` when logs need paths and decisions without values. Add `--preserve-only` when regenerated presentation would be unsafe or too noisy to review.
 
-Keep normal backups and version control. The transaction protects against partial output, not a logically wrong query or a machine failure during rollback.
+Each replacement is an atomic same-directory rename. The multi-file sequence is preflighted and rollback-capable, not globally atomic or power-loss durable. Another process can still race after the final comparison. Keep normal backups and version control; guards do not make a logically wrong query correct.
 
 ## Reporting a vulnerability
 

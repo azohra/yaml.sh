@@ -35,7 +35,7 @@ Preview the exact write first:
 ysh --diff '.image.tag = "stable"' deploy.yml
 ```
 
-Exit status is `0` for clean, `1` for drift, and `2` for an invalid query or input. Use `--check` when a file list is enough. Then make the same update atomically:
+Exit status is `0` for clean, `1` for drift, and `2` for an invalid query or input. Use `--check` when a file list is enough. Then commit the same prepared update:
 
 ```sh
 ysh -i '.image.tag = "stable"' deploy.yml
@@ -61,6 +61,16 @@ ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 
 Every candidate is prepared before the first replacement. The JSON Lines report records paths and decisions without recording changed values.
+
+Require an invariant before changing anything:
+
+```sh
+query='with(.kind; select(. == "Deployment") or error("expected Deployment")) | .spec.replicas = 3'
+ysh --diff "$query" deploy.yml
+ysh -i "$query" deploy.yml
+```
+
+`error(MESSAGE)` aborts the complete transaction. Boolean `and` and `or` short-circuit, so the error runs only when its guard fails.
 
 ## Set values from the environment
 

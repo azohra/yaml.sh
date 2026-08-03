@@ -29,7 +29,7 @@
     <a class="brand" href="/" aria-label="YAML.sh home">
       <span class="brand-mark">Y</span>
       <span>YAML.sh</span>
-      <span class="version-pill" data-ysh-version>v1.11.0</span>
+      <span class="version-pill" data-ysh-version>v1.12.0</span>
     </a>
     <nav aria-label="Primary navigation">
       <a href="/story/">Story</a>
@@ -42,7 +42,7 @@
   <main id="main">
     <section class="hero section-shell">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.11.0</span> · see the write before it happens</p>
+        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.12.0</span> · stale writes don't get a vote</p>
         <h1>yq energy.<br><span>zero baggage.</span></h1>
         <p class="hero-lede">Program YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a frankly unreasonable amount of ambition.</p>
         <div class="hero-actions">
@@ -196,7 +196,7 @@ node  1  mapping  line=1</code></pre>
         <article class="feature">
           <p class="feature-index">05 / OBSERVABLE</p>
           <h3>Repository edits explain themselves.</h3>
-          <p><code>--diff</code> shows the exact prepared write. <code>--preserve-only</code> refuses noisy regeneration. Commits skip no-ops, roll back failures, and can record value-free paths.</p>
+          <p><code>--diff</code> shows the exact prepared write. <code>--preserve-only</code> refuses noisy regeneration. Commits skip no-ops, refuse source drift, roll back failures, and can record value-free paths.</p>
         </article>
       </div>
     </section>
@@ -219,7 +219,7 @@ node  1  mapping  line=1</code></pre>
         <p>The installer downloads and checksum-verifies a pinned release, then places <code>ysh</code> in <code>/usr/local/bin</code>. Set <code>YSH_INSTALL_DIR</code> to choose another location.</p>
       </div>
       <div class="install-command">
-        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.11.0</span></div>
+        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.12.0</span></div>
         <pre><code id="install-code">curl -fsSL https://yaml.azohra.com/install | sh</code></pre>
         <button class="copy-button" type="button" data-copy="install-code"><span>Copy command</span><b aria-hidden="true">⌘</b></button>
         <p class="install-note">Homebrew: <code>brew install azohra/tools/ysh</code><br>Prefer to inspect first? <a href="/install">Read the installer source.</a></p>

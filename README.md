@@ -98,6 +98,12 @@ ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml prod
 ysh eval-all -i 'select(fileIndex == 0).tag as $tag | select(fileIndex > 0).image.tag = $tag' release.yml services/*.yml
 ```
 
+Guard an update with a useful failure:
+
+```sh
+ysh -i 'with(.kind; select(. == "Deployment") or error("expected Deployment")) | .spec.replicas = 3' deploy.yml
+```
+
 Preview and commit a repository with the same query:
 
 ```sh
@@ -136,7 +142,7 @@ Mappings remain mappings. Empty collections survive. Tags and source lines stay 
 
 Common replacements, block mapping/sequence appends, inserts, deletes, and sequence reorders preserve comments, whitespace, quoting, styles, anchors, tags, and directives. Styles, tags, anchors, and aliases are writable graph metadata. Larger structural changes fall back to deterministic semantic YAML unless `--preserve-only` is set.
 
-Multi-file `-i` is one transaction: all inputs parse and transform before the first replacement. A commit failure or interrupt restores preserved originals. Writable `eval-all` can read a value from one file and update another under the same transaction.
+Multi-file `-i` evaluates preserved source snapshots, then verifies the live inputs still match before replacing anything. Each changed file is checked again immediately before its atomic sibling rename. Drift aborts the transaction; a commit failure or interrupt restores the evaluated snapshots. Writable `eval-all` can read one file and update another under the same guarded transaction.
 
 ## Tested where it matters
 
@@ -145,10 +151,10 @@ The test suite covers parser behavior, yq-shaped queries, safe edits, portabilit
 | Evidence | What it establishes |
 | --- | --- |
 | Pinned YAML Test Suite | Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases |
-| Pinned yq differential | 2,628 categorized programs plus Kubernetes, Compose, Actions, GitLab CI, overlay, metadata, and cross-file workflows |
+| Pinned yq differential | 2,630 categorized programs plus Kubernetes, Compose, Actions, GitLab CI, overlay, metadata, and cross-file workflows |
 | Grammar/property matrix | Every combination of 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties |
 | Presentation matrix | Strict preview and exact compound edits across scalar styles and value/comment variants |
-| Repository transactions | Exact diffs, strict refusal, clean/drift/error, no-op, cross-file data flow, rollback, and interruption |
+| Repository transactions | Exact diffs, strict refusal, source-drift detection, no-op, cross-file data flow, rollback, and interruption |
 | Scale checks | 125,000 nodes with a strict one-line preview; 1,500 documents; ≤224 MiB RSS |
 
 Supported behavior has a test. Nearby unsupported behavior gets an explicit error instead of a confident misparse.

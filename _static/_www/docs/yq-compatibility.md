@@ -7,12 +7,12 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 | Area | Status | Included |
 |---|---|---|
 | Traverse and streams | Strong | paths, dynamic keys, indexes, optional traversal, recursive descent, pipes, unions, slices |
-| Select and logic | Strong | `select`, `filter`, comparisons, `and`, `or`, `not`, `//`, `any`, `all` |
+| Select and logic | Strong | `select`, `filter`, comparisons, short-circuiting `and`/`or`, `not`, `//`, `any`, `all`, `error` guards |
 | Build and mutate | Strong | arrays, computed keys, reducers, `=`, `|=`, compound updates, `setpath`, `delpaths`, `del`, `with`, deep merge and `*+`/`*d`/`*?`/`*n` policies |
 | Collections | Strong | `map`, `map_values`, entries, sort/group/unique/min/max families, flatten, reverse, add, first, pick, omit, pivot |
 | Context | Strong | `path`, `parent`, `key`, `line`, `tag`, `filename`, `fileIndex`, `documentIndex` |
 | Environment | Strong | `env`, `strenv`, `envsubst`, defaults, `nu`/`ne`/`ff`, security disable switch |
-| Files and documents | Strong | one-process multi-file evaluation; all-document mode; writable cross-file `eval-all`; exact no-write diffs; preflighted transactions |
+| Files and documents | Strong | one-process multi-file evaluation; all-document mode; writable cross-file `eval-all`; exact no-write diffs; snapshot-guarded transactions |
 | Strings | Focused | interpolation, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
 | YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
 | YAML presentation | Focused | comments and styles survive common edits; line comments and scalar/collection styles are writable |
@@ -29,7 +29,7 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 - `--ast` and `--events` expose the parser directly when a strange document needs explaining.
 - `--check`, `--diff`, and `-i` share one prepared edit plan. Previewed bytes are committed bytes; net-zero updates are no-ops.
 - `--preserve-only` turns source fidelity into an enforceable precondition instead of a best-effort promise.
-- Multi-file queries compile once. Writable `eval-all` can read one file, mutate several others, preflight the complete set, skip no-ops, and roll back commit failures.
+- Multi-file queries compile once. Writable `eval-all` can read one file, mutate several others, refuse detected source drift, skip no-ops, and roll back commit failures from the evaluated snapshots.
 - `--explain=json` produces one value-free audit record per input for CI.
 - Parser outcomes, invalid input, yq comparisons, presentation edits, and useful scale are covered by repeatable tests.
 
@@ -51,6 +51,6 @@ Some areas remain partial: `eval-all` supports combined reads, bindings, merges,
 
 ## Compared with yq
 
-The suite compares canonical JSON with mikefarah/yq v4.53.3 across 2,628 categorized programs plus Kubernetes, Compose, GitHub Actions, GitLab CI, deployment-overlay, metadata, and cross-file workflows. See [YAML support](supported_yml.md) for parser coverage and limits.
+The suite compares canonical JSON with mikefarah/yq v4.53.3 across 2,630 categorized programs plus Kubernetes, Compose, GitHub Actions, GitLab CI, deployment-overlay, metadata, and cross-file workflows. See [YAML support](supported_yml.md) for parser coverage and limits.
 
 If a form is not in the query guide or tests, treat it as unsupported even when a nearby form works.

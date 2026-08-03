@@ -52,7 +52,7 @@ The emitter is semantic. It uses a stable layout while retaining recorded line c
 
 The `-i` presentation layer patches the original source for common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders. Other structural changes use the semantic emitter.
 
-With several inputs, every changed candidate is built before the first replacement. No-op files are not replaced. Preserved siblings allow rollback if a later commit fails or the process is interrupted. Permission bits survive, and symlinks are refused.
+With several inputs, source snapshots are evaluated and every changed candidate is built before the first replacement. Live files must still match those snapshots before reporting or commit, and each changed target is checked again immediately before replacement. No-op files are not replaced. The snapshots allow rollback if a later commit fails or the process is interrupted. Permission bits survive; symlinks, duplicate paths, and newline-containing names are refused.
 
 ## Type
 
