@@ -332,7 +332,7 @@ END {
     print "  <dialog class=\"search-dialog\" data-search-dialog>"
     print "    <form method=\"dialog\" class=\"search-box\"><label for=\"docs-search\">Search the docs</label><button value=\"close\" aria-label=\"Close search\">×</button><input id=\"docs-search\" type=\"search\" autocomplete=\"off\" placeholder=\"Try “merge files” or “envsubst”\"><div class=\"search-results\" aria-live=\"polite\"></div><p><kbd>↑</kbd><kbd>↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close</p></form>"
     print "  </dialog>"
-    print "  <footer class=\"site-footer\"><p>YAML.sh · yq energy, zero baggage.</p><p><a href=\"https://github.com/azohra/yaml.sh\">Source</a> · <a href=\"/docs/development/\">Contribute</a></p></footer>"
+    print "  <footer class=\"site-footer\"><p>YAML.sh · YAML in shell. No, really.</p><p><a href=\"https://github.com/azohra/yaml.sh\">Source</a> · <a href=\"/docs/development/\">Contribute</a></p></footer>"
     print "</body>"
     print "</html>"
 }

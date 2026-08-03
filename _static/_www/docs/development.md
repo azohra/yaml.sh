@@ -11,15 +11,27 @@ The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, ru
 ## Source layout
 
 ```text
-src/ysh.sh              POSIX shell CLI
-src/ysh.awk             YAML engine
+src/ysh.sh              POSIX shell CLI and transaction coordinator
+src/awk/00-core.awk     common diagnostics and text primitives
+src/awk/10-codecs.awk   configuration and utility codecs
+src/awk/20-*.awk        YAML source, graph, parser, and resolver
+src/awk/30-*.awk        query parser
+src/awk/40-*.awk        Pointer, Patch, Merge Patch, and Schema
+src/awk/50-*.awk        query runtime
+src/awk/60-*.awk        semantic emitters
+src/awk/70-*.awk        source edit compiler
+src/awk/80-*.awk        output coordination
+src/awk/90-*.awk        AWK input lifecycle
 src/diff.awk            bounded unified-diff renderer
 test/test.sh            behavioral suite
+test/public-contract.tsv named product capabilities, roles, and evidence
+test/public-contract.sh  public-contract integrity gate
 test/conformance.sh     pinned YAML Test Suite gate
+test/conformance-outcomes.tsv exact result for every upstream YAML case
 test/differential.sh    pinned yq comparison gate
 test/operator-manifest.sh audited operator/form contract
 test/yq-corpus-base.tsv hand-written differential cases
-test/generate-yq-corpus.sh reproducible categorized expansion
+test/generate-yq-corpus.sh stable family labels for the curated differential cases
 test/fuzz.sh            grammar-guided replayable properties
 test/presentation-matrix.sh exact compound-edit matrix
 test/parser-boundaries.sh deliberate accept/reject boundary matrix

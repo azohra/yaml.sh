@@ -86,6 +86,6 @@ YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth 
 
 The pinned YAML Test Suite owns accepted and strict-invalid outcomes. The parser-boundary matrix sits beside it: valid neighboring forms must parse, while malformed directives, collection keys, reserved indicators, malformed escapes, indentation errors, invalid aliases, and merge sources must fail before producing a graph.
 
-Focused fixtures then cover graph semantics, query behavior, presentation preservation, repository transactions, and resource limits. Configuration workflows exercise Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays against yq. The [operator manifest](operators.md) owns expression-language claims.
+Focused fixtures then cover graph semantics, query behavior, presentation preservation, repository transactions, resource limits, and common configuration shapes. The [operator manifest](operators.md) owns expression-language claims.
 
 See [`test/parser-boundaries.sh`](https://github.com/azohra/yaml.sh/blob/main/test/parser-boundaries.sh), [`test/conformance.sh`](https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh), [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh), and [`bench/scale.sh`](https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh).

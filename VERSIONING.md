@@ -10,7 +10,8 @@ The compatibility contract includes documented:
 - queries and transformations
 - output values and formats
 - supported YAML interpretation
-- the one-file POSIX `/bin/sh` plus AWK runtime
+- the one-file POSIX `/bin/sh` plus AWK reader runtime
+- the documented host file utilities used by source-aware edit modes
 
 Undocumented internals and rejected malformed or unsupported input are outside that contract.
 
@@ -24,4 +25,4 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 
 ## Release mechanics
 
-Releases come from tested `main` commits and use signed `vMAJOR.MINOR.PATCH` tags. The executable, installer, and generated release text must agree. Brand artwork is evergreen rather than versioned. Tests and compatibility measurements report capability progress.
+Releases come from tested `main` commits and use signed `vMAJOR.MINOR.PATCH` tags. The executable, installer, and generated release text must agree. Brand artwork is evergreen rather than versioned. The machine-readable public contract owns capability status and evidence.

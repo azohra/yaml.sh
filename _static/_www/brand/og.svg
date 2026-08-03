@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">YAML.sh — YAML in shell, no really</title>
+  <desc id="desc">YAML.sh wordmark and a source-aware YAML diff.</desc>
+  <defs>
+    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+      <path d="M50 0H0V50" fill="none" stroke="#d8ff45" stroke-opacity=".055"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="#101410"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect x="54" y="54" width="76" height="76" rx="5" fill="#d8ff45"/>
+  <text x="92" y="109" text-anchor="middle" fill="#101410" font-family="ui-monospace,monospace" font-size="48" font-weight="900">Y</text>
+  <text x="54" y="256" fill="#f5f1e8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="110" font-weight="850" letter-spacing="-7">YAML</text>
+  <text x="337" y="256" fill="#d8ff45" font-family="ui-sans-serif,system-ui,sans-serif" font-size="110" font-weight="850" letter-spacing="-7">.sh</text>
+  <path d="M57 288h470" stroke="#d8ff45" stroke-width="7"/>
+  <text x="57" y="350" fill="#f5f1e8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="38" font-weight="750">YAML in shell.</text>
+  <text x="57" y="401" fill="#d8ff45" font-family="ui-sans-serif,system-ui,sans-serif" font-size="38" font-weight="750">No, really.</text>
+  <text x="57" y="476" fill="#9aa694" font-family="ui-monospace,monospace" font-size="20" font-weight="700">one readable file · /bin/sh + awk</text>
+  <g transform="translate(624 86)">
+    <rect width="518" height="410" rx="14" fill="#0c100d" stroke="#53634c" stroke-width="2"/>
+    <path d="M0 61h518" stroke="#354030"/>
+    <circle cx="28" cy="30" r="8" fill="#d8ff45"/>
+    <circle cx="56" cy="30" r="8" fill="#61705d"/>
+    <circle cx="84" cy="30" r="8" fill="#61705d"/>
+    <text x="28" y="119" fill="#d8ff45" font-family="ui-monospace,monospace" font-size="21" font-weight="800">$</text>
+    <text x="57" y="119" fill="#f5f1e8" font-family="ui-monospace,monospace" font-size="20">ysh --preserve-only --diff</text>
+    <text x="57" y="151" fill="#f5f1e8" font-family="ui-monospace,monospace" font-size="20">'.image.tag="stable"' app.yml</text>
+    <path d="M28 187h462" stroke="#354030" stroke-dasharray="4 6"/>
+    <text x="28" y="240" fill="#d48282" font-family="ui-monospace,monospace" font-size="23" font-weight="700">- tag: old    # keep this</text>
+    <text x="28" y="292" fill="#d8ff45" font-family="ui-monospace,monospace" font-size="23" font-weight="700">+ tag: stable # keep this</text>
+    <text x="28" y="360" fill="#899684" font-family="ui-monospace,monospace" font-size="17">untouched bytes stay untouched</text>
+  </g>
+  <text x="57" y="574" fill="#71806b" font-family="ui-monospace,monospace" font-size="17">PORTABLE · SOURCE-AWARE · REVIEWABLE</text>
+</svg>

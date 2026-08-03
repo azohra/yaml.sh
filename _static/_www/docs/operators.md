@@ -1,6 +1,6 @@
 # Operator manifest
 
-This is the audited YAML-oriented surface for v1.16. “Supported” means the listed forms are expected to agree with yq for documented inputs. “Focused” names a smaller portable contract. “Excluded” is a tested boundary—not a guess.
+This is the audited YAML-oriented surface for the current release. “Supported” means the listed forms are expected to agree with yq for documented inputs. “Focused” names a smaller portable contract. “Excluded” is a tested boundary—not a guess.
 
 The evidence column names the focused test or release gate that owns each claim. The differential gate compares supported programs with mikefarah/yq v4.53.3; the parser-boundary gate makes exclusions fail closed.
 

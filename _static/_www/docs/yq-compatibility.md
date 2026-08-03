@@ -33,7 +33,7 @@ YAML.sh is optimized for a different boundary:
 - `--preserve-only` turns source fidelity into an enforceable precondition instead of a best-effort promise.
 - Source plans preserve bytes outside changed spans and carry record comments through mapping and sequence moves—useful behavior that ordinary semantic serialization cannot promise.
 - Multi-file queries compile once. Writable `eval-all` can read one file, mutate several others, refuse detected source drift, skip no-ops, and roll back commit failures from the evaluated snapshots.
-- `--explain=json` produces one value-free audit record per input for CI.
+- `--explain=json` produces one value-free audit record per input for automation or logs.
 - Parser outcomes, invalid input, yq comparisons, TOML and JSON Schema oracles, presentation edits, and useful scale are covered by repeatable tests.
 
 yq remains the better choice for date arithmetic, broad XML controls, polished platform packaging, and its ecosystem. YAML.sh is strongest when inspectability, runtime reach, exact source-aware repository edits, standard contract workflows, and a small controllable security model matter most.
