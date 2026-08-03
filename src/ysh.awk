@@ -1420,6 +1420,15 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         return
     }
 
+    multiline_scalar_delimiter = !index(raw, "\n") && raw ~ /["']/ ? multiline_scalar_quote(raw) : ""
+    if (multiline_scalar_delimiter != "") {
+        multiline_scalar_active = 1
+        multiline_scalar_line = source_line
+        multiline_scalar_text = raw
+        multiline_scalar_min_indent = flow_continuation_indent(raw)
+        return
+    }
+
     if (flow_balance(raw) > 0) {
         if (raw ~ /,#[^[:space:]]/) {
             fail("comments in flow collections require separation on line " source_line)
@@ -3387,7 +3396,7 @@ function expression_delete_node(target,    parent, i, j, key, child) {
     if (inplace_mode) {
         presentation_track_delete(target)
     }
-    parent = node_parent[target]
+    parent = (target in node_parent) ? node_parent[target] : 0
     if (!parent) {
         expression_clear_node(target)
         node_kind[target] = "scalar"
@@ -3704,9 +3713,15 @@ function expression_set_node_property(node, property, value_node,    resolved, v
         expression_set_alias(node, value)
     }
     if (inplace_mode) {
-        if ((property == "style" || property == "line_comment") && node_kind[node] == "scalar" &&
+        if (presentation_flow_owner(node) &&
+            !(property == "style" && (node_kind[node] == "mapping" || node_kind[node] == "sequence") && old_value != "flow")) {
+            presentation_track_replace(node, node)
+        } else if ((property == "style" || property == "line_comment") && node_kind[node] == "scalar" &&
             node_style[node] != "literal" && node_style[node] != "folded") {
             presentation_track_replace(node, node)
+        } else if (property == "line_comment" && node_kind[node] == "scalar" &&
+            (node_style[node] == "literal" || node_style[node] == "folded")) {
+            presentation_track_owned_span(node)
         } else {
             presentation_possible = 0
         }
@@ -5769,12 +5784,59 @@ function presentation_has_flow_collection(value) {
     return (index(value, "[") && index(value, "]")) || (index(value, "{") && index(value, "}"))
 }
 
+function presentation_flow_owner(target,    current, parent, owner, line) {
+    current = target
+    if ((current in expression_missing_parent) && !expression_placeholder_attached[current]) {
+        current = expression_missing_parent[current]
+    }
+    line = node_line[current]
+    while (current) {
+        if (node_style[current] == "flow") {
+            owner = current
+        }
+        if (!(current in node_parent)) {
+            break
+        }
+        parent = node_parent[current]
+        if (!parent || (line && node_line[parent] != line)) {
+            break
+        }
+        current = parent
+    }
+    return owner
+}
+
+function presentation_track_owned_span(node,    line, end, i) {
+    line = node_line[node]
+    if (line < 1 || ((line in presentation_line_node) && presentation_line_node[line] != node)) {
+        presentation_possible = 0
+        return 0
+    }
+    end = line
+    if (line in source_multiline_flow_end) {
+        end = source_multiline_flow_end[line]
+        for (i = line; i < end; i++) {
+            if (strip_flow_line_comment(raw_input_line[i]) != trim(raw_input_line[i])) {
+                presentation_possible = 0
+                return 0
+            }
+        }
+    } else if (line in source_multiline_scalar_end) {
+        end = source_multiline_scalar_end[line]
+    } else if (node_style[node] == "literal" || node_style[node] == "folded") {
+        end = presentation_span_end(node)
+    }
+    presentation_line_node[line] = node
+    presentation_line_end[line] = end
+    return 1
+}
+
 function presentation_track_sequence_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, lower, start, previous_end) {
     if (node_kind[target] != "sequence" || node_kind[source] != "sequence" ||
         sequence_count[target] == 0 || sequence_count[target] != sequence_count[source]) {
         return 0
     }
-    parent = node_parent[target]
+    parent = (target in node_parent) ? node_parent[target] : 0
     header = node_line[target]
     if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
         header in presentation_deleted_line || header in presentation_reorder_count) {
@@ -5829,6 +5891,7 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
     presentation_reorder_count[header] = sequence_count[source]
     for (i = header + 1; i <= target_end; i++) {
         presentation_deleted_line[i] = 1
+        presentation_reorder_owned_line[i] = header
     }
     return 1
 }
@@ -5838,7 +5901,7 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         sequence_count[target] == 0 || sequence_count[source] <= sequence_count[target]) {
         return 0
     }
-    parent = node_parent[target]
+    parent = (target in node_parent) ? node_parent[target] : 0
     header = node_line[target]
     if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
         header in presentation_deleted_line || header in presentation_reorder_count) {
@@ -5869,6 +5932,68 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         item = ++presentation_sequence_insert_count[after]
         presentation_sequence_insert_node[after, item] = sequence_child[source, i]
         presentation_sequence_insert_indent[after, item] = indent
+    }
+    return 1
+}
+
+function presentation_track_mapping_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, lower, start, previous_end, key) {
+    if (node_kind[target] != "mapping" || node_kind[source] != "mapping" ||
+        mapping_count[target] == 0 || mapping_count[target] != mapping_count[source]) {
+        return 0
+    }
+    parent = (target in node_parent) ? node_parent[target] : 0
+    header = node_line[target]
+    if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
+        header in presentation_deleted_line || header in presentation_reorder_count) {
+        return 0
+    }
+    raw = raw_input_line[header]
+    text = substr(raw, indentation(raw, header) + 1)
+    if (!find_mapping_separator(text, 1) || presentation_has_flow_collection(text)) {
+        return 0
+    }
+
+    serial = ++presentation_reorder_serial
+    lower = header + 1
+    previous_end = header
+    for (i = 1; i <= mapping_count[target]; i++) {
+        child = mapping_child[target, i]
+        if (node_line[child] <= header) {
+            return 0
+        }
+        lower = previous_end + 1
+        start = presentation_attached_start(child, lower)
+        presentation_original_start[serial, child] = start
+        previous_end = presentation_span_end(child)
+    }
+    target_end = presentation_span_end(target)
+    for (i = 1; i <= mapping_count[source]; i++) {
+        child = mapping_child[source, i]
+        origin = node_origin[child]
+        key = mapping_key[source, i]
+        found = 0
+        for (j = 1; j <= mapping_count[target]; j++) {
+            if (mapping_key[target, j] == key && mapping_child[target, j] == origin &&
+                !(serial SUBSEP origin in presentation_reorder_seen)) {
+                found = j
+                presentation_reorder_seen[serial, origin] = 1
+                break
+            }
+        }
+        if (!found) {
+            return 0
+        }
+        presentation_reorder_start[header, i] = presentation_original_start[serial, origin]
+        if (found < mapping_count[target]) {
+            presentation_reorder_end[header, i] = presentation_original_start[serial, mapping_child[target, found + 1]] - 1
+        } else {
+            presentation_reorder_end[header, i] = target_end
+        }
+    }
+    presentation_reorder_count[header] = mapping_count[source]
+    for (i = header + 1; i <= target_end; i++) {
+        presentation_deleted_line[i] = 1
+        presentation_reorder_owned_line[i] = header
     }
     return 1
 }
@@ -5908,11 +6033,16 @@ function presentation_track_mapping_append(target, source,    first, after, raw,
     return 1
 }
 
-function presentation_track_replace(target, source,    line, raw, resolved_source) {
+function presentation_track_replace(target, source,    line, raw, resolved_source, flow_owner) {
     if (!inplace_mode || !presentation_possible) {
         return
     }
     resolved_source = resolve_alias(source)
+    flow_owner = presentation_flow_owner(target)
+    if (flow_owner) {
+        presentation_track_owned_span(flow_owner)
+        return
+    }
     if (node_kind[target] == "sequence" && node_kind[resolved_source] == "sequence") {
         if (presentation_track_sequence_reorder(target, resolved_source)) {
             return
@@ -5924,6 +6054,9 @@ function presentation_track_replace(target, source,    line, raw, resolved_sourc
         return
     }
     if (node_kind[target] == "mapping" && node_kind[resolved_source] == "mapping") {
+        if (presentation_track_mapping_reorder(target, resolved_source)) {
+            return
+        }
         if (presentation_track_mapping_append(target, resolved_source)) {
             return
         }
@@ -5936,6 +6069,12 @@ function presentation_track_replace(target, source,    line, raw, resolved_sourc
     }
     line = node_line[target]
     raw = raw_input_line[line]
+    if (node_kind[target] == "scalar" && node_kind[resolved_source] == "scalar" &&
+        (node_style[target] == "literal" || node_style[target] == "folded" ||
+         line in source_multiline_scalar_end)) {
+        presentation_track_owned_span(target)
+        return
+    }
     if (line < 1 || node_kind[target] != "scalar" || node_kind[resolved_source] != "scalar" ||
         raw ~ /(^|:[[:space:]]*)[|>][+-]?[[:space:]]*(#|$)/ || presentation_has_flow_collection(raw) || raw ~ /:[[:space:]]*[!&]/) {
         presentation_possible = 0
@@ -6030,11 +6169,16 @@ function presentation_span_end(target,    start, start_indent, line, raw, raw_in
     return end
 }
 
-function presentation_track_delete(target,    parent, line, end, raw, indent, text, i, sibling) {
+function presentation_track_delete(target,    parent, line, end, raw, indent, text, i, sibling, flow_owner, lower, previous) {
     if (!inplace_mode || !presentation_possible) {
         return
     }
-    parent = node_parent[target]
+    flow_owner = presentation_flow_owner(target)
+    if (flow_owner) {
+        presentation_track_owned_span(flow_owner)
+        return
+    }
+    parent = (target in node_parent) ? node_parent[target] : 0
     line = node_line[target]
     if (!parent || line < 1 || line in presentation_line_node) {
         presentation_possible = 0
@@ -6043,24 +6187,34 @@ function presentation_track_delete(target,    parent, line, end, raw, indent, te
     raw = raw_input_line[line]
     indent = indentation(raw, line)
     text = substr(raw, indent + 1)
-    if ((text ~ /^-[[:space:]]+/ && find_top_level_colon(text, 1)) || presentation_has_flow_collection(text)) {
+    if (presentation_has_flow_collection(text)) {
         presentation_possible = 0
         return
     }
     if (node_kind[parent] == "mapping") {
+        lower = node_line[parent] + 1
         for (i = 1; i <= mapping_count[parent]; i++) {
             sibling = mapping_child[parent, i]
             if (sibling != target && node_line[sibling] == line) {
                 presentation_possible = 0
                 return
             }
+            if (sibling == target && i > 1) {
+                previous = mapping_child[parent, i - 1]
+                lower = presentation_span_end(previous) + 1
+            }
         }
     } else if (node_kind[parent] == "sequence") {
+        lower = node_line[parent] + 1
         for (i = 1; i <= sequence_count[parent]; i++) {
             sibling = sequence_child[parent, i]
             if (sibling != target && node_line[sibling] == line) {
                 presentation_possible = 0
                 return
+            }
+            if (sibling == target && i > 1) {
+                previous = sequence_child[parent, i - 1]
+                lower = presentation_span_end(previous) + 1
             }
         }
     } else {
@@ -6068,12 +6222,13 @@ function presentation_track_delete(target,    parent, line, end, raw, indent, te
         return
     }
     end = presentation_span_end(target)
+    line = presentation_attached_start(target, lower)
     for (i = line; i <= end; i++) {
         presentation_deleted_line[i] = 1
     }
 }
 
-function emit_presented_line(line, node,    raw, indent, text, separator, rest, prefix, leading, comment_at, token, suffix, body, trailing) {
+function emit_presented_line(line, node,    raw, indent, text, separator, rest, prefix, leading, comment_at, token, suffix, body, trailing, rendered, content_indent, end, span_text, source_line) {
     raw = raw_input_line[line]
     sub(/\r$/, "", raw)
     indent = indentation(raw, line)
@@ -6107,6 +6262,39 @@ function emit_presented_line(line, node,    raw, indent, text, separator, rest, 
     }
     if (node_line_comment_modified[node]) {
         suffix = node_line_comment[node] == "" ? "" : " # " node_line_comment[node]
+    }
+    end = presentation_line_end[line]
+    if (end > line && suffix == "") {
+        span_text = raw
+        for (source_line = line + 1; source_line <= end; source_line++) {
+            span_text = span_text "\n" raw_input_line[source_line]
+        }
+        comment_at = presentation_comment_position(span_text)
+        if (comment_at && !index(substr(span_text, comment_at), "\n")) {
+            suffix = " " substr(span_text, comment_at)
+        }
+    }
+    if (node_kind[node] == "mapping" || node_kind[node] == "sequence") {
+        rendered = yaml_inline_node(node)
+        if (rendered == "") {
+            presentation_possible = 0
+            return
+        }
+        print prefix leading rendered suffix
+        return
+    }
+    if (node_kind[node] == "scalar" && (node_style[node] == "literal" || node_style[node] == "folded")) {
+        rendered = yaml_properties(node)
+        if (rendered != "") {
+            rendered = rendered " "
+        }
+        print prefix leading rendered yaml_block_indicator(node) suffix
+        content_indent = indent + yaml_indent
+        if (end > line && trim(raw_input_line[line + 1]) != "") {
+            content_indent = indentation(raw_input_line[line + 1], line + 1)
+        }
+        emit_yaml_block_scalar(node, content_indent)
+        return
     }
     print prefix leading presentation_scalar_text(node, token) suffix
 }
@@ -6147,13 +6335,17 @@ function emit_presented_sequence_insert(node, indent,    inline, properties) {
     emit_yaml_collection(node, indent + yaml_indent)
 }
 
-function emit_presented_reorder(line,    item, source_line, start, end) {
+function emit_presented_reorder(line,    item, source_line, start, end, replacement_end) {
     for (item = 1; item <= presentation_reorder_count[line]; item++) {
         start = presentation_reorder_start[line, item]
         end = presentation_reorder_end[line, item]
         for (source_line = start; source_line <= end; source_line++) {
             if (source_line in presentation_line_node) {
                 emit_presented_line(source_line, presentation_line_node[source_line])
+                replacement_end = presentation_line_end[source_line]
+                if (replacement_end > source_line) {
+                    source_line = replacement_end
+                }
             } else {
                 print raw_input_line[source_line]
             }
@@ -6161,7 +6353,7 @@ function emit_presented_reorder(line,    item, source_line, start, end) {
     }
 }
 
-function emit_preserved_input(start_line, end_line,    line, i) {
+function emit_preserved_input(start_line, end_line,    line, i, replacement_end) {
     if (!start_line) {
         start_line = 1
     }
@@ -6172,6 +6364,10 @@ function emit_preserved_input(start_line, end_line,    line, i) {
         if (line in presentation_deleted_line) {
         } else if (line in presentation_line_node) {
             emit_presented_line(line, presentation_line_node[line])
+            replacement_end = presentation_line_end[line]
+            if (replacement_end > line) {
+                line = replacement_end
+            }
         } else {
             print raw_input_line[line]
         }
@@ -6185,6 +6381,97 @@ function emit_preserved_input(start_line, end_line,    line, i) {
             emit_presented_insert(presentation_insert_key[line, i], presentation_insert_node[line, i], presentation_insert_indent[line, i])
         }
     }
+}
+
+function source_edit_add(kind, start, end,    edit) {
+    edit = ++source_edit_count
+    source_edit_kind[edit] = kind
+    source_edit_start[edit] = start
+    source_edit_end[edit] = end
+}
+
+function source_edit_compile(start_line, end_line, file,    line, run_start, run_end, replacement_end, i, last_end) {
+    if (!presentation_possible) {
+        source_edit_file_count[file] = 0
+        return 0
+    }
+    if (!start_line) {
+        start_line = 1
+    }
+    if (!end_line) {
+        end_line = NR
+    }
+    source_edit_count = 0
+    for (line = start_line; line <= end_line; line++) {
+        if (line in presentation_line_node) {
+            replacement_end = presentation_line_end[line]
+            if (!replacement_end) {
+                replacement_end = line
+            }
+            if (line in presentation_reorder_owned_line) {
+                for (i = line; i <= replacement_end; i++) {
+                    if (presentation_reorder_owned_line[i] != presentation_reorder_owned_line[line]) {
+                        presentation_possible = 0
+                        source_edit_file_count[file] = 0
+                        return 0
+                    }
+                }
+                source_edit_add("nested-replace", line, replacement_end)
+                line = replacement_end
+                continue
+            }
+            for (i = line; i <= replacement_end; i++) {
+                if ((i != line && i in presentation_line_node) ||
+                    i in presentation_deleted_line || i in presentation_reorder_count ||
+                    presentation_sequence_insert_count[i] || presentation_insert_count[i]) {
+                    presentation_possible = 0
+                    source_edit_file_count[file] = 0
+                    return 0
+                }
+            }
+            source_edit_add("replace", line, replacement_end)
+            line = replacement_end
+            continue
+        }
+        if (line in presentation_deleted_line) {
+            if (line in presentation_reorder_owned_line) {
+                continue
+            }
+            if (presentation_sequence_insert_count[line] || presentation_insert_count[line]) {
+                presentation_possible = 0
+                source_edit_file_count[file] = 0
+                return 0
+            }
+            run_start = line
+            run_end = line
+            while (run_end + 1 <= end_line && (run_end + 1) in presentation_deleted_line &&
+                !((run_end + 1) in presentation_reorder_owned_line)) {
+                run_end++
+            }
+            source_edit_add("delete", run_start, run_end)
+            line = run_end
+            continue
+        }
+        if (line in presentation_reorder_count) {
+            source_edit_add("reorder", line, line)
+        }
+        if (presentation_sequence_insert_count[line] || presentation_insert_count[line]) {
+            source_edit_add("insert", line, line)
+        }
+    }
+    last_end = 0
+    for (i = 1; i <= source_edit_count; i++) {
+        if (source_edit_kind[i] != "insert" && source_edit_start[i] <= last_end) {
+            presentation_possible = 0
+            source_edit_file_count[file] = 0
+            return 0
+        }
+        if (source_edit_kind[i] != "insert") {
+            last_end = source_edit_end[i]
+        }
+    }
+    source_edit_file_count[file] = source_edit_count
+    return source_edit_count
 }
 
 function transform_all_documents(query, file_filter,    document, root, expression, input, results) {
@@ -6273,6 +6560,10 @@ function output_transaction_files(query,    file, last_file, start_nodes, marker
         }
         if (preserve_only_mode && expression_file_changed[file] && !presentation_possible) {
             fail("preserve-only edit would regenerate YAML presentation: " input_file_name[file])
+        }
+        source_edit_compile(input_file_start_line[file], input_file_end_line[file], file)
+        if (preserve_only_mode && expression_file_changed[file] && !presentation_possible) {
+            fail("preserve-only edit would produce overlapping source edits: " input_file_name[file])
         }
         print marker file " " (expression_file_changed[file] ? 1 : 0)
         if (presentation_possible && input_file_has_lines[file]) {
@@ -6409,7 +6700,7 @@ function output_expression_results(results, output_mode,    i) {
     }
 }
 
-function output_explain(    documents, document, generated, presentation, shown, i, source, results, mutations, replacements, insertions, deletions, emitted_changes, parsed) {
+function output_explain(    documents, document, generated, presentation, shown, i, source, results, mutations, replacements, insertions, deletions, emitted_changes, parsed, source_edits) {
     documents = 0
     for (document = 0; document <= document_index; document++) {
         if ((document in document_root) && (!explain_file_mode || document_file_index[document] == explain_file_index)) {
@@ -6423,6 +6714,7 @@ function output_explain(    documents, document, generated, presentation, shown,
     replacements = explain_replacement_count + 0
     insertions = explain_insertion_count + 0
     deletions = explain_deletion_count + 0
+    source_edits = inplace_mode ? source_edit_file_count[explain_file_mode ? explain_file_index : 0] + 0 : 0
     if (explain_file_mode && eval_all_mode) {
         parsed = 0
         results = explain_file_result_count[explain_file_index] + 0
@@ -6463,7 +6755,7 @@ function output_explain(    documents, document, generated, presentation, shown,
     if (explain_mode == 2) {
         printf "{\"input\":%s,\"documents\":%d,\"parsed_nodes\":%d,\"generated_nodes\":%d,", json_quote(source), documents, parsed, generated > "/dev/stderr"
         printf "\"results\":%d,\"mutations\":%d,\"replacements\":%d,\"insertions\":%d,\"deletions\":%d,", results, mutations, replacements, insertions, deletions > "/dev/stderr"
-        printf "\"presentation\":%s,\"changes\":[", json_quote(presentation) > "/dev/stderr"
+        printf "\"presentation\":%s,\"source_edits\":%d,\"changes\":[", json_quote(presentation), source_edits > "/dev/stderr"
         emitted_changes = 0
         for (i = 1; i <= explain_mutation_count; i++) {
             if (explain_file_mode && eval_all_mode && explain_mutation_file[i] != explain_file_index) {
@@ -6480,7 +6772,7 @@ function output_explain(    documents, document, generated, presentation, shown,
     print "Explain: input=" json_quote(source) " documents=" documents " parsed_nodes=" parsed " generated_nodes=" generated > "/dev/stderr"
     print "Explain: results=" results " mutations=" mutations \
         " replacements=" replacements " insertions=" insertions \
-        " deletions=" deletions " presentation=" presentation > "/dev/stderr"
+        " deletions=" deletions " presentation=" presentation " source_edits=" source_edits > "/dev/stderr"
     shown = 0
     for (i = 1; i <= explain_mutation_count && shown < 20; i++) {
         if (explain_file_mode && eval_all_mode && explain_mutation_file[i] != explain_file_index) {
@@ -6680,6 +6972,7 @@ BEGIN {
         }
         multiline_scalar_text = multiline_scalar_text "\n" $0
         if (!multiline_quote_is_open(multiline_scalar_text, multiline_scalar_delimiter)) {
+            source_multiline_scalar_end[multiline_scalar_line] = NR
             process_line(multiline_scalar_text, multiline_scalar_line)
             multiline_scalar_active = 0
             multiline_scalar_text = ""
@@ -6725,6 +7018,7 @@ BEGIN {
         multiline_flow_text = multiline_flow_text " " flow_line_clean
         multiline_flow_depth = flow_balance(multiline_flow_text)
         if (multiline_flow_depth <= 0) {
+            source_multiline_flow_end[multiline_flow_line] = NR
             process_line(multiline_flow_text, multiline_flow_line)
             multiline_flow_active = 0
             multiline_flow_text = ""
@@ -6791,6 +7085,10 @@ END {
             output_transaction_files(query)
         } else if (inplace_mode) {
             transform_all_documents(query, "")
+            source_edit_compile(1, NR, 0)
+            if (preserve_only_mode && !presentation_possible) {
+                fail("preserve-only edit would produce overlapping source edits")
+            }
             if (presentation_possible) {
                 emit_preserved_input(1, NR)
             } else {

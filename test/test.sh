@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.12.0" "$(./ysh --version)"
+    assertEquals "v1.13.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -511,6 +511,7 @@ testInplaceTransactionAcrossFiles() {
     assertEquals 'name: ready # keep three' "$(cat "$spaced_file")"
     assertEquals 3 "$(wc -l < "$explain_file" | tr -d ' ')"
     assertContains "$(sed -n '1p' "$explain_file")" '"presentation":"preserved"'
+    assertContains "$(sed -n '1p' "$explain_file")" '"source_edits":1'
     assertContains "$(sed -n '2p' "$explain_file")" '"path":".name"'
     assertNotContains "$(cat "$explain_file")" '"ready"'
     if command -v jq >/dev/null 2>&1; then
@@ -729,9 +730,11 @@ testPreserveOnlyRefusesRegeneration() {
 
     printf '%s\n' 'meta: {enabled: false}' 'items: [{name: one, score: 4}]' 'tail: kept' > "$flow_file"
     ./ysh --preserve-only --diff '.meta.checked = true | .items |= map(.score += 1)' "$flow_file" > "$preserve_output" 2> "$preserve_error"
-    assertEquals 2 $?
-    assertContains "$(cat "$preserve_error")" 'preserve-only edit would regenerate YAML presentation'
-    ./ysh -i '.meta.checked = true | .items |= map(.score += 1)' "$flow_file"
+    assertEquals 1 $?
+    assertEquals 0 "$(wc -c < "$preserve_error" | tr -d ' ')"
+    assertContains "$(cat "$preserve_output")" '+meta: {"enabled": false, "checked": true}'
+    assertContains "$(cat "$preserve_output")" '+items: [{"name": "one", "score": 5}]'
+    ./ysh --preserve-only -i '.meta.checked = true | .items |= map(.score += 1)' "$flow_file"
     assertEquals 0 $?
     assertEquals '{"enabled":false,"checked":true}' "$(./ysh --json '.meta' "$flow_file")"
     assertEquals '[{"name":"one","score":5}]' "$(./ysh --json '.items' "$flow_file")"
@@ -937,6 +940,117 @@ testInplacePreservesRichYamlPresentation() {
     rm -f "$inplace_file"
 }
 
+testInplaceCompilesOwnedMultilineSourceEdits() {
+    inplace_file=test/.tmp-inplace-owned-spans-$$.yml
+    expected_file=test/.tmp-inplace-owned-spans-expected-$$.yml
+    diff_file=test/.tmp-inplace-owned-spans-diff-$$
+    printf '%s\n' \
+        'meta: {' \
+        '  enabled: false,' \
+        '  labels: [one, two]' \
+        '} # flow tail' \
+        'title: "old' \
+        '  value" # quoted tail' \
+        'note: |- # block tail' \
+        '  old line' \
+        '  second' \
+        'after: kept' > "$inplace_file"
+    printf '%s\n' \
+        'meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail' \
+        'title: "new value" # quoted tail' \
+        'note: |- # block tail' \
+        '  new line' \
+        '  second new' \
+        'after: kept' > "$expected_file"
+
+    ./ysh --preserve-only --diff \
+        '.meta.enabled = true | .meta.labels += ["three"] | .note = "new line\nsecond new" | .title = "new value"' \
+        "$inplace_file" > "$diff_file"
+    assertEquals 1 $?
+    assertContains "$(cat "$diff_file")" '+meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail'
+    assertContains "$(cat "$diff_file")" '+  new line'
+    assertContains "$(cat "$diff_file")" '+title: "new value" # quoted tail'
+    assertContains "$(cat "$inplace_file")" 'enabled: false'
+
+    ./ysh --preserve-only -i \
+        '.meta.enabled = true | .meta.labels += ["three"] | .note = "new line\nsecond new" | .title = "new value"' \
+        "$inplace_file"
+    assertEquals 0 $?
+    assertEquals "$(cat "$expected_file")" "$(cat "$inplace_file")"
+    assertEquals kept "$(./ysh '.after' "$inplace_file")"
+
+    commented_flow=test/.tmp-inplace-commented-flow-$$.yml
+    commented_backup=test/.tmp-inplace-commented-flow-backup-$$.yml
+    printf '%s\n' 'meta: {' '  # attached inside flow' '  enabled: false' '}' 'after: kept' > "$commented_flow"
+    cp "$commented_flow" "$commented_backup"
+    ./ysh --preserve-only --diff '.meta.enabled = true' "$commented_flow" > "$diff_file" 2>/dev/null
+    assertEquals 2 $?
+    assertEquals 0 "$(wc -c < "$diff_file" | tr -d ' ')"
+    cmp -s "$commented_backup" "$commented_flow"
+    assertEquals 0 $?
+
+    rm -f "$commented_backup" "$commented_flow" "$diff_file" "$expected_file" "$inplace_file"
+}
+
+testInplaceMovesAndDeletesOwnedRecordSpans() {
+    inplace_file=test/.tmp-inplace-record-spans-$$.yml
+    expected_file=test/.tmp-inplace-record-spans-expected-$$.yml
+    printf '%s\n' \
+        'settings: # header' \
+        '  # zed setting' \
+        '  z: 1' \
+        '  # alpha setting' \
+        '  a:' \
+        '    nested: yes' \
+        'items:' \
+        '  # first record' \
+        '  - name: one' \
+        '    score: 1' \
+        '  # second record' \
+        '  - name: two' \
+        '    score: 2' \
+        'tail: kept' > "$inplace_file"
+    printf '%s\n' \
+        'settings: # header' \
+        '  # alpha setting' \
+        '  a:' \
+        '    nested: yes' \
+        '  # zed setting' \
+        '  z: 1' \
+        'items:' \
+        '  # second record' \
+        '  - name: two' \
+        '    score: 2' \
+        'tail: kept' > "$expected_file"
+
+    ./ysh --preserve-only -i '.settings = sort_keys(.settings) | del(.items[0])' "$inplace_file"
+    assertEquals 0 $?
+    assertEquals "$(cat "$expected_file")" "$(cat "$inplace_file")"
+
+    rm -f "$expected_file" "$inplace_file"
+}
+
+testInplacePreservesAliasAndMergeSourceOwnership() {
+    inplace_file=test/.tmp-inplace-shared-source-$$.yml
+    printf '%s\n' \
+        'defaults: &defaults {retries: 3, mode: safe} # source owner' \
+        'service:' \
+        '  <<: *defaults # merge stays' \
+        '  inherited: *defaults # alias stays' \
+        'tail: kept' > "$inplace_file"
+
+    ./ysh --preserve-only -i '.service.inherited.retries = 5 | .service.mode = "strict"' "$inplace_file"
+    assertEquals 0 $?
+    result=$(cat "$inplace_file")
+    assertContains "$result" 'defaults: &defaults {"retries": 5, "mode": "strict"} # source owner'
+    assertContains "$result" '<<: *defaults # merge stays'
+    assertContains "$result" 'inherited: *defaults # alias stays'
+    assertContains "$result" 'tail: kept'
+    assertEquals '{"retries":5,"mode":"strict"}' "$(./ysh --json '.service.inherited' "$inplace_file")"
+
+    rm -f "$inplace_file"
+}
+
 testExpressionErrors() {
     result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
     assertNotEquals 0 $?
@@ -1099,7 +1213,8 @@ testExplainPresentationDecision() {
         "$explain_file" 2> "$explain_err"
     assertEquals 0 $?
     result=$(cat "$explain_err")
-    assertContains "$result" 'presentation=regenerated'
+    assertContains "$result" 'presentation=preserved'
+    assertContains "$result" 'source_edits=1'
     assertContains "$result" 'Explain: replace .spec.template.spec.containers[1].env'
 
     rm -f "$explain_file" "$explain_err"
@@ -1277,11 +1392,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.12.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.13.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.12.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.12"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.13.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.13"
     assertNotContains "$(cat _static/_www/story/index.html)" "v1.8"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""

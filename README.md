@@ -126,7 +126,7 @@ ysh --explain -i '.image.tag = "stable"' deploy.yml
 ysh --explain=json -i '.image.tag = "stable"' deploy/*.yml 2>changes.jsonl
 ```
 
-`--explain` writes mutation paths and the presentation decision to stderr, without echoing values. Its JSON form emits one audit record per input, including whether the final prepared candidate actually differs.
+`--explain` writes mutation paths, the presentation decision, and the prepared source-edit count to stderr without echoing values. Its JSON form emits one audit record per input, including whether the final candidate actually differs.
 
 The [recipe book](https://yaml.azohra.com/docs/recipes/) starts with tasks. The [query guide](https://yaml.azohra.com/docs/queries/) covers the language.
 
@@ -140,7 +140,7 @@ YAML stream → node graph → aliases + merges → expression stream → values
 
 Mappings remain mappings. Empty collections survive. Tags and source lines stay attached. Anchors and aliases retain shared identity. Updates operate on selected nodes rather than reconstructed strings.
 
-Common replacements, block mapping/sequence appends, inserts, deletes, and sequence reorders preserve comments, whitespace, quoting, styles, anchors, tags, and directives. Styles, tags, anchors, and aliases are writable graph metadata. Larger structural changes fall back to deterministic semantic YAML unless `--preserve-only` is set.
+After evaluation, YAML.sh compiles a non-overlapping edit plan against the original source. Scalar replacements, flow collections, block scalars, block inserts/appends, record deletions, and mapping or sequence reorders keep untouched bytes intact. Attached comments move with their records; edits through aliases or merges update the owned anchor source. Changed flow spans use stable flow formatting. Unsupported structural edits fall back to deterministic semantic YAML unless `--preserve-only` is set.
 
 Multi-file `-i` evaluates preserved source snapshots, then verifies the live inputs still match before replacing anything. Each changed file is checked again immediately before its atomic sibling rename. Drift aborts the transaction; a commit failure or interrupt restores the evaluated snapshots. Writable `eval-all` can read one file and update another under the same guarded transaction.
 
@@ -153,7 +153,7 @@ The test suite covers parser behavior, yq-shaped queries, safe edits, portabilit
 | Pinned YAML Test Suite | Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases |
 | Pinned yq differential | 2,630 categorized programs plus Kubernetes, Compose, Actions, GitLab CI, overlay, metadata, and cross-file workflows |
 | Grammar/property matrix | Every combination of 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties |
-| Presentation matrix | Strict preview and exact compound edits across scalar styles and value/comment variants |
+| Source-edit matrix | Exact strict preview and commit across scalar styles, flow spans, block scalars, reorders, records, comments, aliases, and merges |
 | Repository transactions | Exact diffs, strict refusal, source-drift detection, no-op, cross-file data flow, rollback, and interruption |
 | Scale checks | 125,000 nodes with a strict one-line preview; 1,500 documents; ≤224 MiB RSS |
 

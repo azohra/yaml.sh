@@ -4,6 +4,30 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.13.0] - 2026-08-02
+
+Version 1.13 makes source fidelity a compiled edit plan rather than a mutation-time guess.
+
+### Added
+
+- Post-evaluation source-edit compilation validates non-overlapping replacements, deletions, moves, and insertions before a candidate is emitted.
+- Strict source edits for single- and multiline flow collections, literal/folded block scalars, and multiline quoted scalars.
+- Comment-carrying block mapping reorders and block sequence-record deletions.
+- `source_edits` in text and JSON explanations reports the prepared source operation count without exposing values.
+
+### Changed
+
+- Flow edits rewrite only their owned collection span; source outside that span remains byte-identical. Flow whitespace and key quoting inside the changed span may normalize.
+- Attached comments move with reordered mapping entries and are removed with deleted sequence records.
+- Updates through aliases and merge keys retain shared node ownership, so the anchor source changes while alias and merge occurrences remain intact.
+- The presentation evidence gate now covers exact preview and commit for flow, block scalar, reorder, and record spans in addition to scalar-style combinations.
+
+### Boundaries
+
+- Head/foot comments and mapping-key nodes are still not writable graph objects.
+- Strict mode refuses multiline flow compaction when the owned span contains internal comments; trailing comments after the closing delimiter are preserved.
+- A structural edit without a safe, non-overlapping source plan still uses semantic YAML, or fails before candidate output under `--preserve-only`.
+
 ## [1.12.0] - 2026-08-02
 
 Version 1.12 makes repository updates conditional on the files that were actually evaluated.

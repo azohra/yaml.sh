@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.12.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.13.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -87,7 +87,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.12.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.13.0</span></div>
       <article>
           <h1 id="yaml-support">YAML support</h1>
           <p>YAML.sh parses the syntax below into a real node graph and exercises it in the test suite. The limitations section names the nearby forms it does not support.</p>
@@ -156,7 +156,7 @@
             <li>Tags and anchors before scalar keys are accepted, but mapping keys remain text in the graph.</li>
             <li>Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.</li>
             <li>Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded line comments, and supported scalar/collection styles where representable. It does not reconstruct original spacing or head/foot comments.</li>
-            <li>Common in-place replacements, direct block inserts/deletes, block mapping and sequence appends, and pure sequence reorders preserve comments, whitespace, quoting, block/flow style, anchors, tags, and directives. Other structural changes fall back to semantic YAML.</li>
+            <li>In-place source plans cover scalar replacements, single- and multiline flow collections, block scalars, direct block inserts/appends/deletes, and pure mapping or sequence reorders. Untouched spans remain byte-identical; changed flow spans use stable flow formatting.</li>
             <li>Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.</li>
             <li>Sequence slices, scalar interpolation, grouping, <code>ireduce</code>, computed object keys, <code>setpath</code>/<code>delpaths</code>, and POSIX-ERE <code>test</code>/global <code>sub</code> are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.</li>
             <li><code>style</code> can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. <code>line_comment</code> can inspect and set line comments. Head/foot comments and key-node presentation remain outside the graph.</li>
@@ -192,8 +192,8 @@
                 <td>6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties, including non-writing mutation previews</td>
               </tr>
               <tr>
-                <td>Presentation matrix</td>
-                <td>Strict preview and commit across 3 scalar styles × 3 value/comment variants</td>
+                <td>Source-edit matrix</td>
+                <td>Strict preview and commit across scalar styles, flow and block-scalar spans, mapping reorders, sequence records, aliases, merges, and attached comments</td>
               </tr>
               <tr>
                 <td>Repository transaction suite</td>
