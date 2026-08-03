@@ -42,7 +42,7 @@ Aliases retain node identity internally. JSON and normal value output resolve al
 
 ## Tags and directives
 
-- `%YAML` directives, with duplicate and malformed directives rejected.
+- `%YAML` directives, with duplicates and malformed versions rejected.
 - `%TAG` directives and handle expansion.
 - Standard `!!` tags.
 - Verbatim tags such as `!<tag:example.com,2026:widget>`.
@@ -58,7 +58,7 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - LF and CRLF input.
 - Multiple documents using `---` and `...`.
 - Empty explicit documents represented as null.
-- Source lines retained on nodes.
+- Source lines and focused block-node columns retained on nodes.
 - Anchor, alias, tag, scalar/collection style, and line-comment metadata available to queries and supported setters.
 
 ## Intentional limitations
@@ -82,25 +82,10 @@ YAML version directives are validated but do not switch between complete YAML 1.
 
 YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond these tested behaviors is required.
 
-## Test coverage
-
-The current suite checks:
-
-| Evidence | Coverage |
-| --- | --- |
-| YAML Test Suite | Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases |
-| yq v4.53.3 differential | 2,630 categorized programs plus YAML metadata and cross-file programs |
-| Configuration workflows | Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays |
-| Grammar/property matrix | 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties, including non-writing mutation previews |
-| Source-edit matrix | Strict preview and commit across scalar styles, flow and block-scalar spans, mapping reorders, sequence records, aliases, merges, and attached comments |
-| Repository transaction suite | Exact diffs, strict refusal, source-drift races, no-op, cross-file binding, rollback, interruption, empty files, and JSON audit behavior |
-| Scale | 125,000 payload nodes with strict diff; 1,500 documents; at most 224 MiB RSS |
-| Runtime portability | macOS AWK, mawk, original AWK, POSIX gawk, BusyBox AWK, and multiple POSIX shells |
-
-Three YAML Test Suite cases contain partial-event JSON but are marked errors; YAML.sh counts their rejection rather than imitating a partial AST.
-
 ## How it is tested
 
-The focused fixtures cover parser syntax, graph semantics, query behavior, presentation preservation, and rejection boundaries. A separate workflow corpus exercises Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays against yq.
+The pinned YAML Test Suite owns accepted and strict-invalid outcomes. The parser-boundary matrix sits beside it: valid neighboring forms must parse, while malformed directives, collection keys, reserved indicators, malformed escapes, indentation errors, invalid aliases, and merge sources must fail before producing a graph.
 
-See [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh), [`test/conformance.sh`](https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh), [`test/differential.sh`](https://github.com/azohra/yaml.sh/blob/main/test/differential.sh), [`test/fuzz.sh`](https://github.com/azohra/yaml.sh/blob/main/test/fuzz.sh), and [`bench/scale.sh`](https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh).
+Focused fixtures then cover graph semantics, query behavior, presentation preservation, repository transactions, and resource limits. Configuration workflows exercise Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays against yq. The [operator manifest](operators.md) owns expression-language claims.
+
+See [`test/parser-boundaries.sh`](https://github.com/azohra/yaml.sh/blob/main/test/parser-boundaries.sh), [`test/conformance.sh`](https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh), [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh), and [`bench/scale.sh`](https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh).

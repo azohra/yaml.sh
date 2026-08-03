@@ -96,6 +96,12 @@ paths	expressions.yml	.metadata | .channel = "stable"
 mutation	expressions.yml	.metadata | del(.region)
 mutation	expressions.yml	.services | del(.[1]) | map(.name)
 selection	expressions.yml	.. | select(type == "!!str")
+paths	expressions.yml	"  yaml.sh  " | trim
+collections	expressions.yml	[1, true, null, "cat"] | map(to_string)
+collections	expressions.yml	["zero", "one"] | array_to_map
+paths	expressions.yml	.metadata.owner | column
+practical	expressions.yml	sort_keys(..)
+paths	expressions.yml	.services[].name | split_doc
 paths	advanced.yml	.scalar
 yaml-metadata	advanced.yml	.scalar_alias
 yaml-metadata	advanced.yml	.mapping_alias.color

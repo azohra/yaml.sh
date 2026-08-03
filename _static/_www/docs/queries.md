@@ -137,12 +137,13 @@ ysh --json '.metadata | with_entries(.value |= upcase)' config.yml
 ysh --json '.metadata | to_entries | from_entries' config.yml
 ```
 
-Sequence helpers include `sort`, `sort_by`, `group_by`, `unique`, `unique_by`, `reverse`, `flatten`, `min`/`max`, `min_by`/`max_by`, and `add`. Quantifiers include `any`, `all`, `any_c`, and `all_c`. String helpers include `upcase`, `downcase`, `contains`, `startswith`, `endswith`, `split`, and `join`.
+Sequence helpers include `sort`, `sort_by`, `group_by`, `unique`, `unique_by`, `reverse`, `flatten`, `array_to_map`, `min`/`max`, `min_by`/`max_by`, and `add`. Quantifiers include `any`, `all`, `any_c`, and `all_c`. String helpers include `upcase`, `downcase`, `trim`, `to_string`, `contains`, `startswith`, `endswith`, `split`, and `join`.
 
 ```sh
 ysh -n --json '[3, 1, 2, 1] | unique'
 ysh -n --json '[[1, 2], [3, [4]]] | flatten'
 ysh -n --json '["yaml", "sh"] | join(".")'
+ysh -n --json '["zero", "one"] | array_to_map'
 ```
 
 Focused helpers cover common selection and reshaping jobs:
@@ -151,6 +152,7 @@ Focused helpers cover common selection and reshaping jobs:
 ysh '.services | filter(.enabled) | first' config.yml
 ysh '.metadata | pick(["name", "owner"])' config.yml
 ysh '.metadata | omit(["internal"]) | sort_keys(.)' config.yml
+ysh --json 'sort_keys(..)' config.yml
 ysh -n --json '[["a", "b"], ["x"]] | pivot'
 ```
 
@@ -208,11 +210,11 @@ Modifiers combine, as in `*?+` for existing fields with appended arrays.
 
 ## Context and environment
 
-`path`, `parent`, `key`, `line`, and `tag` expose graph context. `filename`, `fileIndex`, and `documentIndex` identify input provenance:
+`path`, `parent`, `key`, `line`, `column`, and `tag` expose graph context. `filename`, `fileIndex`, and `documentIndex` identify input provenance:
 
 ```sh
 ysh '.. | select(. == "api") | path' config.yml
-ysh '.services[0].name | [filename, line, tag]' config.yml
+ysh '.services[0].name | [filename, line, column, tag]' config.yml
 ```
 
 `env(NAME)` parses the variable as YAML. `strenv(NAME)` always creates a string. `envsubst` expands `$NAME` and `${NAME}`, including `-` and `:-` defaults; `nu`, `ne`, and `ff` options are accepted. Use `--security-disable-env-ops` when expressions must not read the environment.
@@ -252,7 +254,17 @@ ysh ea --check "$query" release.yml services/*.yml
 ysh ea -i "$query" release.yml services/*.yml
 ```
 
-`eval-all` is intentionally focused; it is not a complete clone of yq's general stream algebra.
+Whole-stream reduction can fold any number of files into one result:
+
+```sh
+ysh ea '. as $document ireduce ({}; . * $document)' defaults.yml region.yml secrets.yml
+```
+
+`split_doc` marks each streamed match as its own YAML document. YAML.sh already separates multiple YAML results, so the operator is explicit and idempotent:
+
+```sh
+ysh -o=yaml '.services[] | split_doc' config.yml
+```
 
 ## Construct values
 
@@ -336,6 +348,6 @@ Scalar styles can be reset or set to plain, single, double, literal, or folded. 
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. It does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [yq compatibility map](yq-compatibility.md).
+This is a useful yq-shaped language, not the complete yq language. It does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [operator manifest](operators.md) for the audited form-by-form boundary.
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.

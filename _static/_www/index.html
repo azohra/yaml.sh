@@ -29,7 +29,7 @@
     <a class="brand" href="/" aria-label="YAML.sh home">
       <span class="brand-mark">Y</span>
       <span>YAML.sh</span>
-      <span class="version-pill" data-ysh-version>v1.13.0</span>
+      <span class="version-pill" data-ysh-version>v1.14.0</span>
     </a>
     <nav aria-label="Primary navigation">
       <a href="/story/">Story</a>
@@ -42,7 +42,7 @@
   <main id="main">
     <section class="hero section-shell">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.13.0</span> · source spans, not vibes</p>
+        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.14.0</span> · the useful surface, audited</p>
         <h1>yq energy.<br><span>zero baggage.</span></h1>
         <p class="hero-lede">Program YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a frankly unreasonable amount of ambition.</p>
         <div class="hero-actions">
@@ -96,6 +96,7 @@
         <span>DIFF BEFORE WRITE</span><b>◆</b>
         <span>STRICT PRESERVATION</span><b>◆</b>
         <span>FLOW + BLOCK SURGERY</span><b>◆</b>
+        <span>TRIM + SPLIT DOC</span><b>◆</b>
         <span>CROSS-FILE UPDATES</span><b>◆</b>
         <span>TRANSACTIONAL EDITS</span>
       </div>
@@ -186,8 +187,8 @@ node  1  mapping  line=1</code></pre>
         <article class="feature feature-accent">
           <p class="feature-index">03 / TESTED</p>
           <h3>Know what works.</h3>
-          <p>Supported syntax, rejected edge cases, resource limits, and yq overlap are tested and documented in plain language.</p>
-          <a href="/docs/supported_yml/">Explore YAML support <span aria-hidden="true">→</span></a>
+          <p>Every YAML-oriented yq area is marked supported, focused, or excluded—with a named test behind the claim.</p>
+          <a href="/docs/operators/">Open the operator manifest <span aria-hidden="true">→</span></a>
         </article>
         <article class="feature">
           <p class="feature-index">04 / HACKABLE</p>
@@ -220,7 +221,7 @@ node  1  mapping  line=1</code></pre>
         <p>The installer downloads and checksum-verifies a pinned release, then places <code>ysh</code> in <code>/usr/local/bin</code>. Set <code>YSH_INSTALL_DIR</code> to choose another location.</p>
       </div>
       <div class="install-command">
-        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.13.0</span></div>
+        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.14.0</span></div>
         <pre><code id="install-code">curl -fsSL https://yaml.azohra.com/install | sh</code></pre>
         <button class="copy-button" type="button" data-copy="install-code"><span>Copy command</span><b aria-hidden="true">⌘</b></button>
         <p class="install-note">Homebrew: <code>brew install azohra/tools/ysh</code><br>Prefer to inspect first? <a href="/install">Read the installer source.</a></p>

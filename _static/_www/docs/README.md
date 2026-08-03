@@ -13,6 +13,7 @@ ysh --preserve-only --diff '.release.channel = "stable"' services/*.yml
 - [Install one file and run the first query](getting-started.md).
 - [Copy a recipe for filtering, updates, environment, or file merging](recipes.md).
 - [Learn the query language](queries.md).
+- [Check the operator manifest](operators.md).
 - [Choose value, JSON, YAML, metadata, AST, or events](output.md).
 - [Check, compose, and update files or document streams](documents.md).
 
@@ -49,9 +50,10 @@ The graph is why empty collections survive, punctuated keys behave, aliases reta
 
 The useful overlap with yq is large, but deliberate. YAML.sh does not implement non-YAML codecs, dates, file-loading operators, dynamic evaluation, system execution, or yq's complete operator and flag surface.
 
-Two references make that boundary easy to inspect:
+Three references make that boundary easy to inspect:
 
 - [YAML support](supported_yml.md) lists parser behavior, limits, and test coverage.
+- [Operator manifest](operators.md) classifies every YAML-oriented yq area with named evidence.
 - [yq compatibility](yq-compatibility.md) maps the useful overlap and intentional omissions.
 
 Unsupported neighboring syntax should fail explicitly, not produce a plausible lie.
