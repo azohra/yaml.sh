@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Tagged-JSON adapter for the pinned toml-lang/toml-test oracle.
+exec "${YSH_TOML_TEST_BINARY:-./ysh}" -p toml --toml-test-json '.'

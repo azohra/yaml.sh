@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.15.0
+YSH_VERSION=1.16.0
 
 # Replaced by the build with the embedded AWK engine.
 ysh_awk_program() {
@@ -40,9 +40,14 @@ function trim_quoted_right(value, double_quoted) {
     return trim_right_horizontal(value)
 }
 
-function json_escape(value,    result, i, char) {
+function json_escape(value,    result, i, char, byte) {
     result = ""
     for (i = 1; i <= length(value); i++) {
+        if (codec_toml_nul_marker != "" && substr(value, i, length(codec_toml_nul_marker)) == codec_toml_nul_marker) {
+            result = result "\\u0000"
+            i += length(codec_toml_nul_marker) - 1
+            continue
+        }
         char = substr(value, i, 1)
         if (char == "\\") {
             result = result "\\\\"
@@ -59,7 +64,9 @@ function json_escape(value,    result, i, char) {
         } else if (char == sprintf("%c", 12)) {
             result = result "\\f"
         } else {
-            result = result char
+            byte = codec_byte(char)
+            if (byte < 32 || byte == 127) result = result "\\u00" substr(codec_hex, int(byte / 16) + 1, 1) substr(codec_hex, (byte % 16) + 1, 1)
+            else result = result char
         }
     }
     return result
@@ -72,6 +79,7 @@ function json_quote(value) {
 function codec_initialize(    i, char) {
     codec_hex = "0123456789ABCDEF"
     codec_base64_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    codec_toml_nul_marker = SUBSEP "YSH_TOML_NUL" SUBSEP
     for (i = 1; i <= 255; i++) {
         char = sprintf("%c", i)
         codec_byte_value[char] = i
@@ -449,6 +457,929 @@ function codec_delimited_decode(value, separator,    row, column, field, quoted,
     return root
 }
 
+function codec_strip_comment(value, marker,    result, i, char, quote, escaped, triple, next_three, quote_count) {
+    result = ""
+    quote = ""
+    for (i = 1; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        next_three = substr(value, i, 3)
+        if (quote != "") {
+            if (triple && next_three == quote quote quote) {
+                quote_count = 3
+                while (quote_count < 5 && substr(value, i + quote_count, 1) == quote) quote_count++
+                result = result substr(value, i, quote_count)
+                i += quote_count - 1
+                quote = ""
+                triple = 0
+            } else {
+                result = result char
+                if (quote == "\"" && char == "\\" && !escaped) escaped = 1
+                else {
+                    if (!triple && char == quote && !escaped) quote = ""
+                    escaped = 0
+                }
+            }
+        } else if (next_three == "\"\"\"" || next_three == "'''") {
+            quote = char
+            triple = 1
+            result = result next_three
+            i += 2
+        } else if (char == "\"" || char == "'") {
+            quote = char
+            result = result char
+        } else if (index(marker, char)) {
+            while (i <= length(value) && substr(value, i, 1) != "\n") i++
+            if (i <= length(value)) result = result "\n"
+        } else {
+            result = result char
+        }
+    }
+    return trim_right_horizontal(result)
+}
+
+function codec_toml_complete(value,    i, char, next_three, quote, triple, escaped, brackets, braces, quote_count) {
+    for (i = 1; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        next_three = substr(value, i, 3)
+        if (quote != "") {
+            if (triple) {
+                if (next_three == quote quote quote) {
+                    quote_count = 3
+                    while (quote_count < 5 && substr(value, i + quote_count, 1) == quote) quote_count++
+                    quote = ""
+                    triple = 0
+                    i += quote_count - 1
+                } else if (quote == "\"" && char == "\\") {
+                    i++
+                }
+            } else if (quote == "\"" && char == "\\" && !escaped) {
+                escaped = 1
+            } else {
+                if (char == quote && !escaped) quote = ""
+                escaped = 0
+            }
+            continue
+        }
+        if (next_three == "\"\"\"" || next_three == "'''" ) {
+            quote = char
+            triple = 1
+            i += 2
+        } else if (char == "\"" || char == "'") quote = char
+        else if (char == "#") {
+            while (i <= length(value) && substr(value, i, 1) != "\n") i++
+        }
+        else if (char == "[") brackets++
+        else if (char == "]") brackets--
+        else if (char == "{") braces++
+        else if (char == "}") braces--
+        if (brackets < 0 || braces < 0) return 0
+    }
+    return quote == "" && brackets == 0 && braces == 0
+}
+
+function codec_toml_next_statement(    newline, line, clean, statement, separator, complete) {
+    statement = ""
+    separator = ""
+    while (codec_toml_remaining != "") {
+        newline = index(codec_toml_remaining, "\n")
+        if (newline) {
+            line = substr(codec_toml_remaining, 1, newline - 1)
+            codec_toml_remaining = substr(codec_toml_remaining, newline + 1)
+        } else {
+            line = codec_toml_remaining
+            codec_toml_remaining = ""
+        }
+        sub(/\r$/, "", line)
+        # Only strip comments once the whole statement is understood.  A # in a
+        # multiline string is data, and line-at-a-time stripping loses that fact.
+        clean = line
+        if (statement == "" && trim(clean) == "") continue
+        statement = statement separator clean
+        separator = "\n"
+        if (codec_toml_complete(statement)) {
+            complete = trim(codec_strip_comment(statement, "#"))
+            if (complete != "") return complete
+            statement = ""
+            separator = ""
+        }
+    }
+    if (statement != "") fail("unterminated TOML statement")
+    return ""
+}
+
+function codec_toml_find_equals(value, start,    i, char, quote, escaped) {
+    quote = ""
+    for (i = start; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        if (quote != "") {
+            if (quote == "\"" && char == "\\" && !escaped) escaped = 1
+            else {
+                if (char == quote && !escaped) quote = ""
+                escaped = 0
+            }
+        } else if (char == "\"" || char == "'") quote = char
+        else if (char == "=") return i
+    }
+    return 0
+}
+
+function codec_toml_inline_has_newline(value, start,    i, char, next_three, quote, triple, escaped, depth, brackets, quote_count) {
+    depth = 0
+    for (i = start; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        next_three = substr(value, i, 3)
+        if (quote != "") {
+            if (triple && next_three == quote quote quote) {
+                quote_count = 3
+                while (quote_count < 5 && substr(value, i + quote_count, 1) == quote) quote_count++
+                quote = ""
+                triple = 0
+                i += quote_count - 1
+            } else if (!triple && char == quote && !escaped) quote = ""
+            else if (quote == "\"" && char == "\\" && !escaped) escaped = 1
+            else escaped = 0
+            continue
+        }
+        if (next_three == "\"\"\"" || next_three == "'''") {
+            quote = char
+            triple = 1
+            i += 2
+        } else if (char == "\"" || char == "'") quote = char
+        else if (char == "{") depth++
+        else if (char == "}" && --depth == 0) return 0
+        else if (char == "[") brackets++
+        else if (char == "]") brackets--
+        else if ((char == "\n" || char == "\r") && brackets == 0) return 1
+    }
+    return 0
+}
+
+function codec_toml_skip_space() {
+    while (codec_toml_position <= length(codec_toml_source) && substr(codec_toml_source, codec_toml_position, 1) ~ /[ \t\r\n]/) codec_toml_position++
+}
+
+function codec_toml_hex_value(char) {
+    char = toupper(char)
+    return char ~ /[0-9]/ ? char + 0 : index("ABCDEF", char) + 9
+}
+
+function codec_toml_string(quote, triple,    result, char, escaped, digits, codepoint, count, quote_count, extra) {
+    result = ""
+    codec_toml_position += triple ? 3 : 1
+    if (triple && substr(codec_toml_source, codec_toml_position, 2) == "\r\n") codec_toml_position += 2
+    else if (triple && substr(codec_toml_source, codec_toml_position, 1) == "\n") codec_toml_position++
+    while (codec_toml_position <= length(codec_toml_source)) {
+        if (triple && substr(codec_toml_source, codec_toml_position, 3) == quote quote quote) {
+            quote_count = 3
+            while (quote_count < 5 && substr(codec_toml_source, codec_toml_position + quote_count, 1) == quote) quote_count++
+            extra = quote_count - 3
+            while (extra > 0) {
+                result = result quote
+                extra--
+            }
+            codec_toml_position += quote_count
+            return result
+        }
+        char = substr(codec_toml_source, codec_toml_position++, 1)
+        if (!triple && char == quote) return result
+        if (!triple && (char == "\n" || char == "\r")) fail("newline in single-line TOML string")
+        if (quote == "'" || char != "\\") {
+            result = result char
+            continue
+        }
+        char = substr(codec_toml_source, codec_toml_position++, 1)
+        if (triple && char ~ /[ \t]/) {
+            while (substr(codec_toml_source, codec_toml_position, 1) ~ /[ \t]/) codec_toml_position++
+            char = substr(codec_toml_source, codec_toml_position++, 1)
+            if (char != "\n" && !(char == "\r" && substr(codec_toml_source, codec_toml_position, 1) == "\n")) fail("invalid TOML string escape")
+            if (char == "\r") codec_toml_position++
+            while (substr(codec_toml_source, codec_toml_position, 1) ~ /[ \t\r\n]/) codec_toml_position++
+        } else if (triple && char == "\r" && substr(codec_toml_source, codec_toml_position, 1) == "\n") {
+            codec_toml_position++
+            while (substr(codec_toml_source, codec_toml_position, 1) ~ /[ \t\r\n]/) codec_toml_position++
+        } else if (triple && char == "\n") {
+            while (substr(codec_toml_source, codec_toml_position, 1) ~ /[ \t\r\n]/) codec_toml_position++
+        } else if (char == "n") result = result "\n"
+        else if (char == "r") result = result "\r"
+        else if (char == "t") result = result "\t"
+        else if (char == "b") result = result sprintf("%c", 8)
+        else if (char == "f") result = result sprintf("%c", 12)
+        else if (char == "\"") result = result "\""
+        else if (char == "\\") result = result "\\"
+        else if (char == "u" || char == "U") {
+            count = char == "u" ? 4 : 8
+            digits = substr(codec_toml_source, codec_toml_position, count)
+            if (length(digits) != count || digits !~ /^[0-9A-Fa-f]+$/) fail("invalid TOML Unicode escape")
+            codepoint = 0
+            for (escaped = 1; escaped <= count; escaped++) codepoint = codepoint * 16 + codec_toml_hex_value(substr(digits, escaped, 1))
+            if (codepoint > 1114111 || (codepoint >= 55296 && codepoint <= 57343)) fail("invalid TOML Unicode code point")
+            result = result (codepoint == 0 ? codec_toml_nul_marker : unicode_utf8(codepoint))
+            codec_toml_position += count
+        } else fail("invalid TOML string escape")
+    }
+    fail("unterminated TOML string")
+}
+
+function codec_toml_key_parts(value, parts,    position, count, char, quote, start, key, saved_source, saved_position) {
+    position = 1
+    count = 0
+    while (position <= length(value)) {
+        while (substr(value, position, 1) ~ /[ \t]/) position++
+        char = substr(value, position, 1)
+        if (char == "\"" || char == "'") {
+            saved_source = codec_toml_source
+            saved_position = codec_toml_position
+            codec_toml_source = value
+            codec_toml_position = position
+            key = codec_toml_string(char, 0)
+            position = codec_toml_position
+            codec_toml_source = saved_source
+            codec_toml_position = saved_position
+        } else {
+            start = position
+            while (substr(value, position, 1) ~ /[A-Za-z0-9_-]/) position++
+            key = substr(value, start, position - start)
+            if (key == "") fail("invalid TOML key")
+        }
+        parts[++count] = key
+        while (substr(value, position, 1) ~ /[ \t]/) position++
+        if (position > length(value)) break
+        if (substr(value, position, 1) != ".") fail("invalid TOML dotted key")
+        position++
+        while (substr(value, position, 1) ~ /[ \t]/) position++
+        if (position > length(value)) fail("invalid TOML dotted key")
+    }
+    return count
+}
+
+function codec_toml_base_number(value, base,    result, i, char, digit) {
+    result = 0
+    for (i = 1; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        digit = char ~ /[0-9]/ ? char + 0 : index("abcdef", tolower(char)) + 9
+        if (digit < 0 || digit >= base) fail("invalid TOML integer")
+        result = result * base + digit
+    }
+    return result
+}
+
+function codec_toml_date_valid(value,    year, month, day, days, leap) {
+    if (value !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) return 0
+    year = substr(value, 1, 4) + 0
+    month = substr(value, 6, 2) + 0
+    day = substr(value, 9, 2) + 0
+    if (month < 1 || month > 12 || day < 1) return 0
+    days = (month == 2 ? 28 : ((month == 4 || month == 6 || month == 9 || month == 11) ? 30 : 31))
+    leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+    if (month == 2 && leap) days = 29
+    return day <= days
+}
+
+function codec_toml_time_valid(value, offset,    core, fraction, hour, minute, second, sign_at, offset_hour, offset_minute) {
+    core = value
+    offset = ""
+    if (substr(core, length(core), 1) ~ /[Zz]/) {
+        offset = substr(core, length(core), 1)
+        core = substr(core, 1, length(core) - 1)
+    } else {
+        sign_at = 0
+        for (offset_hour = 9; offset_hour <= length(core); offset_hour++) {
+            if (substr(core, offset_hour, 1) == "+" || substr(core, offset_hour, 1) == "-") sign_at = offset_hour
+        }
+        if (sign_at) {
+            offset = substr(core, sign_at)
+            core = substr(core, 1, sign_at - 1)
+            if (offset !~ /^[+-][0-9][0-9]:[0-9][0-9]$/) return 0
+            offset_hour = substr(offset, 2, 2) + 0
+            offset_minute = substr(offset, 5, 2) + 0
+            if (offset_hour > 23 || offset_minute > 59) return 0
+        }
+    }
+    if (core !~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9](\.[0-9]+)?$/) return 0
+    hour = substr(core, 1, 2) + 0
+    minute = substr(core, 4, 2) + 0
+    second = substr(core, 7, 2) + 0
+    return hour <= 23 && minute <= 59 && second <= 60
+}
+
+function codec_toml_datetime(value,    date, time, separator, node, tagged) {
+    codec_toml_datetime_tag = ""
+    if (length(value) == 10 && codec_toml_date_valid(value)) codec_toml_datetime_tag = "date-local"
+    else if (substr(value, 3, 1) == ":" && codec_toml_time_valid(value)) codec_toml_datetime_tag = "time-local"
+    else if (length(value) > 18 && (substr(value, 11, 1) == "T" || substr(value, 11, 1) == "t" || substr(value, 11, 1) == " ")) {
+        date = substr(value, 1, 10)
+        time = substr(value, 12)
+        if (codec_toml_date_valid(date) && codec_toml_time_valid(time)) {
+            codec_toml_datetime_tag = time ~ /([Zz]|[+-][0-9][0-9]:[0-9][0-9])$/ ? "datetime" : "datetime-local"
+        }
+    }
+    if (codec_toml_datetime_tag == "") return 0
+    tagged = value
+    if (substr(tagged, 11, 1) == "t" || substr(tagged, 11, 1) == " ") tagged = substr(tagged, 1, 10) "T" substr(tagged, 12)
+    if (substr(tagged, length(tagged), 1) == "z") tagged = substr(tagged, 1, length(tagged) - 1) "Z"
+    node = expression_scalar(tagged, "string")
+    node_tag[node] = "!toml/" codec_toml_datetime_tag
+    return node
+}
+
+function codec_toml_assign_path(root, parts, count, value, array_table,    current, i, key, child, sequence, item) {
+    if (count < 1) fail("TOML key cannot be empty")
+    current = root
+    for (i = 1; i < count; i++) {
+        key = parts[i]
+        child = mapping_lookup(current, key)
+        if (!child) {
+            child = new_node("mapping", 0, "", "", "")
+            add_mapping(current, key, child, 0, 0)
+            if (value) toml_dotted_table[child] = 1
+            else toml_implicit_table[child] = 1
+        } else {
+            child = resolve_alias(child)
+            if (toml_inline_table[child]) fail("TOML inline tables cannot be extended")
+            if (node_kind[child] == "sequence" && toml_array_table[child] && !value && sequence_count[child]) child = resolve_alias(sequence_child[child, sequence_count[child]])
+            if (node_kind[child] != "mapping") fail("TOML dotted key traverses a non-table")
+            if (value && toml_explicit_table[child]) fail("TOML dotted key cannot extend an explicitly defined table")
+        }
+        current = child
+    }
+    key = parts[count]
+    if (array_table) {
+        sequence = mapping_lookup(current, key)
+        if (!sequence) {
+            sequence = new_node("sequence", 0, "", "", "")
+            add_mapping(current, key, sequence, 0, 0)
+            toml_array_table[sequence] = 1
+        } else if (node_kind[resolve_alias(sequence)] != "sequence" || !toml_array_table[resolve_alias(sequence)]) fail("TOML array table conflicts with an existing value")
+        item = new_node("mapping", 0, "", "", "")
+        add_sequence(sequence, item, 0)
+        return item
+    }
+    if (value) {
+        if (mapping_lookup(current, key)) fail("duplicate TOML key: " key)
+        add_mapping(current, key, value, 0, 0)
+        if (node_kind[resolve_alias(value)] == "mapping") toml_inline_table[resolve_alias(value)] = 1
+        return value
+    }
+    child = mapping_lookup(current, key)
+    if (!child) {
+        child = new_node("mapping", 0, "", "", "")
+        add_mapping(current, key, child, 0, 0)
+        toml_explicit_table[child] = 1
+    } else if (node_kind[resolve_alias(child)] != "mapping") fail("TOML table conflicts with an existing value")
+    else {
+        child = resolve_alias(child)
+        if (toml_explicit_table[child] || toml_dotted_table[child] || toml_inline_table[child]) fail("TOML table is defined more than once")
+        toml_explicit_table[child] = 1
+        delete toml_implicit_table[child]
+    }
+    return resolve_alias(child)
+}
+
+function codec_toml_value(    char, triple, node, key_text, key_count, key_parts, child, token, start, base, sign, normalized, date_node) {
+    codec_toml_skip_space()
+    char = substr(codec_toml_source, codec_toml_position, 1)
+    triple = substr(codec_toml_source, codec_toml_position, 3) == char char char
+    if (char == "\"" || char == "'") return expression_scalar(codec_toml_string(char, triple), "string")
+    if (char == "[") {
+        codec_toml_position++
+        node = new_node("sequence", 0, "", "", "")
+        codec_toml_skip_space()
+        if (substr(codec_toml_source, codec_toml_position, 1) == "]") {
+            codec_toml_position++
+            return node
+        }
+        while (1) {
+            add_sequence(node, codec_toml_value(), 0)
+            codec_toml_skip_space()
+            char = substr(codec_toml_source, codec_toml_position++, 1)
+            if (char == "]") return node
+            if (char != ",") fail("expected comma or closing bracket in TOML array")
+            codec_toml_skip_space()
+            if (substr(codec_toml_source, codec_toml_position, 1) == "]") {
+                codec_toml_position++
+                return node
+            }
+        }
+    }
+    if (char == "{") {
+        if (codec_toml_inline_has_newline(codec_toml_source, codec_toml_position)) fail("TOML 1.0 inline tables cannot contain separator newlines")
+        codec_toml_position++
+        node = new_node("mapping", 0, "", "", "")
+        codec_toml_skip_space()
+        if (substr(codec_toml_source, codec_toml_position, 1) == "}") {
+            codec_toml_position++
+            return node
+        }
+        while (1) {
+            start = codec_toml_position
+            codec_toml_position = codec_toml_find_equals(codec_toml_source, start)
+            if (!codec_toml_position) fail("TOML inline table entry requires =")
+            key_text = trim(substr(codec_toml_source, start, codec_toml_position - start))
+            codec_toml_position++
+            key_count = codec_toml_key_parts(key_text, key_parts)
+            child = codec_toml_value()
+            codec_toml_assign_path(node, key_parts, key_count, child, 0)
+            codec_toml_skip_space()
+            char = substr(codec_toml_source, codec_toml_position++, 1)
+            if (char == "}") return node
+            if (char != ",") fail("expected comma or closing brace in TOML inline table")
+        }
+    }
+    start = codec_toml_position
+    while (codec_toml_position <= length(codec_toml_source)) {
+        char = substr(codec_toml_source, codec_toml_position, 1)
+        if (char == "," || char == "]" || char == "}") break
+        codec_toml_position++
+    }
+    token = trim(substr(codec_toml_source, start, codec_toml_position - start))
+    if (token == "true" || token == "false") return expression_scalar(token, "bool")
+    if (index(token, "_")) {
+        if (token ~ /^0x/ && token !~ /^0x[0-9A-Fa-f]+(_[0-9A-Fa-f]+)*$/) fail("invalid underscore in TOML hexadecimal integer")
+        if (token ~ /^0o/ && token !~ /^0o[0-7]+(_[0-7]+)*$/) fail("invalid underscore in TOML octal integer")
+        if (token ~ /^0b/ && token !~ /^0b[01]+(_[01]+)*$/) fail("invalid underscore in TOML binary integer")
+        if (token !~ /^0[xob]/ && token !~ /^[+-]?(0|[1-9][0-9]*(_[0-9]+)*)(\.[0-9]+(_[0-9]+)*)?([eE][+-]?[0-9]+(_[0-9]+)*)?$/) fail("invalid underscore in TOML number")
+    }
+    normalized = token
+    gsub(/_/, "", normalized)
+    sign = 1
+    if (substr(normalized, 1, 1) == "-") {
+        sign = -1
+        normalized = substr(normalized, 2)
+    } else if (substr(normalized, 1, 1) == "+") normalized = substr(normalized, 2)
+    if (sign != 1 || substr(token, 1, 1) == "+") {
+        if (normalized ~ /^0[xob]/) fail("TOML base-prefixed integers cannot have a sign")
+    }
+    if (normalized ~ /^0x[0-9A-Fa-f]+$/) return expression_scalar((sign * codec_toml_base_number(substr(normalized, 3), 16)) "", "int")
+    if (normalized ~ /^0o[0-7]+$/) return expression_scalar((sign * codec_toml_base_number(substr(normalized, 3), 8)) "", "int")
+    if (normalized ~ /^0b[01]+$/) return expression_scalar((sign * codec_toml_base_number(substr(normalized, 3), 2)) "", "int")
+    normalized = (sign < 0 ? "-" : "") normalized
+    if (normalized ~ /^-?(0|[1-9][0-9]*)$/) return expression_scalar((normalized + 0 == 0 ? "0" : normalized), "int")
+    if (normalized ~ /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) return expression_scalar(normalized, normalized ~ /[.eE]/ ? "float" : "int")
+    if (normalized == "inf" || normalized == "-inf" || normalized == "nan" || normalized == "-nan") {
+        node = expression_scalar(normalized ~ /nan$/ ? "nan" : normalized, "string")
+        node_tag[node] = "!toml/float"
+        return node
+    }
+    date_node = codec_toml_datetime(token)
+    if (date_node) return date_node
+    fail("invalid TOML value: " token)
+}
+
+function codec_toml_decode(value,    root, current, statement, body, array_table, count, parts, equals, key_text, child, i, byte) {
+    if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded TOML size limit exceeded (max " max_input_bytes " bytes)")
+    for (i = 1; i <= length(value); i++) {
+        byte = codec_byte(substr(value, i, 1))
+        if ((byte < 32 && byte != 9 && byte != 10 && !(byte == 13 && codec_byte(substr(value, i + 1, 1)) == 10)) || byte == 127) {
+            fail("TOML contains a forbidden control character")
+        }
+    }
+    root = new_node("mapping", 0, "", "", "")
+    current = root
+    codec_toml_remaining = value
+    while ((statement = codec_toml_next_statement()) != "") {
+        if (substr(statement, 1, 2) == "[[" && substr(statement, length(statement) - 1) == "]]" ) {
+            if (index(statement, "\n")) fail("TOML table headers must stay on one line")
+            array_table = 1
+            body = trim(substr(statement, 3, length(statement) - 4))
+            count = codec_toml_key_parts(body, parts)
+            current = codec_toml_assign_path(root, parts, count, 0, 1)
+        } else if (substr(statement, 1, 1) == "[" && substr(statement, length(statement), 1) == "]") {
+            if (index(statement, "\n")) fail("TOML table headers must stay on one line")
+            array_table = 0
+            body = trim(substr(statement, 2, length(statement) - 2))
+            count = codec_toml_key_parts(body, parts)
+            current = codec_toml_assign_path(root, parts, count, 0, 0)
+        } else {
+            codec_toml_source = statement
+            codec_toml_position = 1
+            equals = codec_toml_find_equals(codec_toml_source, codec_toml_position)
+            if (!equals) fail("TOML assignment requires =")
+            key_text = trim(substr(codec_toml_source, 1, equals - 1))
+            count = codec_toml_key_parts(key_text, parts)
+            codec_toml_position = equals + 1
+            child = codec_toml_value()
+            codec_toml_skip_space()
+            if (codec_toml_position <= length(codec_toml_source)) fail("trailing content after TOML value")
+            codec_toml_assign_path(current, parts, count, child, 0)
+        }
+    }
+    return root
+}
+
+function codec_toml_key(value) {
+    return value ~ /^[A-Za-z0-9_-]+$/ ? value : json_quote(value)
+}
+
+function codec_toml_escape(value,    result) {
+    result = json_escape(value)
+    gsub(/\//, "/", result)
+    return result
+}
+
+function codec_toml_inline(node,    resolved, result, i, key) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar") {
+        if (substr(node_tag[resolved], 1, 6) == "!toml/") return node_value[resolved]
+        if (node_type[resolved] == "string") return "\"" codec_toml_escape(node_value[resolved]) "\""
+        if (node_type[resolved] == "null") fail("TOML has no null value")
+        return node_value[resolved]
+    }
+    if (node_kind[resolved] == "sequence") {
+        result = "["
+        for (i = 1; i <= sequence_count[resolved]; i++) result = result (i > 1 ? ", " : "") codec_toml_inline(sequence_child[resolved, i])
+        return result "]"
+    }
+    result = "{"
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        key = mapping_key[resolved, i]
+        result = result (i > 1 ? ", " : "") codec_toml_key(key) " = " codec_toml_inline(mapping_child[resolved, i])
+    }
+    return result "}"
+}
+
+function codec_toml_array_tables(node,    resolved, i) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "sequence" || !sequence_count[resolved]) return 0
+    for (i = 1; i <= sequence_count[resolved]; i++) if (node_kind[resolve_alias(sequence_child[resolved, i])] != "mapping") return 0
+    return 1
+}
+
+function codec_toml_emit_table(node, path, header,    resolved, result, i, key, child, nested, child_path, j) {
+    resolved = resolve_alias(node)
+    result = header == "" ? "" : header "\n"
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        key = mapping_key[resolved, i]
+        child = resolve_alias(mapping_child[resolved, i])
+        if (node_kind[child] != "mapping" && !codec_toml_array_tables(child)) result = result codec_toml_key(key) " = " codec_toml_inline(child) "\n"
+    }
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        key = mapping_key[resolved, i]
+        child = resolve_alias(mapping_child[resolved, i])
+        child_path = path == "" ? codec_toml_key(key) : path "." codec_toml_key(key)
+        if (node_kind[child] == "mapping") {
+            if (result != "" && substr(result, length(result), 1) != "\n") result = result "\n"
+            result = result "\n" codec_toml_emit_table(child, child_path, "[" child_path "]")
+        } else if (codec_toml_array_tables(child)) {
+            for (j = 1; j <= sequence_count[child]; j++) result = result "\n" codec_toml_emit_table(sequence_child[child, j], child_path, "[[" child_path "]]" )
+        }
+    }
+    return result
+}
+
+function codec_toml_encode(node,    resolved, result) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "mapping") fail("TOML encoding requires a mapping root")
+    result = codec_toml_emit_table(resolved, "", "")
+    sub(/^\n+/, "", result)
+    return result
+}
+
+function codec_toml_test_json(node,    resolved, result, type, i) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar") {
+        if (substr(node_tag[resolved], 1, 6) == "!toml/") type = substr(node_tag[resolved], 7)
+        else if (node_type[resolved] == "int") type = "integer"
+        else if (node_type[resolved] == "bool") type = "bool"
+        else type = node_type[resolved] == "float" ? "float" : "string"
+        return "{\"type\":" json_quote(type) ",\"value\":" json_quote(node_value[resolved]) "}"
+    }
+    if (node_kind[resolved] == "sequence") {
+        result = "["
+        for (i = 1; i <= sequence_count[resolved]; i++) result = result (i > 1 ? "," : "") codec_toml_test_json(sequence_child[resolved, i])
+        return result "]"
+    }
+    result = "{"
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        result = result (i > 1 ? "," : "") json_quote(mapping_key[resolved, i]) ":" codec_toml_test_json(mapping_child[resolved, i])
+    }
+    return result "}"
+}
+
+function codec_toml_test_decode(node,    resolved, result, type_node, value_node, type, value, i, child) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "sequence") {
+        result = new_node("sequence", 0, "", "", "")
+        for (i = 1; i <= sequence_count[resolved]; i++) add_sequence(result, codec_toml_test_decode(sequence_child[resolved, i]), 0)
+        return result
+    }
+    if (node_kind[resolved] != "mapping") fail("toml-test tagged JSON must contain objects and arrays")
+    type_node = mapping_lookup(resolved, "type")
+    value_node = mapping_lookup(resolved, "value")
+    if (mapping_count[resolved] == 2 && type_node && value_node &&
+        node_kind[resolve_alias(type_node)] == "scalar" && node_type[resolve_alias(type_node)] == "string" &&
+        node_kind[resolve_alias(value_node)] == "scalar" && node_type[resolve_alias(value_node)] == "string") {
+        type = node_value[resolve_alias(type_node)]
+        value = node_value[resolve_alias(value_node)]
+        if (type == "string") return expression_scalar(value, "string")
+        if (type != "integer" && type != "float" && type != "bool" && type != "datetime" &&
+            type != "datetime-local" && type != "date-local" && type != "time-local") fail("unknown toml-test scalar type: " type)
+        if (type == "float" && value ~ /^[+-]?[0-9]+$/) value = value ".0"
+        child = expression_scalar(value, type == "integer" ? "int" : (type == "bool" ? "bool" : "string"))
+        node_tag[child] = "!toml/" type
+        return child
+    }
+    result = new_node("mapping", 0, "", "", "")
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        add_mapping(result, mapping_key[resolved, i], codec_toml_test_decode(mapping_child[resolved, i]), 0, 0)
+    }
+    return result
+}
+
+function codec_ini_decode(value,    root, current, remaining, newline, line, clean, section, count, parts, separator, key, raw, child) {
+    if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded INI size limit exceeded (max " max_input_bytes " bytes)")
+    root = new_node("mapping", 0, "", "", "")
+    current = root
+    remaining = value
+    while (remaining != "") {
+        newline = index(remaining, "\n")
+        if (newline) {
+            line = substr(remaining, 1, newline - 1)
+            remaining = substr(remaining, newline + 1)
+        } else {
+            line = remaining
+            remaining = ""
+        }
+        sub(/\r$/, "", line)
+        clean = trim(codec_strip_comment(line, "#;"))
+        if (clean == "") continue
+        if (substr(clean, 1, 1) == "[" && substr(clean, length(clean), 1) == "]") {
+            section = trim(substr(clean, 2, length(clean) - 2))
+            if (section == "") fail("INI section name cannot be empty")
+            count = split(section, parts, /\./)
+            current = codec_toml_assign_path(root, parts, count, 0, 0)
+            continue
+        }
+        separator = index(clean, "=")
+        if (!separator) separator = index(clean, ":")
+        if (!separator) fail("INI assignment requires = or :")
+        key = trim(substr(clean, 1, separator - 1))
+        raw = trim(substr(clean, separator + 1))
+        if (key == "") fail("INI key cannot be empty")
+        if ((substr(raw, 1, 1) == "\"" && substr(raw, length(raw), 1) == "\"") ||
+            (substr(raw, 1, 1) == "'" && substr(raw, length(raw), 1) == "'")) {
+            codec_toml_source = raw
+            codec_toml_position = 1
+            raw = codec_toml_string(substr(raw, 1, 1), 0)
+        }
+        child = expression_scalar(raw, "string")
+        if (mapping_lookup(current, key)) fail("duplicate INI key: " key)
+        add_mapping(current, key, child, 0, 0)
+    }
+    return root
+}
+
+function codec_ini_emit(node, path,    resolved, result, i, key, child, child_path, nested) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "mapping") fail("INI encoding requires mappings")
+    result = path == "" ? "" : "[" path "]\n"
+    nested = ""
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        key = mapping_key[resolved, i]
+        child = resolve_alias(mapping_child[resolved, i])
+        if (node_kind[child] == "mapping") {
+            child_path = path == "" ? key : path "." key
+            nested = nested (nested == "" ? "" : "\n") codec_ini_emit(child, child_path)
+        } else {
+            if (node_kind[child] != "scalar") fail("INI encoding supports scalar values and nested sections")
+            result = result key " = \"" codec_toml_escape(expression_to_string(child)) "\"\n"
+        }
+    }
+    if (nested != "") result = result (result == "" ? "" : "\n") nested
+    return result
+}
+
+function codec_ini_encode(node) {
+    return codec_ini_emit(resolve_alias(node), "")
+}
+
+function codec_xml_name(    start, char) {
+    start = codec_xml_position
+    while (codec_xml_position <= length(codec_xml_source)) {
+        char = substr(codec_xml_source, codec_xml_position, 1)
+        if (char !~ /[A-Za-z0-9_.:-]/) break
+        codec_xml_position++
+    }
+    if (codec_xml_position == start || substr(codec_xml_source, start, 1) !~ /[A-Za-z_:]/) fail("invalid XML name")
+    return substr(codec_xml_source, start, codec_xml_position - start)
+}
+
+function codec_xml_skip_space() {
+    while (substr(codec_xml_source, codec_xml_position, 1) ~ /[ \t\r\n]/) codec_xml_position++
+}
+
+function codec_xml_codepoint_valid(codepoint) {
+    return codepoint == 9 || codepoint == 10 || codepoint == 13 ||
+        (codepoint >= 32 && codepoint <= 55295) ||
+        (codepoint >= 57344 && codepoint <= 65533) ||
+        (codepoint >= 65536 && codepoint <= 1114111)
+}
+
+function codec_xml_name_valid(name) {
+    return name ~ /^[A-Za-z_:][A-Za-z0-9_.:-]*$/
+}
+
+function codec_xml_entity(value,    result, i, semi, entity, codepoint, j, digit, base) {
+    result = ""
+    for (i = 1; i <= length(value); i++) {
+        if (substr(value, i, 1) != "&") {
+            result = result substr(value, i, 1)
+            continue
+        }
+        semi = index(substr(value, i + 1), ";")
+        if (!semi) fail("unterminated XML entity reference")
+        entity = substr(value, i + 1, semi - 1)
+        if (entity == "amp") result = result "&"
+        else if (entity == "lt") result = result "<"
+        else if (entity == "gt") result = result ">"
+        else if (entity == "quot") result = result "\""
+        else if (entity == "apos") result = result "'"
+        else if (substr(entity, 1, 1) == "#") {
+            base = substr(entity, 2, 1) ~ /[xX]/ ? 16 : 10
+            entity = substr(entity, base == 16 ? 3 : 2)
+            if (entity == "" || (base == 16 && entity !~ /^[0-9A-Fa-f]+$/) || (base == 10 && entity !~ /^[0-9]+$/)) fail("invalid XML character reference")
+            codepoint = 0
+            for (j = 1; j <= length(entity); j++) {
+                digit = codec_toml_hex_value(substr(entity, j, 1))
+                codepoint = codepoint * base + digit
+            }
+            if (!codec_xml_codepoint_valid(codepoint)) fail("invalid XML character reference")
+            result = result unicode_utf8(codepoint)
+        } else fail("XML named entities are limited to the five predefined entities")
+        i += semi
+    }
+    return result
+}
+
+function codec_xml_skip_misc(    ending) {
+    while (1) {
+        codec_xml_skip_space()
+        if (substr(codec_xml_source, codec_xml_position, 4) == "<!--") {
+            ending = index(substr(codec_xml_source, codec_xml_position + 4), "-->")
+            if (!ending) fail("unterminated XML comment")
+            codec_xml_position += ending + 6
+        } else if (substr(codec_xml_source, codec_xml_position, 2) == "<?") {
+            ending = index(substr(codec_xml_source, codec_xml_position + 2), "?>")
+            if (!ending) fail("unterminated XML processing instruction")
+            codec_xml_position += ending + 3
+        } else break
+    }
+}
+
+function codec_xml_add_child(node, key, child,    existing, sequence) {
+    existing = mapping_lookup(node, key)
+    if (!existing) {
+        add_mapping(node, key, child, 0, 0)
+        return
+    }
+    existing = resolve_alias(existing)
+    if (node_kind[existing] == "sequence") {
+        add_sequence(existing, child, 0)
+        return
+    }
+    sequence = new_node("sequence", 0, "", "", "")
+    add_sequence(sequence, expression_clone_node(existing), 0)
+    add_sequence(sequence, child, 0)
+    expression_replace_node(existing, sequence)
+}
+
+function codec_xml_element(    name, attr, quote, start, raw, node, child, child_name, text, closing, ending, has_structure) {
+    if (substr(codec_xml_source, codec_xml_position, 1) != "<") fail("expected XML element")
+    codec_xml_position++
+    name = codec_xml_name()
+    node = new_node("mapping", 0, "", "", "")
+    codec_xml_skip_space()
+    while (substr(codec_xml_source, codec_xml_position, 1) != ">" && substr(codec_xml_source, codec_xml_position, 2) != "/>") {
+        attr = codec_xml_name()
+        codec_xml_skip_space()
+        if (substr(codec_xml_source, codec_xml_position++, 1) != "=") fail("XML attribute requires =")
+        codec_xml_skip_space()
+        quote = substr(codec_xml_source, codec_xml_position++, 1)
+        if (quote != "\"" && quote != "'") fail("XML attribute value must be quoted")
+        start = codec_xml_position
+        ending = index(substr(codec_xml_source, codec_xml_position), quote)
+        if (!ending) fail("unterminated XML attribute")
+        raw = substr(codec_xml_source, start, ending - 1)
+        codec_xml_position += ending
+        if (mapping_lookup(node, "+@" attr)) fail("duplicate XML attribute: " attr)
+        add_mapping(node, "+@" attr, expression_scalar(codec_xml_entity(raw), "string"), 0, 0)
+        has_structure = 1
+        codec_xml_skip_space()
+    }
+    if (substr(codec_xml_source, codec_xml_position, 2) == "/>") {
+        codec_xml_position += 2
+        codec_xml_last_name = name
+        return has_structure ? node : expression_null()
+    }
+    codec_xml_position++
+    text = ""
+    while (1) {
+        if (codec_xml_position > length(codec_xml_source)) fail("unterminated XML element: " name)
+        if (substr(codec_xml_source, codec_xml_position, 2) == "</") {
+            codec_xml_position += 2
+            closing = codec_xml_name()
+            codec_xml_skip_space()
+            if (substr(codec_xml_source, codec_xml_position++, 1) != ">") fail("invalid XML closing tag")
+            if (closing != name) fail("XML closing tag " closing " does not match " name)
+            break
+        }
+        if (substr(codec_xml_source, codec_xml_position, 9) == "<![CDATA[") {
+            ending = index(substr(codec_xml_source, codec_xml_position + 9), "]]>")
+            if (!ending) fail("unterminated XML CDATA section")
+            text = text substr(codec_xml_source, codec_xml_position + 9, ending - 1)
+            codec_xml_position += ending + 11
+            continue
+        }
+        if (substr(codec_xml_source, codec_xml_position, 4) == "<!--") {
+            ending = index(substr(codec_xml_source, codec_xml_position + 4), "-->")
+            if (!ending) fail("unterminated XML comment")
+            codec_xml_position += ending + 6
+            continue
+        }
+        if (substr(codec_xml_source, codec_xml_position, 1) == "<") {
+            child = codec_xml_element()
+            child_name = codec_xml_last_name
+            codec_xml_add_child(node, child_name, child)
+            has_structure = 1
+            continue
+        }
+        start = codec_xml_position
+        while (codec_xml_position <= length(codec_xml_source) && substr(codec_xml_source, codec_xml_position, 1) != "<") codec_xml_position++
+        text = text codec_xml_entity(substr(codec_xml_source, start, codec_xml_position - start))
+    }
+    codec_xml_last_name = name
+    if (!has_structure) return expression_scalar(text, "string")
+    if (trim(text) != "") add_mapping(node, "+content", expression_scalar(text, "string"), 0, 0)
+    return node
+}
+
+function codec_xml_decode(value,    root, child, name, i, byte) {
+    if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded XML size limit exceeded (max " max_input_bytes " bytes)")
+    if (toupper(value) ~ /<!DOCTYPE/ || toupper(value) ~ /<!ENTITY/) fail("XML DTDs and entity declarations are disabled")
+    for (i = 1; i <= length(value); i++) {
+        byte = codec_byte(substr(value, i, 1))
+        if (byte < 32 && byte != 9 && byte != 10 && byte != 13) fail("XML contains a forbidden control character")
+    }
+    codec_xml_source = value
+    codec_xml_position = 1
+    if (substr(codec_xml_source, 1, 3) == sprintf("%c%c%c", 239, 187, 191)) codec_xml_position = 4
+    codec_xml_skip_misc()
+    child = codec_xml_element()
+    name = codec_xml_last_name
+    codec_xml_skip_misc()
+    if (codec_xml_position <= length(codec_xml_source)) fail("XML input must contain exactly one root element")
+    root = new_node("mapping", 0, "", "", "")
+    add_mapping(root, name, child, 0, 0)
+    return root
+}
+
+function codec_xml_escape(value, attribute,    result) {
+    result = value
+    gsub(/&/, "\\&amp;", result)
+    gsub(/</, "\\&lt;", result)
+    gsub(/>/, "\\&gt;", result)
+    if (attribute) gsub(/"/, "\\&quot;", result)
+    return result
+}
+
+function codec_xml_emit_element(name, node,    resolved, result, i, key, child, content, has_children, j) {
+    if (!codec_xml_name_valid(name)) fail("invalid XML element name: " name)
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar") {
+        if (node_type[resolved] == "null") return "<" name "/>"
+        return "<" name ">" codec_xml_escape(expression_to_string(resolved), 0) "</" name ">"
+    }
+    if (node_kind[resolved] != "mapping") fail("XML elements must be scalar or mapping values")
+    result = "<" name
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        key = mapping_key[resolved, i]
+        child = resolve_alias(mapping_child[resolved, i])
+        if (substr(key, 1, 2) == "+@") {
+            if (node_kind[child] != "scalar") fail("XML attributes must be scalar")
+            if (!codec_xml_name_valid(substr(key, 3))) fail("invalid XML attribute name: " substr(key, 3))
+            result = result " " substr(key, 3) "=\"" codec_xml_escape(expression_to_string(child), 1) "\""
+        } else if (key == "+content") content = expression_to_string(child)
+        else has_children = 1
+    }
+    if (!has_children && content == "") return result "/>"
+    result = result ">" codec_xml_escape(content, 0)
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        key = mapping_key[resolved, i]
+        if (substr(key, 1, 1) == "+") continue
+        child = resolve_alias(mapping_child[resolved, i])
+        if (node_kind[child] == "sequence") {
+            for (j = 1; j <= sequence_count[child]; j++) result = result codec_xml_emit_element(key, sequence_child[child, j])
+        } else result = result codec_xml_emit_element(key, child)
+    }
+    return result "</" name ">"
+}
+
+function codec_xml_encode(node,    resolved, key) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "mapping" || mapping_count[resolved] != 1) fail("XML encoding requires a mapping with exactly one root element")
+    key = mapping_key[resolved, 1]
+    return codec_xml_emit_element(key, mapping_child[resolved, 1]) "\n"
+}
+
 function codec_random_next(    high, low, test) {
     high = int(codec_random_state / 127773)
     low = codec_random_state % 127773
@@ -503,8 +1434,10 @@ function codec_json_string(    result, char, escaped, digits, codepoint, high, l
             } else if (codepoint >= 56320 && codepoint <= 57343) {
                 fail("unpaired low surrogate in JSON string")
             }
-            if (!codepoint) fail("JSON strings cannot contain NUL")
-            result = result unicode_utf8(codepoint)
+            if (!codepoint) {
+                if (output_mode != "toml-test-encode") fail("JSON strings cannot contain NUL")
+                result = result codec_toml_nul_marker
+            } else result = result unicode_utf8(codepoint)
         } else fail("invalid JSON escape")
     }
     fail("unterminated JSON string")
@@ -582,7 +1515,7 @@ function expression_parse_json_text(value,    node) {
     return node
 }
 
-function codec_yaml_process_line(raw, source_line,    clean) {
+function codec_yaml_process_line(raw, source_line,    clean, next_char) {
     if (multiline_scalar_active) {
         multiline_scalar_text = multiline_scalar_text "\n" raw
         if (!multiline_quote_is_open(multiline_scalar_text, multiline_scalar_delimiter)) {
@@ -601,7 +1534,8 @@ function codec_yaml_process_line(raw, source_line,    clean) {
         if (multiline_flow_comment_break) {
             clean = trim(multiline_flow_text)
             clean = substr(clean, length(clean), 1)
-            if (clean != "," && trim(raw) !~ /^[,}\]]/) fail("flow entries separated by a comment require a comma")
+            next_char = substr(trim(raw), 1, 1)
+            if (clean != "," && next_char != "," && next_char != "}" && next_char != "]") fail("flow entries separated by a comment require a comma")
             multiline_flow_comment_break = 0
         }
         clean = strip_flow_line_comment(raw)
@@ -706,8 +1640,7 @@ function expression_parse_yaml_text(value,    saved_document_index, saved_file_o
     return root
 }
 
-function expression_read_file(path,    line, result, status, bytes, separator) {
-    if (disable_file_ops) fail("file operations are disabled")
+function local_file_read(path,    line, result, status, bytes, separator) {
     if (path == "" || index(path, "\n") || index(path, "\r")) fail("load path must be a non-empty single line")
     result = ""
     separator = ""
@@ -724,6 +1657,11 @@ function expression_read_file(path,    line, result, status, bytes, separator) {
     if (status < 0) fail("could not load file: " path)
     if (separator != "") result = result "\n"
     return result
+}
+
+function expression_read_file(path) {
+    if (disable_file_ops) fail("file operations are disabled")
+    return local_file_read(path)
 }
 
 function unicode_utf8(codepoint,    first, second, third, fourth) {
@@ -3290,7 +4228,13 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             argument = expression_parse_stream()
             expression_expect("right_parenthesis")
             expression = expression_new("explode", argument, 0, "")
-        } else if (name == "error" || name == "eval" || name == "load" || name == "load_str" || name == "load_base64" || name == "load_props") {
+        } else if (name == "error" || name == "eval" || name == "load" || name == "load_str" || name == "load_base64" || name == "load_props" ||
+            name == "pointer" || name == "apply_patch" || name == "merge_patch" || name == "diff_patch") {
+            expression_expect("left_parenthesis")
+            argument = expression_parse_stream()
+            expression_expect("right_parenthesis")
+            expression = expression_new(name, argument, 0, "")
+        } else if (name == "validate" || name == "schema_valid" || name == "schema_errors") {
             expression_expect("left_parenthesis")
             argument = expression_parse_stream()
             expression_expect("right_parenthesis")
@@ -3306,7 +4250,8 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             }
             expression = expression_new(name, argument, 0, "")
         } else if (name == "from_json" || name == "from_yaml" || name == "from_props" || name == "from_csv" || name == "from_tsv" ||
-            name == "to_props" || name == "to_csv" || name == "to_tsv") {
+            name == "from_toml" || name == "from_ini" || name == "from_xml" || name == "to_props" || name == "to_csv" || name == "to_tsv" ||
+            name == "to_toml" || name == "to_ini" || name == "to_xml") {
             if (expression_token_type == "left_parenthesis") {
                 expression_lex_next()
                 expression_expect("right_parenthesis")
@@ -3314,6 +4259,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             expression = expression_new(name, 0, 0, "")
         } else if (name == "@json" || name == "@jsond" || name == "@yaml" || name == "@yamld" ||
             name == "@props" || name == "@propsd" || name == "@csv" || name == "@csvd" || name == "@tsv" || name == "@tsvd" ||
+            name == "@toml" || name == "@tomld" || name == "@ini" || name == "@inid" || name == "@xml" || name == "@xmld" ||
             name == "@base64" || name == "@base64d" ||
             name == "@uri" || name == "@urid" || name == "@sh") {
             if (name == "@json") expression = expression_new("to_json", 0, 0, "compact")
@@ -3326,6 +4272,12 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             else if (name == "@csvd") expression = expression_new("from_csv", 0, 0, "")
             else if (name == "@tsv") expression = expression_new("to_tsv", 0, 0, "")
             else if (name == "@tsvd") expression = expression_new("from_tsv", 0, 0, "")
+            else if (name == "@toml") expression = expression_new("to_toml", 0, 0, "")
+            else if (name == "@tomld") expression = expression_new("from_toml", 0, 0, "")
+            else if (name == "@ini") expression = expression_new("to_ini", 0, 0, "")
+            else if (name == "@inid") expression = expression_new("from_ini", 0, 0, "")
+            else if (name == "@xml") expression = expression_new("to_xml", 0, 0, "")
+            else if (name == "@xmld") expression = expression_new("from_xml", 0, 0, "")
             else expression = expression_new("codec_" substr(name, 2), 0, 0, "")
         } else if (name == "select" || name == "has" || name == "del" || name == "map" || name == "map_values" || name == "with_entries" ||
             name == "contains" || name == "startswith" || name == "endswith" || name == "split" || name == "join" ||
@@ -3347,7 +4299,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             name == "sort" || name == "unique" || name == "flatten" || name == "reverse" || name == "upcase" || name == "downcase" ||
             name == "trim" || name == "to_string" || name == "array_to_map" || name == "split_doc" || name == "shuffle" ||
             name == "min" || name == "max" || name == "any" || name == "all" || name == "add" || name == "path" ||
-            name == "parent" || name == "to_number" || name == "documentindex" ||
+            name == "parent" || name == "root" || name == "to_number" || name == "documentindex" ||
             name == "fileindex" || name == "filename" || name == "empty" || name == "line" || name == "key" ||
             name == "column" || name == "tag" || name == "anchor" || name == "alias" || name == "style" || name == "line_comment" ||
             name == "head_comment" || name == "foot_comment" || name == "pivot") {
@@ -3501,6 +4453,703 @@ function expression_path(node,    result, depth, current, edge, i, value) {
         delete expression_path_edge[i]
     }
     return result
+}
+
+function expression_root(node,    current) {
+    current = node
+    while (current in node_parent) current = node_parent[current]
+    return current
+}
+
+function patch_pointer_decode(token,    result, i, char, next_char) {
+    result = ""
+    for (i = 1; i <= length(token); i++) {
+        char = substr(token, i, 1)
+        if (char != "~") {
+            result = result char
+            continue
+        }
+        next_char = substr(token, ++i, 1)
+        if (next_char == "0") result = result "~"
+        else if (next_char == "1") result = result "/"
+        else fail("invalid JSON Pointer escape")
+    }
+    return result
+}
+
+function patch_pointer_encode(token,    result) {
+    result = token
+    gsub(/~/, "~0", result)
+    gsub(/\//, "~1", result)
+    return result
+}
+
+function patch_pointer_find(root, pointer, allow_append,    remaining, slash, token, current, resolved, child, index_value) {
+    patch_pointer_parent = 0
+    patch_pointer_target = 0
+    patch_pointer_token = ""
+    patch_pointer_index = -1
+    if (pointer == "") {
+        patch_pointer_target = root
+        return root
+    }
+    if (substr(pointer, 1, 1) != "/") fail("JSON Pointer must be empty or start with /")
+    remaining = substr(pointer, 2)
+    current = root
+    while (1) {
+        slash = index(remaining, "/")
+        if (slash) {
+            token = patch_pointer_decode(substr(remaining, 1, slash - 1))
+            remaining = substr(remaining, slash + 1)
+        } else {
+            token = patch_pointer_decode(remaining)
+        }
+        resolved = resolve_alias(current)
+        if (!slash) {
+            patch_pointer_parent = resolved
+            patch_pointer_token = token
+            if (node_kind[resolved] == "mapping") {
+                patch_pointer_target = mapping_lookup(resolved, token)
+                return patch_pointer_target
+            }
+            if (node_kind[resolved] == "sequence") {
+                if (token == "-" && allow_append) {
+                    patch_pointer_index = sequence_count[resolved]
+                    return 0
+                }
+                if (token !~ /^(0|[1-9][0-9]*)$/) fail("JSON Pointer array index must be an unsigned integer without leading zeros")
+                index_value = token + 0
+                if (index_value < sequence_count[resolved]) patch_pointer_target = sequence_child[resolved, index_value + 1]
+                else if (!(allow_append && index_value == sequence_count[resolved])) fail("JSON Pointer array index is out of bounds: " token)
+                patch_pointer_index = index_value
+                return patch_pointer_target
+            }
+            fail("JSON Pointer cannot traverse " expression_type_name(resolved))
+        }
+        if (node_kind[resolved] == "mapping") {
+            child = mapping_lookup(resolved, token)
+        } else if (node_kind[resolved] == "sequence") {
+            if (token !~ /^(0|[1-9][0-9]*)$/ || token + 0 >= sequence_count[resolved]) {
+                fail("JSON Pointer array index is out of bounds: " token)
+            }
+            child = sequence_child[resolved, token + 1]
+        } else {
+            fail("JSON Pointer cannot traverse " expression_type_name(resolved))
+        }
+        if (!child) fail("JSON Pointer path does not exist at /" patch_pointer_encode(token))
+        current = child
+    }
+}
+
+function expression_semantic_equal(left, right,    left_node, right_node, i, collection, key, child) {
+    left_node = resolve_alias(left)
+    right_node = resolve_alias(right)
+    if (node_kind[left_node] != node_kind[right_node]) return 0
+    if (node_kind[left_node] == "scalar") return expression_nodes_equal(left_node, right_node)
+    if (node_kind[left_node] == "sequence") {
+        if (sequence_count[left_node] != sequence_count[right_node]) return 0
+        for (i = 1; i <= sequence_count[left_node]; i++) {
+            if (!expression_semantic_equal(sequence_child[left_node, i], sequence_child[right_node, i])) return 0
+        }
+        return 1
+    }
+    if (expression_mapping_length(left_node) != expression_mapping_length(right_node)) return 0
+    collection = ++collection_serial
+    collect_mapping_keys(left_node, collection)
+    for (i = 1; i <= collection_count[collection]; i++) {
+        key = collection_key[collection, i]
+        child = mapping_lookup(right_node, key)
+        if (!child || !expression_semantic_equal(mapping_lookup(left_node, key), child)) return 0
+    }
+    return 1
+}
+
+function patch_sequence_insert(parent, index_value, value,    replacement, i) {
+    replacement = new_node("sequence", 0, "", "", "")
+    for (i = 0; i <= sequence_count[parent]; i++) {
+        if (i == index_value) add_sequence(replacement, expression_clone_node(value), 0)
+        if (i < sequence_count[parent]) add_sequence(replacement, expression_clone_node(sequence_child[parent, i + 1]), 0)
+    }
+    expression_replace_node(parent, replacement)
+    return expression_last_replace_changed
+}
+
+function patch_add(root, pointer, value,    target, parent, placeholder, changed) {
+    target = patch_pointer_find(root, pointer, 1)
+    parent = patch_pointer_parent
+    if (!parent) {
+        expression_replace_node(root, value)
+        return expression_last_replace_changed
+    }
+    if (node_kind[parent] == "mapping") {
+        if (target) {
+            expression_replace_node(target, value)
+            return expression_last_replace_changed
+        }
+        placeholder = expression_null()
+        expression_missing_parent[placeholder] = parent
+        expression_missing_key[placeholder] = patch_pointer_token
+        expression_replace_node(placeholder, value)
+        return expression_last_replace_changed
+    }
+    return patch_sequence_insert(parent, patch_pointer_index, value)
+}
+
+function patch_remove(root, pointer,    target) {
+    target = patch_pointer_find(root, pointer, 0)
+    if (!target) fail("JSON Patch remove path does not exist: " pointer)
+    expression_delete_node(target)
+    return expression_last_delete_changed
+}
+
+function patch_replace(root, pointer, value,    target) {
+    target = patch_pointer_find(root, pointer, 0)
+    if (!target) fail("JSON Patch replace path does not exist: " pointer)
+    expression_replace_node(target, value)
+    return expression_last_replace_changed
+}
+
+function patch_required_string(operation, name,    node) {
+    node = mapping_lookup(operation, name)
+    if (!node) fail("JSON Patch operation requires " name)
+    node = resolve_alias(node)
+    if (node_kind[node] != "scalar" || node_type[node] != "string") fail("JSON Patch " name " must be a string")
+    return node_value[node]
+}
+
+function patch_apply(root, patch,    resolved_patch, i, operation, op, path, from, value, source, changed) {
+    resolved_patch = resolve_alias(patch)
+    if (node_kind[resolved_patch] != "sequence") fail("JSON Patch must be an array of operations")
+    for (i = 1; i <= sequence_count[resolved_patch]; i++) {
+        changed = 0
+        operation = resolve_alias(sequence_child[resolved_patch, i])
+        if (node_kind[operation] != "mapping") fail("JSON Patch operation must be an object")
+        op = patch_required_string(operation, "op")
+        path = patch_required_string(operation, "path")
+        if (op == "add" || op == "replace" || op == "test") {
+            value = mapping_lookup(operation, "value")
+            if (!value) fail("JSON Patch " op " operation requires value")
+        }
+        if (op == "add") {
+            changed = patch_add(root, path, value)
+        } else if (op == "remove") {
+            changed = patch_remove(root, path)
+        } else if (op == "replace") {
+            changed = patch_replace(root, path, value)
+        } else if (op == "copy" || op == "move") {
+            from = patch_required_string(operation, "from")
+            source = patch_pointer_find(root, from, 0)
+            if (!source) fail("JSON Patch " op " source does not exist: " from)
+            if (op == "move" && path != from && index(path, from "/") == 1) fail("JSON Patch cannot move a value into its own descendant")
+            value = expression_clone_node(source)
+            if (op == "move" && path != from) changed = patch_remove(root, from) || changed
+            if (path != from) changed = patch_add(root, path, value) || changed
+        } else if (op == "test") {
+            source = patch_pointer_find(root, path, 0)
+            if (!source || !expression_semantic_equal(source, value)) fail("JSON Patch test failed at " path)
+        } else {
+            fail("unsupported JSON Patch operation: " op)
+        }
+        if (changed) expression_mark_changed(root)
+    }
+    return root
+}
+
+function merge_patch_apply(target, patch,    resolved_target, resolved_patch, collection, i, key, child, existing, placeholder) {
+    resolved_target = resolve_alias(target)
+    resolved_patch = resolve_alias(patch)
+    if (node_kind[resolved_patch] != "mapping") {
+        expression_replace_node(target, resolved_patch)
+        if (expression_last_replace_changed) expression_mark_changed(target)
+        return
+    }
+    if (node_kind[resolved_target] != "mapping") {
+        expression_replace_node(target, new_node("mapping", 0, "", "", ""))
+        if (expression_last_replace_changed) expression_mark_changed(target)
+        resolved_target = resolve_alias(target)
+    }
+    collection = ++collection_serial
+    collect_mapping_keys(resolved_patch, collection)
+    for (i = 1; i <= collection_count[collection]; i++) {
+        key = collection_key[collection, i]
+        child = resolve_alias(mapping_lookup(resolved_patch, key))
+        existing = mapping_lookup(resolved_target, key)
+        if (node_kind[child] == "scalar" && node_type[child] == "null") {
+            if (existing) {
+                expression_delete_node(existing)
+                if (expression_last_delete_changed) expression_mark_changed(resolved_target)
+            }
+        } else if (existing) {
+            merge_patch_apply(existing, child)
+        } else {
+            placeholder = expression_null()
+            expression_missing_parent[placeholder] = resolved_target
+            expression_missing_key[placeholder] = key
+            if (node_kind[child] == "mapping") {
+                expression_replace_node(placeholder, new_node("mapping", 0, "", "", ""))
+                merge_patch_apply(placeholder, child)
+            } else {
+                expression_replace_node(placeholder, child)
+            }
+            if (expression_last_replace_changed) expression_mark_changed(resolved_target)
+        }
+    }
+}
+
+function patch_operation(result, op, path, value,    operation) {
+    operation = new_node("mapping", 0, "", "", "")
+    add_mapping(operation, "op", expression_scalar(op, "string"), 0, 0)
+    add_mapping(operation, "path", expression_scalar(path, "string"), 0, 0)
+    if (value) add_mapping(operation, "value", expression_clone_node(value), 0, 0)
+    add_sequence(result, operation, 0)
+}
+
+function patch_diff_into(before, after, path, result,    left, right, left_keys, right_keys, i, key, left_child, right_child) {
+    left = resolve_alias(before)
+    right = resolve_alias(after)
+    if (expression_semantic_equal(left, right)) return
+    if (node_kind[left] != "mapping" || node_kind[right] != "mapping") {
+        patch_operation(result, "replace", path, right)
+        return
+    }
+    left_keys = ++collection_serial
+    right_keys = ++collection_serial
+    collect_mapping_keys(left, left_keys)
+    collect_mapping_keys(right, right_keys)
+    for (i = 1; i <= collection_count[left_keys]; i++) {
+        key = collection_key[left_keys, i]
+        if (!mapping_lookup(right, key)) patch_operation(result, "remove", path "/" patch_pointer_encode(key), 0)
+    }
+    for (i = 1; i <= collection_count[left_keys]; i++) {
+        key = collection_key[left_keys, i]
+        left_child = mapping_lookup(left, key)
+        right_child = mapping_lookup(right, key)
+        if (right_child) patch_diff_into(left_child, right_child, path "/" patch_pointer_encode(key), result)
+    }
+    for (i = 1; i <= collection_count[right_keys]; i++) {
+        key = collection_key[right_keys, i]
+        if (!mapping_lookup(left, key)) patch_operation(result, "add", path "/" patch_pointer_encode(key), mapping_lookup(right, key))
+    }
+}
+
+function schema_add_error(errors, instance_path, schema_path, keyword, message,    error) {
+    error = new_node("mapping", 0, "", "", "")
+    add_mapping(error, "instancePath", expression_scalar(instance_path, "string"), 0, 0)
+    add_mapping(error, "schemaPath", expression_scalar(schema_path, "string"), 0, 0)
+    add_mapping(error, "keyword", expression_scalar(keyword, "string"), 0, 0)
+    add_mapping(error, "message", expression_scalar(message, "string"), 0, 0)
+    add_sequence(errors, error, 0)
+}
+
+function schema_type_name(instance,    node) {
+    node = resolve_alias(instance)
+    if (node_kind[node] == "mapping") return "object"
+    if (node_kind[node] == "sequence") return "array"
+    if (node_type[node] == "bool") return "boolean"
+    if (node_type[node] == "null") return "null"
+    if (node_type[node] == "int") return "integer"
+    if (node_type[node] == "float") return "number"
+    return "string"
+}
+
+function schema_type_matches(instance, wanted,    node, number) {
+    node = resolve_alias(instance)
+    if (wanted == "object") return node_kind[node] == "mapping"
+    if (wanted == "array") return node_kind[node] == "sequence"
+    if (wanted == "string") return node_kind[node] == "scalar" && node_type[node] == "string"
+    if (wanted == "boolean") return node_kind[node] == "scalar" && node_type[node] == "bool"
+    if (wanted == "null") return node_kind[node] == "scalar" && node_type[node] == "null"
+    if (wanted == "number") return node_kind[node] == "scalar" && (node_type[node] == "int" || node_type[node] == "float")
+    if (wanted == "integer") {
+        if (node_kind[node] != "scalar" || (node_type[node] != "int" && node_type[node] != "float")) return 0
+        number = node_value[node] + 0
+        return number == int(number)
+    }
+    return 0
+}
+
+function schema_type_contract(type_node,    node, i, child) {
+    node = resolve_alias(type_node)
+    if (node_kind[node] == "scalar" && node_type[node] == "string") return node_value[node]
+    if (node_kind[node] == "sequence") {
+        for (i = 1; i <= sequence_count[node]; i++) {
+            child = resolve_alias(sequence_child[node, i])
+            if (node_kind[child] != "scalar" || node_type[child] != "string") fail("JSON Schema type array must contain strings")
+        }
+        return "array"
+    }
+    fail("JSON Schema type must be a string or array of strings")
+}
+
+function schema_matches_type(instance, type_node,    node, i) {
+    node = resolve_alias(type_node)
+    if (node_kind[node] == "scalar") return schema_type_matches(instance, node_value[node])
+    for (i = 1; i <= sequence_count[node]; i++) {
+        if (schema_type_matches(instance, node_value[resolve_alias(sequence_child[node, i])])) return 1
+    }
+    return 0
+}
+
+function schema_utf8_length(value,    count, i, byte) {
+    count = 0
+    for (i = 1; i <= length(value); i++) {
+        byte = codec_byte(substr(value, i, 1))
+        if (byte < 128 || byte >= 192) count++
+    }
+    return count
+}
+
+function schema_number(node, keyword,    resolved) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "scalar" || (node_type[resolved] != "int" && node_type[resolved] != "float")) {
+        fail("JSON Schema " keyword " must be a number")
+    }
+    return node_value[resolved] + 0
+}
+
+function schema_nonnegative_integer(node, keyword,    resolved, value) {
+    resolved = resolve_alias(node)
+    value = node_value[resolved] + 0
+    if (node_kind[resolved] != "scalar" || (node_type[resolved] != "int" && node_type[resolved] != "float") || value < 0 || value != int(value)) {
+        fail("JSON Schema " keyword " must be a non-negative integer")
+    }
+    return value
+}
+
+function schema_boolean(node, keyword,    resolved) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "scalar" || node_type[resolved] != "bool") fail("JSON Schema " keyword " must be a boolean")
+    return tolower(node_value[resolved]) == "true"
+}
+
+function schema_trial(instance, schema, instance_path, schema_path, root,    errors) {
+    errors = new_node("sequence", 0, "", "", "")
+    schema_validate(instance, schema, errors, instance_path, schema_path, root)
+    return sequence_count[errors] == 0
+}
+
+function schema_validate(instance, schema, errors, instance_path, schema_path, root,    resolved_schema, resolved_instance, valid, keyword, type_node, i, j, child, collection, key, property_schema, instance_child, required, matched, count, trial, minimum, maximum, number, size, pattern, properties, pattern_properties, additional, covered, item_start, contains_count, min_contains, max_contains, ref, referenced, active_key, dependent, dependency, name_node, name_schema, conditional, numeric_text) {
+    if (++schema_validation_depth > max_depth) fail("JSON Schema validation depth limit exceeded (max " max_depth ")")
+    resolved_schema = resolve_alias(schema)
+    resolved_instance = resolve_alias(instance)
+    valid = 1
+
+    if (node_kind[resolved_schema] == "scalar" && node_type[resolved_schema] == "bool") {
+        if (tolower(node_value[resolved_schema]) != "true") {
+            schema_add_error(errors, instance_path, schema_path, "falseSchema", "value is rejected by the schema")
+            valid = 0
+        }
+        schema_validation_depth--
+        return valid
+    }
+    if (node_kind[resolved_schema] != "mapping") fail("JSON Schema must be an object or boolean")
+    if (mapping_lookup(resolved_schema, "$dynamicRef")) fail("JSON Schema dynamic references are outside the focused profile")
+    if (mapping_lookup(resolved_schema, "unevaluatedProperties") || mapping_lookup(resolved_schema, "unevaluatedItems")) {
+        fail("JSON Schema unevaluated vocabularies are outside the focused profile")
+    }
+
+    child = mapping_lookup(resolved_schema, "$ref")
+    if (child) {
+        child = resolve_alias(child)
+        if (node_kind[child] != "scalar" || node_type[child] != "string") fail("JSON Schema $ref must be a string")
+        ref = node_value[child]
+        if (ref == "#") referenced = root
+        else if (substr(ref, 1, 2) == "#/") referenced = patch_pointer_find(root, substr(ref, 2), 0)
+        else fail("JSON Schema supports local $ref values only")
+        if (!referenced) fail("JSON Schema $ref does not resolve: " ref)
+        active_key = referenced SUBSEP resolved_instance
+        if (schema_ref_active[active_key]) fail("cyclic JSON Schema $ref")
+        schema_ref_active[active_key] = 1
+        if (!schema_validate(resolved_instance, referenced, errors, instance_path, ref, root)) valid = 0
+        delete schema_ref_active[active_key]
+    }
+
+    type_node = mapping_lookup(resolved_schema, "type")
+    if (type_node) {
+        schema_type_contract(type_node)
+        if (!schema_matches_type(resolved_instance, type_node)) {
+            schema_add_error(errors, instance_path, schema_path "/type", "type", "expected " expression_to_string(type_node) ", got " schema_type_name(resolved_instance))
+            valid = 0
+        }
+    }
+
+    child = mapping_lookup(resolved_schema, "const")
+    if (child && !expression_semantic_equal(resolved_instance, child)) {
+        schema_add_error(errors, instance_path, schema_path "/const", "const", "value does not match const")
+        valid = 0
+    }
+    child = mapping_lookup(resolved_schema, "enum")
+    if (child) {
+        child = resolve_alias(child)
+        if (node_kind[child] != "sequence") fail("JSON Schema enum must be an array")
+        matched = 0
+        for (i = 1; i <= sequence_count[child]; i++) if (expression_semantic_equal(resolved_instance, sequence_child[child, i])) matched = 1
+        if (!matched) {
+            schema_add_error(errors, instance_path, schema_path "/enum", "enum", "value is not in enum")
+            valid = 0
+        }
+    }
+
+    for (j = 1; j <= 3; j++) {
+        keyword = j == 1 ? "allOf" : (j == 2 ? "anyOf" : "oneOf")
+        child = mapping_lookup(resolved_schema, keyword)
+        if (!child) continue
+        child = resolve_alias(child)
+        if (node_kind[child] != "sequence" || !sequence_count[child]) fail("JSON Schema " keyword " must be a non-empty array")
+        count = 0
+        if (keyword == "allOf") {
+            for (i = 1; i <= sequence_count[child]; i++) {
+                if (!schema_validate(resolved_instance, sequence_child[child, i], errors, instance_path, schema_path "/" keyword "/" (i - 1), root)) valid = 0
+            }
+        } else {
+            for (i = 1; i <= sequence_count[child]; i++) {
+                if (schema_trial(resolved_instance, sequence_child[child, i], instance_path, schema_path "/" keyword "/" (i - 1), root)) count++
+            }
+            if ((keyword == "anyOf" && count == 0) || (keyword == "oneOf" && count != 1)) {
+                schema_add_error(errors, instance_path, schema_path "/" keyword, keyword, keyword == "anyOf" ? "value matches no subschema" : "value must match exactly one subschema")
+                valid = 0
+            }
+        }
+    }
+    child = mapping_lookup(resolved_schema, "not")
+    if (child && schema_trial(resolved_instance, child, instance_path, schema_path "/not", root)) {
+        schema_add_error(errors, instance_path, schema_path "/not", "not", "value matches the forbidden schema")
+        valid = 0
+    }
+    conditional = mapping_lookup(resolved_schema, "if")
+    if (conditional) {
+        if (schema_trial(resolved_instance, conditional, instance_path, schema_path "/if", root)) {
+            child = mapping_lookup(resolved_schema, "then")
+            if (child && !schema_validate(resolved_instance, child, errors, instance_path, schema_path "/then", root)) valid = 0
+        } else {
+            child = mapping_lookup(resolved_schema, "else")
+            if (child && !schema_validate(resolved_instance, child, errors, instance_path, schema_path "/else", root)) valid = 0
+        }
+    }
+
+    if (node_kind[resolved_instance] == "mapping") {
+        size = expression_mapping_length(resolved_instance)
+        child = mapping_lookup(resolved_schema, "minProperties")
+        if (child && size < schema_nonnegative_integer(child, "minProperties")) {
+            schema_add_error(errors, instance_path, schema_path "/minProperties", "minProperties", "object has too few properties")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "maxProperties")
+        if (child && size > schema_nonnegative_integer(child, "maxProperties")) {
+            schema_add_error(errors, instance_path, schema_path "/maxProperties", "maxProperties", "object has too many properties")
+            valid = 0
+        }
+        required = mapping_lookup(resolved_schema, "required")
+        if (required) {
+            required = resolve_alias(required)
+            if (node_kind[required] != "sequence") fail("JSON Schema required must be an array")
+            for (i = 1; i <= sequence_count[required]; i++) {
+                name_node = resolve_alias(sequence_child[required, i])
+                if (node_kind[name_node] != "scalar" || node_type[name_node] != "string") fail("JSON Schema required names must be strings")
+                key = node_value[name_node]
+                if (!mapping_lookup(resolved_instance, key)) {
+                    schema_add_error(errors, instance_path, schema_path "/required", "required", "required property is missing: " key)
+                    valid = 0
+                }
+            }
+        }
+        properties = mapping_lookup(resolved_schema, "properties")
+        if (properties && node_kind[resolve_alias(properties)] != "mapping") fail("JSON Schema properties must be an object")
+        pattern_properties = mapping_lookup(resolved_schema, "patternProperties")
+        if (pattern_properties && node_kind[resolve_alias(pattern_properties)] != "mapping") fail("JSON Schema patternProperties must be an object")
+        additional = mapping_lookup(resolved_schema, "additionalProperties")
+        name_schema = mapping_lookup(resolved_schema, "propertyNames")
+        collection = ++collection_serial
+        collect_mapping_keys(resolved_instance, collection)
+        for (i = 1; i <= collection_count[collection]; i++) {
+            key = collection_key[collection, i]
+            instance_child = mapping_lookup(resolved_instance, key)
+            if (name_schema) {
+                name_node = expression_scalar(key, "string")
+                if (!schema_validate(name_node, name_schema, errors, instance_path "/" patch_pointer_encode(key), schema_path "/propertyNames", root)) valid = 0
+            }
+            covered = 0
+            if (properties) {
+                property_schema = mapping_lookup(resolve_alias(properties), key)
+                if (property_schema) {
+                    covered = 1
+                    if (!schema_validate(instance_child, property_schema, errors, instance_path "/" patch_pointer_encode(key), schema_path "/properties/" patch_pointer_encode(key), root)) valid = 0
+                }
+            }
+            if (pattern_properties) {
+                trial = ++collection_serial
+                collect_mapping_keys(resolve_alias(pattern_properties), trial)
+                for (j = 1; j <= collection_count[trial]; j++) {
+                    pattern = collection_key[trial, j]
+                    if (key ~ pattern) {
+                        covered = 1
+                        if (!schema_validate(instance_child, mapping_lookup(resolve_alias(pattern_properties), pattern), errors, instance_path "/" patch_pointer_encode(key), schema_path "/patternProperties/" patch_pointer_encode(pattern), root)) valid = 0
+                    }
+                }
+            }
+            if (!covered && additional) {
+                child = resolve_alias(additional)
+                if (node_kind[child] == "scalar" && node_type[child] == "bool") {
+                    if (!schema_boolean(child, "additionalProperties")) {
+                        schema_add_error(errors, instance_path "/" patch_pointer_encode(key), schema_path "/additionalProperties", "additionalProperties", "additional property is not allowed")
+                        valid = 0
+                    }
+                } else if (!schema_validate(instance_child, child, errors, instance_path "/" patch_pointer_encode(key), schema_path "/additionalProperties", root)) valid = 0
+            }
+        }
+        dependent = mapping_lookup(resolved_schema, "dependentRequired")
+        if (dependent) {
+            dependent = resolve_alias(dependent)
+            if (node_kind[dependent] != "mapping") fail("JSON Schema dependentRequired must be an object")
+            trial = ++collection_serial
+            collect_mapping_keys(dependent, trial)
+            for (i = 1; i <= collection_count[trial]; i++) {
+                key = collection_key[trial, i]
+                if (!mapping_lookup(resolved_instance, key)) continue
+                dependency = resolve_alias(mapping_lookup(dependent, key))
+                if (node_kind[dependency] != "sequence") fail("JSON Schema dependentRequired entries must be arrays")
+                for (j = 1; j <= sequence_count[dependency]; j++) {
+                    name_node = resolve_alias(sequence_child[dependency, j])
+                    if (node_kind[name_node] != "scalar" || node_type[name_node] != "string") fail("JSON Schema dependentRequired names must be strings")
+                    if (!mapping_lookup(resolved_instance, node_value[name_node])) {
+                        schema_add_error(errors, instance_path, schema_path "/dependentRequired/" patch_pointer_encode(key), "dependentRequired", "dependent property is missing: " node_value[name_node])
+                        valid = 0
+                    }
+                }
+            }
+        }
+        dependent = mapping_lookup(resolved_schema, "dependentSchemas")
+        if (dependent) {
+            dependent = resolve_alias(dependent)
+            if (node_kind[dependent] != "mapping") fail("JSON Schema dependentSchemas must be an object")
+            trial = ++collection_serial
+            collect_mapping_keys(dependent, trial)
+            for (i = 1; i <= collection_count[trial]; i++) {
+                key = collection_key[trial, i]
+                if (mapping_lookup(resolved_instance, key) &&
+                    !schema_validate(resolved_instance, mapping_lookup(dependent, key), errors, instance_path, schema_path "/dependentSchemas/" patch_pointer_encode(key), root)) valid = 0
+            }
+        }
+    }
+
+    if (node_kind[resolved_instance] == "sequence") {
+        size = sequence_count[resolved_instance]
+        child = mapping_lookup(resolved_schema, "minItems")
+        if (child && size < schema_nonnegative_integer(child, "minItems")) {
+            schema_add_error(errors, instance_path, schema_path "/minItems", "minItems", "array has too few items")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "maxItems")
+        if (child && size > schema_nonnegative_integer(child, "maxItems")) {
+            schema_add_error(errors, instance_path, schema_path "/maxItems", "maxItems", "array has too many items")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "uniqueItems")
+        if (child && schema_boolean(child, "uniqueItems")) {
+            for (i = 1; i <= size; i++) for (j = i + 1; j <= size; j++) {
+                if (expression_semantic_equal(sequence_child[resolved_instance, i], sequence_child[resolved_instance, j])) {
+                    schema_add_error(errors, instance_path, schema_path "/uniqueItems", "uniqueItems", "array items are not unique")
+                    valid = 0
+                    i = size
+                    break
+                }
+            }
+        }
+        child = mapping_lookup(resolved_schema, "prefixItems")
+        item_start = 1
+        if (child) {
+            child = resolve_alias(child)
+            if (node_kind[child] != "sequence") fail("JSON Schema prefixItems must be an array")
+            for (i = 1; i <= sequence_count[child] && i <= size; i++) {
+                if (!schema_validate(sequence_child[resolved_instance, i], sequence_child[child, i], errors, instance_path "/" (i - 1), schema_path "/prefixItems/" (i - 1), root)) valid = 0
+            }
+            item_start = sequence_count[child] + 1
+        }
+        child = mapping_lookup(resolved_schema, "items")
+        if (child) for (i = item_start; i <= size; i++) {
+            if (!schema_validate(sequence_child[resolved_instance, i], child, errors, instance_path "/" (i - 1), schema_path "/items", root)) valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "contains")
+        if (child) {
+            contains_count = 0
+            for (i = 1; i <= size; i++) if (schema_trial(sequence_child[resolved_instance, i], child, instance_path "/" (i - 1), schema_path "/contains", root)) contains_count++
+            min_contains = mapping_lookup(resolved_schema, "minContains") ? schema_nonnegative_integer(mapping_lookup(resolved_schema, "minContains"), "minContains") : 1
+            max_contains = mapping_lookup(resolved_schema, "maxContains") ? schema_nonnegative_integer(mapping_lookup(resolved_schema, "maxContains"), "maxContains") : -1
+            if (contains_count < min_contains || (max_contains >= 0 && contains_count > max_contains)) {
+                schema_add_error(errors, instance_path, schema_path "/contains", "contains", "array contains count is outside the allowed range")
+                valid = 0
+            }
+        }
+    }
+
+    if (node_kind[resolved_instance] == "scalar" && node_type[resolved_instance] == "string") {
+        size = schema_utf8_length(node_value[resolved_instance])
+        child = mapping_lookup(resolved_schema, "minLength")
+        if (child && size < schema_nonnegative_integer(child, "minLength")) {
+            schema_add_error(errors, instance_path, schema_path "/minLength", "minLength", "string is too short")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "maxLength")
+        if (child && size > schema_nonnegative_integer(child, "maxLength")) {
+            schema_add_error(errors, instance_path, schema_path "/maxLength", "maxLength", "string is too long")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "pattern")
+        if (child) {
+            child = resolve_alias(child)
+            if (node_kind[child] != "scalar" || node_type[child] != "string") fail("JSON Schema pattern must be a string")
+            if (node_value[resolved_instance] !~ node_value[child]) {
+                schema_add_error(errors, instance_path, schema_path "/pattern", "pattern", "string does not match the required pattern")
+                valid = 0
+            }
+        }
+    }
+
+    if (node_kind[resolved_instance] == "scalar" && (node_type[resolved_instance] == "int" || node_type[resolved_instance] == "float")) {
+        number = node_value[resolved_instance] + 0
+        child = mapping_lookup(resolved_schema, "minimum")
+        if (child && number < schema_number(child, "minimum")) {
+            schema_add_error(errors, instance_path, schema_path "/minimum", "minimum", "number is below the minimum")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "maximum")
+        if (child && number > schema_number(child, "maximum")) {
+            schema_add_error(errors, instance_path, schema_path "/maximum", "maximum", "number is above the maximum")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "exclusiveMinimum")
+        if (child && number <= schema_number(child, "exclusiveMinimum")) {
+            schema_add_error(errors, instance_path, schema_path "/exclusiveMinimum", "exclusiveMinimum", "number is not above the exclusive minimum")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "exclusiveMaximum")
+        if (child && number >= schema_number(child, "exclusiveMaximum")) {
+            schema_add_error(errors, instance_path, schema_path "/exclusiveMaximum", "exclusiveMaximum", "number is not below the exclusive maximum")
+            valid = 0
+        }
+        child = mapping_lookup(resolved_schema, "multipleOf")
+        if (child) {
+            minimum = schema_number(child, "multipleOf")
+            if (minimum <= 0) fail("JSON Schema multipleOf must be greater than zero")
+            maximum = number / minimum
+            if (maximum < 0) maximum = -maximum
+            numeric_text = tolower(sprintf("%.15g", maximum))
+            if (numeric_text ~ /inf|nan/ || maximum - int(maximum + 0.000000000001) > 0.000000001) {
+                schema_add_error(errors, instance_path, schema_path "/multipleOf", "multipleOf", "number is not a multiple of the required value")
+                valid = 0
+            }
+        }
+    }
+
+    schema_validation_depth--
+    return valid
+}
+
+function schema_errors(instance, schema,    errors) {
+    errors = new_node("sequence", 0, "", "", "")
+    schema_validation_depth = 0
+    schema_validate(instance, schema, errors, "", "#", resolve_alias(schema))
+    return errors
 }
 
 function explain_path(node,    depth, current, parent, edge, i, result, key) {
@@ -4123,7 +5772,7 @@ function expression_nodes_equal(left, right,    left_node, right_node) {
     if (node_type[left_node] == "bool" && node_type[right_node] == "bool") {
         return tolower(node_value[left_node]) == tolower(node_value[right_node])
     }
-    return node_value[left_node] == node_value[right_node]
+    return node_type[left_node] == node_type[right_node] && node_value[left_node] == node_value[right_node]
 }
 
 function expression_compare(left, right, operator,    left_node, right_node, left_value, right_value, equal) {
@@ -5230,11 +6879,13 @@ function expression_evaluate_context(kind, expression, input,    output, middle,
         }
         return output
     }
-    if (kind == "path" || kind == "parent") {
+    if (kind == "path" || kind == "parent" || kind == "root") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = expression_stream_node[input, i]
             if (kind == "path") {
                 expression_stream_push(output, expression_path(node))
+            } else if (kind == "root") {
+                expression_stream_push(output, expression_root(node))
             } else if (node in node_parent) {
                 expression_stream_push(output, node_parent[node])
             }
@@ -5392,6 +7043,59 @@ function expression_shuffle(node,    resolved, result, serial, count, i, j, swap
     return result
 }
 
+function expression_evaluate_patch(kind, expression, input,    output, i, node, single, argument_stream, argument, value, result) {
+    output = expression_stream_new()
+    for (i = 1; i <= expression_stream_count[input]; i++) {
+        node = expression_stream_node[input, i]
+        single = expression_stream_single(node)
+        argument_stream = expression_evaluate(expression_left[expression], single)
+        if (expression_stream_count[argument_stream] != 1) fail(kind " requires exactly one argument value")
+        argument = expression_stream_node[argument_stream, 1]
+        if (kind == "pointer") {
+            value = expression_string_value(argument)
+            result = patch_pointer_find(node, value, 0)
+            if (!result) fail("JSON Pointer path does not exist: " value)
+            expression_stream_push(output, result)
+        } else if (kind == "apply_patch") {
+            patch_apply(node, argument)
+            expression_stream_push(output, node)
+        } else if (kind == "merge_patch") {
+            merge_patch_apply(node, argument)
+            expression_stream_push(output, node)
+        } else {
+            result = new_node("sequence", 0, "", "", "")
+            patch_diff_into(node, argument, "", result)
+            expression_stream_push(output, result)
+        }
+    }
+    return output
+}
+
+function expression_evaluate_schema(kind, expression, input,    output, i, node, single, argument_stream, schema, errors, first, path, message) {
+    output = expression_stream_new()
+    for (i = 1; i <= expression_stream_count[input]; i++) {
+        node = expression_stream_node[input, i]
+        single = expression_stream_single(node)
+        argument_stream = expression_evaluate(expression_left[expression], single)
+        if (expression_stream_count[argument_stream] != 1) fail(kind " requires exactly one schema")
+        schema = expression_stream_node[argument_stream, 1]
+        errors = schema_errors(node, schema)
+        if (kind == "schema_errors") {
+            expression_stream_push(output, errors)
+        } else if (kind == "schema_valid") {
+            expression_stream_push(output, expression_boolean(sequence_count[errors] == 0))
+        } else if (!sequence_count[errors]) {
+            expression_stream_push(output, node)
+        } else {
+            first = sequence_child[errors, 1]
+            path = node_value[resolve_alias(mapping_lookup(first, "instancePath"))]
+            message = node_value[resolve_alias(mapping_lookup(first, "message"))]
+            fail("schema validation failed at " (path == "" ? "/" : path) ": " message)
+        }
+    }
+    return output
+}
+
 function expression_evaluate_utility(kind, expression, input,    output, i, j, node, resolved, single, argument_stream, argument_node, value, result_node, dynamic_expression, dynamic_results, step) {
     output = expression_stream_new()
     if (kind == "eval") {
@@ -5452,6 +7156,18 @@ function expression_evaluate_utility(kind, expression, input,    output, i, j, n
             result_node = expression_scalar(codec_delimited_encode(node, kind == "to_csv" ? "," : "\t"), "string")
         } else if (kind == "from_csv" || kind == "from_tsv") {
             result_node = codec_delimited_decode(expression_string_value(node), kind == "from_csv" ? "," : "\t")
+        } else if (kind == "to_toml") {
+            result_node = expression_scalar(codec_toml_encode(node), "string")
+        } else if (kind == "from_toml") {
+            result_node = codec_toml_decode(expression_string_value(node))
+        } else if (kind == "to_ini") {
+            result_node = expression_scalar(codec_ini_encode(node), "string")
+        } else if (kind == "from_ini") {
+            result_node = codec_ini_decode(expression_string_value(node))
+        } else if (kind == "to_xml") {
+            result_node = expression_scalar(codec_xml_encode(node), "string")
+        } else if (kind == "from_xml") {
+            result_node = codec_xml_decode(expression_string_value(node))
         } else if (kind == "codec_base64" || kind == "codec_base64d" || kind == "codec_uri" || kind == "codec_urid" || kind == "codec_sh") {
             if (node_kind[resolved] != "scalar" || node_type[resolved] != "string") fail(substr(kind, 7) " codec requires a string")
             value = node_value[resolved]
@@ -5473,10 +7189,18 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
     output = expression_stream_new()
     kind = expression_kind[expression]
 
+    if (kind == "pointer" || kind == "apply_patch" || kind == "merge_patch" || kind == "diff_patch") {
+        return expression_evaluate_patch(kind, expression, input)
+    }
+    if (kind == "validate" || kind == "schema_valid" || kind == "schema_errors") {
+        return expression_evaluate_schema(kind, expression, input)
+    }
+
     if (kind == "eval" || kind == "load" || kind == "load_str" || kind == "load_base64" || kind == "load_props" ||
         kind == "to_json" || kind == "from_json" || kind == "to_yaml" || kind == "from_yaml" ||
         kind == "to_props" || kind == "from_props" || kind == "to_csv" || kind == "from_csv" ||
-        kind == "to_tsv" || kind == "from_tsv" ||
+        kind == "to_tsv" || kind == "from_tsv" || kind == "to_toml" || kind == "from_toml" ||
+        kind == "to_ini" || kind == "from_ini" || kind == "to_xml" || kind == "from_xml" ||
         kind == "codec_base64" || kind == "codec_base64d" || kind == "codec_uri" || kind == "codec_urid" ||
         kind == "codec_sh" || kind == "shuffle") {
         return expression_evaluate_utility(kind, expression, input)
@@ -5521,7 +7245,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
-    if (kind == "filename" || kind == "fileindex" || kind == "documentindex" || kind == "path" || kind == "parent" ||
+    if (kind == "filename" || kind == "fileindex" || kind == "documentindex" || kind == "path" || kind == "parent" || kind == "root" ||
         kind == "node_property" || kind == "node_line" || kind == "node_column" || kind == "node_key" || kind == "node_tag" ||
         kind == "node_anchor" || kind == "node_alias" || kind == "node_style" || kind == "node_line_comment" ||
         kind == "node_head_comment" || kind == "node_foot_comment") {
@@ -7847,7 +9571,7 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
             for (i = line; i <= replacement_end; i++) {
                 if ((i != line && i in presentation_line_node) ||
                     i in presentation_deleted_line || i in presentation_reorder_count ||
-                    presentation_sequence_insert_count[i] || presentation_insert_count[i]) {
+                    ((presentation_sequence_insert_count[i] || presentation_insert_count[i]) && i != replacement_end)) {
                     presentation_possible = 0
                     source_edit_file_count[file] = 0
                     return 0
@@ -7861,11 +9585,6 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
             if (line in presentation_reorder_owned_line) {
                 continue
             }
-            if (presentation_sequence_insert_count[line] || presentation_insert_count[line]) {
-                presentation_possible = 0
-                source_edit_file_count[file] = 0
-                return 0
-            }
             run_start = line
             run_end = line
             while (run_end + 1 <= end_line && (run_end + 1) in presentation_deleted_line &&
@@ -7874,7 +9593,8 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
             }
             comment_replace = 0
             for (i = run_start; i <= run_end; i++) {
-                if (presentation_comment_before_count[i] || presentation_comment_after_count[i]) comment_replace = 1
+                if (presentation_comment_before_count[i] || presentation_comment_after_count[i] ||
+                    presentation_sequence_insert_count[i] || presentation_insert_count[i]) comment_replace = 1
             }
             source_edit_add(comment_replace ? "replace" : "delete", run_start, run_end)
             line = run_end
@@ -7916,7 +9636,7 @@ function transform_all_documents(query, file_filter,    document, root, expressi
         }
         root = document_root[document]
         input = expression_stream_single(root)
-        results = expression_evaluate(expression, input)
+        results = configuration_apply_contracts(expression_evaluate(expression, input))
         explain_result_count += expression_stream_count[results]
     }
 }
@@ -7933,7 +9653,7 @@ function transform_eval_all_documents(query,    document, expression, input, res
             expression_stream_push(input, document_root[document])
         }
     }
-    results = expression_evaluate(expression, input)
+    results = configuration_apply_contracts(expression_evaluate(expression, input))
     explain_result_count += expression_stream_count[results]
     for (i = 1; i <= expression_stream_count[results]; i++) {
         file = expression_input_file(expression_stream_node[results, i])
@@ -8051,6 +9771,46 @@ function event_indent(depth,    prefix, i) {
     return prefix
 }
 
+function configuration_file_node(path,    value, lower) {
+    # Contract paths are explicit CLI inputs, like the primary document. The
+    # file-ops policy only prevents expressions from selecting paths at runtime.
+    value = local_file_read(path)
+    lower = tolower(path)
+    if (lower ~ /\.json$/) return expression_parse_json_text(value)
+    if (lower ~ /\.toml$/) return codec_toml_decode(value)
+    if (lower ~ /\.ini$/) return codec_ini_decode(value)
+    if (lower ~ /\.xml$/) return codec_xml_decode(value)
+    return expression_parse_yaml_text(value)
+}
+
+function configuration_apply_contracts(results,    output, i, node, errors, first, path, message) {
+    if (schema_file != "" && !configuration_schema_node) configuration_schema_node = configuration_file_node(schema_file)
+    if (patch_file != "" && !configuration_patch_node) configuration_patch_node = configuration_file_node(patch_file)
+    if (merge_patch_file != "" && !configuration_merge_patch_node) configuration_merge_patch_node = configuration_file_node(merge_patch_file)
+    if (patch_target_file != "" && !configuration_patch_target_node) configuration_patch_target_node = configuration_file_node(patch_target_file)
+    output = expression_stream_new()
+    for (i = 1; i <= expression_stream_count[results]; i++) {
+        node = expression_stream_node[results, i]
+        if (patch_file != "") patch_apply(node, configuration_patch_node)
+        if (merge_patch_file != "") merge_patch_apply(node, configuration_merge_patch_node)
+        if (schema_file != "") {
+            errors = schema_errors(node, configuration_schema_node)
+            if (sequence_count[errors]) {
+                first = sequence_child[errors, 1]
+                path = node_value[resolve_alias(mapping_lookup(first, "instancePath"))]
+                message = node_value[resolve_alias(mapping_lookup(first, "message"))]
+                fail("schema validation failed at " (path == "" ? "/" : path) ": " message)
+            }
+        }
+        if (patch_target_file != "") {
+            first = new_node("sequence", 0, "", "")
+            patch_diff_into(node, configuration_patch_target_node, "", first)
+            expression_stream_push(output, first)
+        } else expression_stream_push(output, node)
+    }
+    return output
+}
+
 function output_node_events(node, depth,    i, prefix) {
     prefix = event_indent(depth)
     if (node_kind[node] == "alias") {
@@ -8104,6 +9864,16 @@ function output_expression_node(target, output_mode,    resolved) {
         printf "\n"
     } else if (output_mode == "yaml") {
         emit_yaml(target)
+    } else if (output_mode == "toml") {
+        printf "%s", codec_toml_encode(target)
+    } else if (output_mode == "ini") {
+        printf "%s", codec_ini_encode(target)
+    } else if (output_mode == "xml") {
+        printf "%s", codec_xml_encode(target)
+    } else if (output_mode == "toml-test-json") {
+        print codec_toml_test_json(target)
+    } else if (output_mode == "toml-test-encode") {
+        printf "%s", codec_toml_encode(codec_toml_test_decode(target))
     } else if (node_kind[resolved] == "scalar") {
         if (unwrap_scalar_mode) {
             print node_value[resolved]
@@ -8239,7 +10009,7 @@ function output_result(document, query, output_mode,    root, expression, input,
     }
     expression = compiled_expression
     input = expression_stream_single(root)
-    results = expression_evaluate(expression, input)
+    results = configuration_apply_contracts(expression_evaluate(expression, input))
     output_expression_results(results, output_mode)
 }
 
@@ -8253,7 +10023,7 @@ function output_eval_all(query, output_mode,    expression, input, results, i) {
             expression_stream_push(input, document_root[i])
         }
     }
-    results = expression_evaluate(expression, input)
+    results = configuration_apply_contracts(expression_evaluate(expression, input))
     output_expression_results(results, output_mode)
 }
 
@@ -8306,6 +10076,7 @@ BEGIN {
     if (output_mode == "") {
         output_mode = "value"
     }
+    if (input_format == "" || input_format == "auto") input_format = "yaml"
     if (selected_document == "") {
         selected_document = 0
     }
@@ -8344,6 +10115,12 @@ BEGIN {
 }
 
 {
+    if (input_format != "yaml") {
+        input_byte_count += length($0) + 1
+        if (max_input_bytes > 0 && input_byte_count > max_input_bytes) fail("input size limit exceeded (max " max_input_bytes " bytes)")
+        codec_input_buffer = codec_input_buffer $0 "\n"
+        next
+    }
     if (combined_files_mode && FNR == 1) {
         next_input_file_index = combined_seen_file ? current_input_file_index + 1 : input_file_index + 0
         while (next_input_file_index <= declared_last_input_file_index && input_physical_name[next_input_file_index] != FILENAME) {
@@ -8491,7 +10268,15 @@ END {
         print "Error: unclosed multiline flow collection on line " multiline_flow_line > "/dev/stderr"
         exit_status = 1
     }
-    if (!exit_status) {
+    if (!exit_status && input_format != "yaml") {
+        document_index = 0
+        if (input_format == "json") document_root[0] = expression_parse_json_text(codec_input_buffer)
+        else if (input_format == "toml") document_root[0] = codec_toml_decode(codec_input_buffer)
+        else if (input_format == "ini") document_root[0] = codec_ini_decode(codec_input_buffer)
+        else if (input_format == "xml") document_root[0] = codec_xml_decode(codec_input_buffer)
+        else fail("unsupported input format: " input_format)
+        document_has_content[0] = 1
+    } else if (!exit_status) {
         if (combined_files_mode && combined_seen_file) {
             input_file_end_line[current_input_file_index] = NR
         }
@@ -8757,7 +10542,9 @@ Usage:
 Examples:
   ysh ".server.host" config.yml
   ysh ".services[] | select(.enabled) | .name" config.yml
-  ysh -o yaml '.release.channel = "stable"' config.yml
+  ysh -p toml -o yaml '.database' config.toml
+  ysh --schema service.schema.json service.yml
+  ysh --apply-patch change.json service.yml
   ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
   ysh --check '.image.tag = "stable"' services/*.yml
   ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
@@ -8770,7 +10557,8 @@ Examples:
   printf "%s\\n" "answer: 42" | ysh ".answer"
 
 Output:
-  -o, --output FORMAT      value, raw, json, or yaml
+  -p, --input-format FMT  yaml, json, toml, ini, xml, or auto
+  -o, --output FORMAT      value, raw, json, yaml, toml, ini, or xml
   -r, --raw-output        print scalar values without JSON quoting
       --json              emit JSON
   -y, --yaml-output       emit YAML
@@ -8801,6 +10589,11 @@ Evaluation:
       --security-disable-file-ops
                           disable load(), load_str(), load_base64(), and load_props()
       --shuffle-seed N    make shuffle reproducible with an integer seed
+      --schema FILE       validate query results against a local JSON/YAML schema
+      --apply-patch FILE  apply a local RFC 6902 JSON Patch after the query
+      --merge-patch FILE  apply a local RFC 7396 Merge Patch after the query
+      --generate-patch FILE
+                          emit RFC 6902 operations from results to a target file
 
 Safety:
       --max-input-bytes N reject larger inputs (default: 16777216)
@@ -8824,8 +10617,22 @@ ysh_set_output_mode() {
     value|raw) YSH_OUTPUT_MODE="value" ;;
     json) YSH_OUTPUT_MODE="json" ;;
     yaml|yml) YSH_OUTPUT_MODE="yaml" ;;
+    toml) YSH_OUTPUT_MODE="toml" ;;
+    ini) YSH_OUTPUT_MODE="ini" ;;
+    xml) YSH_OUTPUT_MODE="xml" ;;
     *)
         ysh_error "unsupported output format: $1"
+        return 2
+        ;;
+    esac
+}
+
+ysh_set_input_format() {
+    case "$1" in
+    yaml|yml) YSH_INPUT_FORMAT=yaml ;;
+    json|toml|ini|xml|auto) YSH_INPUT_FORMAT=$1 ;;
+    *)
+        ysh_error "unsupported input format: $1"
         return 2
         ;;
     esac
@@ -8834,6 +10641,7 @@ ysh_set_output_mode() {
 ysh_invoke_awk() {
     ysh_awk_program \
         -v output_mode="$YSH_OUTPUT_MODE" \
+        -v input_format="$YSH_INPUT_FORMAT" \
         -v selected_document="$YSH_DOCUMENT" \
         -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
         -v eval_all_mode="$YSH_EVAL_ALL" \
@@ -8856,6 +10664,10 @@ ysh_invoke_awk() {
         -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
         -v max_nodes="$YSH_MAX_NODES" \
         -v max_depth="$YSH_MAX_DEPTH" \
+        -v schema_file="$YSH_SCHEMA_FILE" \
+        -v patch_file="$YSH_PATCH_FILE" \
+        -v merge_patch_file="$YSH_MERGE_PATCH_FILE" \
+        -v patch_target_file="$YSH_PATCH_TARGET_FILE" \
         "$@"
 }
 
@@ -9387,6 +11199,7 @@ ${YSH_TRANSACTION_SNAPSHOT}"
 
 ysh_main() {
     YSH_OUTPUT_MODE="value"
+    YSH_INPUT_FORMAT=auto
     YSH_DOCUMENT=0
     YSH_ALL_DOCUMENTS=0
     YSH_EVAL_ALL=0
@@ -9420,6 +11233,10 @@ ysh_main() {
     YSH_MAX_INPUT_BYTES=${YSH_MAX_INPUT_BYTES:-16777216}
     YSH_MAX_NODES=${YSH_MAX_NODES:-100000}
     YSH_MAX_DEPTH=${YSH_MAX_DEPTH:-256}
+    YSH_SCHEMA_FILE=
+    YSH_PATCH_FILE=
+    YSH_MERGE_PATCH_FILE=
+    YSH_PATCH_TARGET_FILE=
     YSH_POSITIONAL_COUNT=0
     YSH_POSITIONAL_ONE=
     YSH_POSITIONAL_TWO=
@@ -9428,6 +11245,18 @@ ysh_main() {
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
+        -p|--input-format)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires a format"
+                return 2
+            fi
+            ysh_set_input_format "$2" || return $?
+            shift 2
+            ;;
+        -p=*|--input-format=*)
+            ysh_set_input_format "${1#*=}" || return $?
+            shift
+            ;;
         -o|--output|--output-format)
             if [ "$#" -lt 2 ]; then
                 ysh_error "$1 requires a format"
@@ -9512,6 +11341,14 @@ ysh_main() {
             YSH_OUTPUT_MODE="events"
             shift
             ;;
+        --toml-test-json)
+            YSH_OUTPUT_MODE="toml-test-json"
+            shift
+            ;;
+        --toml-test-encode)
+            YSH_OUTPUT_MODE="toml-test-encode"
+            shift
+            ;;
         -n|--null-input)
             YSH_NULL_INPUT=1
             shift
@@ -9551,6 +11388,19 @@ ysh_main() {
         --security-disable-file-ops)
             YSH_DISABLE_FILE_OPS=1
             shift
+            ;;
+        --schema|--apply-patch|--merge-patch|--generate-patch)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires a file"
+                return 2
+            fi
+            case "$1" in
+            --schema) YSH_SCHEMA_FILE=$2 ;;
+            --apply-patch) YSH_PATCH_FILE=$2 ;;
+            --merge-patch) YSH_MERGE_PATCH_FILE=$2 ;;
+            --generate-patch) YSH_PATCH_TARGET_FILE=$2 ;;
+            esac
+            shift 2
             ;;
         --shuffle-seed)
             if [ "$#" -lt 2 ]; then
@@ -9705,7 +11555,7 @@ $1"
             YSH_INPUT_FILE=$YSH_POSITIONAL_ONE
         else
             case "$YSH_POSITIONAL_ONE" in
-            *.yml|*.yaml|*.json) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
+            *.yml|*.yaml|*.json|*.toml|*.ini|*.xml) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
             *) YSH_QUERY=$YSH_POSITIONAL_ONE ;;
             esac
         fi
@@ -9718,6 +11568,22 @@ $1"
     if [ -n "$YSH_INPUT_FILE" ]; then
         YSH_INPUT_FILENAME=$YSH_INPUT_FILE
     fi
+
+    if [ "$YSH_INPUT_FORMAT" = auto ]; then
+        case "$YSH_INPUT_FILE" in
+        *.json) YSH_INPUT_FORMAT=json ;;
+        *.toml) YSH_INPUT_FORMAT=toml ;;
+        *.ini) YSH_INPUT_FORMAT=ini ;;
+        *.xml) YSH_INPUT_FORMAT=xml ;;
+        *) YSH_INPUT_FORMAT=yaml ;;
+        esac
+    fi
+    for YSH_CONTRACT_FILE in "$YSH_SCHEMA_FILE" "$YSH_PATCH_FILE" "$YSH_MERGE_PATCH_FILE" "$YSH_PATCH_TARGET_FILE"; do
+        if [ -n "$YSH_CONTRACT_FILE" ] && [ ! -f "$YSH_CONTRACT_FILE" ]; then
+            ysh_error "contract file does not exist: $YSH_CONTRACT_FILE"
+            return 1
+        fi
+    done
 
     if [ "$YSH_INPLACE" -eq 1 ]; then
         case "$YSH_INPUT_FILE" in
@@ -9740,6 +11606,21 @@ $1"
         fi
         YSH_INPUT_FILES="${YSH_INPUT_FILE}
 ${YSH_POSITIONAL_REST}"
+    fi
+
+    if [ "$YSH_INPUT_FORMAT" != yaml ]; then
+        if [ -n "$YSH_INPUT_FILES" ] || [ "$YSH_EVAL_ALL" -eq 1 ]; then
+            ysh_error "non-YAML input currently accepts one document at a time"
+            return 2
+        fi
+        if [ "$YSH_INPLACE" -eq 1 ] || [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; then
+            ysh_error "source-aware edits currently require YAML input"
+            return 2
+        fi
+    fi
+    if [ -n "$YSH_PATCH_TARGET_FILE" ] && { [ "$YSH_INPLACE" -eq 1 ] || [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; }; then
+        ysh_error "--generate-patch cannot be combined with an edit transaction"
+        return 2
     fi
 
     if [ "$YSH_CHECK" -eq 1 ] && [ "$YSH_INPLACE" -eq 1 ]; then

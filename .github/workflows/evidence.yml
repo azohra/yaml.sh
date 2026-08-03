@@ -32,6 +32,28 @@ jobs:
         env:
           YAML_TEST_SUITE_DIR: ${{ runner.temp }}/yaml-test-suite
         run: PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make conformance
+      - name: Measure pinned TOML 1.0 conformance
+        run: make toml-conformance
+      - name: Fetch pinned JSON Schema Test Suite
+        run: |
+          git init -q "${RUNNER_TEMP}/json-schema-test-suite"
+          git -C "${RUNNER_TEMP}/json-schema-test-suite" remote add origin https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
+          git -C "${RUNNER_TEMP}/json-schema-test-suite" fetch -q --depth 1 origin fb7372e8763a1417bddc65fa4c911b3e79b57b65
+          git -C "${RUNNER_TEMP}/json-schema-test-suite" checkout -q --detach FETCH_HEAD
+      - name: Measure JSON Schema 2020-12 focused conformance
+        env:
+          JSON_SCHEMA_TEST_SUITE_DIR: ${{ runner.temp }}/json-schema-test-suite
+        run: make schema-conformance
+      - name: Fetch pinned JSON Patch corpora
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/json-patch/json-patch-tests/master/tests.json -o "${RUNNER_TEMP}/json-patch-tests.json"
+          printf '%s  %s\n' 'de3dce3d0d5029fed83007e50b54607750dd3d1478d3c59ca35fdc18fb1a04ae' "${RUNNER_TEMP}/json-patch-tests.json" | sha256sum --check
+          curl -fsSL https://raw.githubusercontent.com/json-patch/json-patch-tests/master/spec_tests.json -o "${RUNNER_TEMP}/json-patch-spec-tests.json"
+          printf '%s  %s\n' 'a26b050292207033e5cccc5d6102b7bd6f8add7db0d0680e5d46a7ecf40a8c7b' "${RUNNER_TEMP}/json-patch-spec-tests.json" | sha256sum --check
+      - name: Measure RFC 6902 conformance
+        run: |
+          JSON_PATCH_TEST_FILE="${RUNNER_TEMP}/json-patch-tests.json" make json-patch-conformance
+          JSON_PATCH_TEST_FILE="${RUNNER_TEMP}/json-patch-spec-tests.json" make json-patch-conformance
       - name: Install pinned yq oracle
         run: |
           curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64 -o "${RUNNER_TEMP}/yq"

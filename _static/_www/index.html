@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A yq-like YAML programming tool in one portable shell script. Map, reduce, update, and preserve comments without another runtime.">
+  <meta name="description" content="Query, patch, validate, convert, and source-edit configuration with one portable shell script.">
   <meta name="theme-color" content="#101410">
   <meta property="og:type" content="website">
   <meta property="og:title" content="YAML.sh — yq energy. zero baggage.">
@@ -29,7 +29,7 @@
     <a class="brand" href="/" aria-label="YAML.sh home">
       <span class="brand-mark">Y</span>
       <span>YAML.sh</span>
-      <span class="version-pill" data-ysh-version>v1.15.0</span>
+      <span class="version-pill" data-ysh-version>v1.16.0</span>
     </a>
     <nav aria-label="Primary navigation">
       <a href="/story/">Story</a>
@@ -42,7 +42,7 @@
   <main id="main">
     <section class="hero section-shell">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.15.0</span> · portable utilities, same one file</p>
+        <p class="eyebrow"><span class="status-dot"></span> Release <span data-ysh-version>v1.16.0</span> · configuration contracts, same one file</p>
         <h1>yq energy.<br><span>zero baggage.</span></h1>
         <p class="hero-lede">Program YAML with one portable shell script. No package manager. No language runtime. No mystery binary. Just <code>/bin/sh</code>, AWK, and a frankly unreasonable amount of ambition.</p>
         <div class="hero-actions">
@@ -96,7 +96,8 @@
         <span>DIFF BEFORE WRITE</span><b>◆</b>
         <span>STRICT PRESERVATION</span><b>◆</b>
         <span>FLOW + BLOCK SURGERY</span><b>◆</b>
-        <span>CODECS + GUARDED LOADS</span><b>◆</b>
+        <span>SCHEMA + STANDARD PATCHES</span><b>◆</b>
+        <span>TOML + INI + XML</span><b>◆</b>
         <span>TRIM + SPLIT DOC</span><b>◆</b>
         <span>CROSS-FILE UPDATES</span><b>◆</b>
         <span>TRANSACTIONAL EDITS</span>
@@ -125,7 +126,7 @@
         <article>
           <span class="step">03</span>
           <h3>Program</h3>
-          <p>Paths, reducers, codecs, dynamic expressions, graph metadata, and repository transactions operate on real node references with identity and type intact.</p>
+          <p>Paths, reducers, schemas, standard patches, codecs, and repository transactions operate on real node references with identity and type intact.</p>
         </article>
       </div>
     </section>
@@ -138,7 +139,7 @@
       <div class="demo-window">
         <div class="demo-tabs" role="tablist" aria-label="CLI examples">
           <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Program</button>
-          <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">JSON</button>
+          <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">Contracts</button>
           <button id="tab-merge" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge">Update</button>
           <button id="tab-inspect" role="tab" aria-selected="false" aria-controls="panel-inspect" data-demo="inspect">Inspect</button>
         </div>
@@ -148,9 +149,13 @@
 {"replicas":3,"region":"west"}</code></pre>
         </div>
         <div class="demo-panel" id="panel-json" role="tabpanel" aria-labelledby="tab-json" hidden>
-          <p class="demo-label">Decode embedded data without inviting another runtime.</p>
-          <pre><code><span class="prompt">$</span> ysh -o=json '.payload | from_json | .services[0]' config.yml
-{"name":"api","enabled":true}</code></pre>
+          <p class="demo-label">Validate and apply a standard patch through the same graph.</p>
+          <pre><code><span class="prompt">$</span> ysh --schema deploy.schema.json --apply-patch promote.json --diff deploy.yml
+--- a/deploy.yml
++++ b/deploy.yml
+@@ -4 +4 @@
+-  tag: old
++  tag: stable</code></pre>
         </div>
         <div class="demo-panel" id="panel-merge" role="tabpanel" aria-labelledby="tab-merge" hidden>
           <p class="demo-label">See the candidate. Keep the comments. Then write.</p>
@@ -188,8 +193,8 @@ node  1  mapping  line=1</code></pre>
         <article class="feature feature-accent">
           <p class="feature-index">03 / TESTED</p>
           <h3>Know what works.</h3>
-          <p>Every YAML-oriented yq area is marked supported, focused, or excluded—with a named test behind the claim.</p>
-          <a href="/docs/operators/">Open the operator manifest <span aria-hidden="true">→</span></a>
+          <p>YAML, TOML, JSON Schema, patches, source preservation, and yq overlap each have a pinned, inspectable evidence gate.</p>
+          <a href="/docs/contracts/">Open configuration contracts <span aria-hidden="true">→</span></a>
         </article>
         <article class="feature">
           <p class="feature-index">04 / HACKABLE</p>
@@ -222,7 +227,7 @@ node  1  mapping  line=1</code></pre>
         <p>The installer downloads and checksum-verifies a pinned release, then places <code>ysh</code> in <code>/usr/local/bin</code>. Set <code>YSH_INSTALL_DIR</code> to choose another location.</p>
       </div>
       <div class="install-command">
-        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.15.0</span></div>
+        <div class="install-command-label"><span>Terminal</span><span data-ysh-version>v1.16.0</span></div>
         <pre><code id="install-code">curl -fsSL https://yaml.azohra.com/install | sh</code></pre>
         <button class="copy-button" type="button" data-copy="install-code"><span>Copy command</span><b aria-hidden="true">⌘</b></button>
         <p class="install-note">Homebrew: <code>brew install azohra/tools/ysh</code><br>Prefer to inspect first? <a href="/install">Read the installer source.</a></p>

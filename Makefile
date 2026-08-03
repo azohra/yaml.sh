@@ -1,7 +1,7 @@
 BUILDERS = $(shell find build/*)
 INSTALL_DIR=/usr/local/bin
 
-.PHONY: lint test docs-check operator-manifest conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
+.PHONY: lint test docs-check operator-manifest conformance toml-conformance schema-conformance json-patch-conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
 
 all: ysh lint test docs-check
 
@@ -12,7 +12,7 @@ ysh: src/ysh.sh src/ysh.awk src/diff.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/operator-manifest.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
@@ -32,6 +32,18 @@ operator-manifest: ysh
 conformance: ysh
 	@echo "🧭 Measuring YAML conformance"
 	@./test/conformance.sh
+
+toml-conformance: ysh
+	@echo "🍅 Measuring TOML 1.0 conformance"
+	@./test/toml-conformance.sh
+
+schema-conformance: ysh
+	@echo "📐 Measuring JSON Schema 2020-12 focused conformance"
+	@./test/schema-conformance.sh
+
+json-patch-conformance: ysh
+	@echo "🩹 Measuring RFC 6902 conformance"
+	@./test/json-patch-conformance.sh
 
 differential: ysh
 	@echo "⚖️  Comparing with yq"

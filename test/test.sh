@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.15.0" "$(./ysh --version)"
+    assertEquals "v1.16.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -1176,10 +1176,15 @@ testExpressionErrors() {
     assertNotEquals 0 $?
     assertContains "$result" "slice start requires an integer"
 
-    for query in now 'load_xml("neighbor.xml")' 'from_xml' '@xmld'; do
+    for query in now 'load_xml("neighbor.xml")'; do
         result=$(./ysh -n "$query" 2>&1)
         assertNotEquals 0 $?
         assertContains "$result" "unknown expression operator"
+    done
+    for query in from_xml @xmld; do
+        result=$(./ysh -n "$query" 2>&1)
+        assertNotEquals 0 $?
+        assertContains "$result" 'expected XML element'
     done
 }
 
@@ -1464,12 +1469,177 @@ testQueryErrors() {
     assertContains "$result" "unknown expression operator"
 }
 
+testConfigurationPointersAndPatches() {
+    input=$(printf '%s\n' 'a/b: tilde' 'items: [one, two]' 'object:' '  keep: 1' '  remove: true')
+
+    assertEquals '"tilde"' "$(printf '%s\n' "$input" | ./ysh --json 'pointer("/a~1b")')"
+    assertEquals '"two"' "$(printf '%s\n' "$input" | ./ysh --json '.items[1] | root | pointer("/items/1")')"
+    assertEquals '"aml.s"' "$(printf '%s\n' 'name: yaml.sh' | ./ysh --json '.name[1:-1]')"
+
+    patch='[{op:"test",path:"/object/keep",value:1},{op:"replace",path:"/object/keep",value:2},{op:"copy",from:"/object/keep",path:"/object/copied"},{op:"move",from:"/items/0",path:"/items/1"},{op:"remove",path:"/object/remove"},{op:"add",path:"/items/-",value:"three"}]'
+    assertEquals '{"a/b":"tilde","items":["two","one","three"],"object":{"keep":2,"copied":2}}' \
+        "$(printf '%s\n' "$input" | ./ysh --json "apply_patch($patch)")"
+
+    assertEquals '{"items":["one","two"],"object":{"keep":3,"added":true}}' \
+        "$(printf '%s\n' "$input" | ./ysh --json 'merge_patch({"a/b":null,object:{keep:3,remove:null,added:true}})')"
+
+    target='{items:["one","two"],object:{keep:4},added:true}'
+    generated=$(printf '%s\n' "$input" | ./ysh --json "diff_patch($target)")
+    assertEquals '[{"op":"remove","path":"/a~1b"},{"op":"remove","path":"/object/remove"},{"op":"replace","path":"/object/keep","value":4},{"op":"add","path":"/added","value":true}]' "$generated"
+    assertEquals '{"items":["one","two"],"object":{"keep":4},"added":true}' \
+        "$(printf '%s\n' "$input" | ./ysh --json "diff_patch($target) as \$patch | apply_patch(\$patch)")"
+
+    result=$(printf '%s\n' "$input" | ./ysh 'apply_patch([{op:"test",path:"/object/keep",value:9}])' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "JSON Patch test failed"
+    result=$(printf '%s\n' "$input" | ./ysh 'pointer("missing")' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "must be empty or start with /"
+}
+
+testConfigurationPatchSourceEdits() {
+    patch_file=test/.tmp-config-patch-$$.yml
+    printf '%s\n' 'service:' '  name: api # keep this' '  obsolete: true' > "$patch_file"
+
+    ./ysh --preserve-only -i \
+        'apply_patch([{op:"replace",path:"/service/name",value:"worker"},{op:"remove",path:"/service/obsolete"},{op:"add",path:"/service/enabled",value:true}])' \
+        "$patch_file"
+    assertEquals "service:
+  name: worker # keep this
+  enabled: true" "$(cat "$patch_file")"
+
+    rm -f "$patch_file"
+}
+
+testConfigurationSchemaContracts() {
+    schema='{"$defs":{port:{type:"integer",minimum:1,maximum:65535}},type:"object",required:["name","port"],properties:{name:{type:"string",minLength:3,pattern:"^[a-z]+$"},port:{"$ref":"#/$defs/port"},tags:{type:"array",items:{type:"string"},uniqueItems:true,minItems:1},mode:{oneOf:[{const:"api"},{const:"worker"}]}},dependentRequired:{mode:["tags"]},additionalProperties:false}'
+    valid=$(printf '%s\n' 'name: service' 'port: 8080' 'tags: [web, stable]' 'mode: api')
+    invalid=$(printf '%s\n' 'name: X' 'port: 70000' 'tags: [web, web]' 'mode: other' 'extra: true')
+
+    assertEquals 'true' "$(printf '%s\n' "$valid" | ./ysh --json "schema_valid($schema)")"
+    assertEquals '{"name":"service","port":8080,"tags":["web","stable"],"mode":"api"}' \
+        "$(printf '%s\n' "$valid" | ./ysh --json "validate($schema)")"
+    errors=$(printf '%s\n' "$invalid" | ./ysh --json "schema_errors($schema)")
+    assertContains "$errors" '"instancePath":"/name"'
+    assertContains "$errors" '"schemaPath":"#/$defs/port/maximum"'
+    assertContains "$errors" '"keyword":"uniqueItems"'
+    assertContains "$errors" '"keyword":"oneOf"'
+    assertContains "$errors" '"keyword":"additionalProperties"'
+    assertEquals 'false' "$(printf '%s\n' "$invalid" | ./ysh --json "schema_valid($schema)")"
+
+    collection_schema='{type:"object",patternProperties:{"^x-":{type:"string"}},additionalProperties:false,properties:{values:{type:"array",contains:{type:"integer",minimum:10},minContains:2,maxContains:3}}}'
+    errors=$(printf '%s\n' 'x-name: 3' 'values: [10, 2]' | ./ysh --json "schema_errors($collection_schema)")
+    assertContains "$errors" '"schemaPath":"#/patternProperties/^x-/type"'
+    assertContains "$errors" '"keyword":"contains"'
+
+    assertEquals 'true' "$(printf '%s\n' 'value: {kind: service, port: 8080}' 'schema: {if: {properties: {kind: {const: service}}}, then: {required: [port]}, else: {required: [path]}}' | ./ysh --json '.value | schema_valid(root.schema)')"
+    assertEquals 'false' "$(printf '%s\n' 'value: {bad-key: 1}' 'schema: {propertyNames: {pattern: "^[a-z]+$"}}' | ./ysh --json '.value | schema_valid(root.schema)')"
+    assertEquals 'false' "$(printf '%s\n' 'value: {card: true}' 'schema: {dependentSchemas: {card: {required: [billing]}}}' | ./ysh --json '.value | schema_valid(root.schema)')"
+
+    result=$(printf '%s\n' "$invalid" | ./ysh "validate($schema)" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'schema validation failed at /name'
+    result=$(printf '%s\n' 'value: 1' | ./ysh 'schema_valid({"$ref":"https://example.com/schema"})' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'local $ref values only'
+    result=$(printf '%s\n' 'value: 1' | ./ysh 'schema_valid({unevaluatedProperties:false})' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'outside the focused profile'
+}
+
+testConfigurationFormatCodecs() {
+    toml='title = "yaml.sh"
+enabled = true
+ports = [80, 443]
+"key=part" = "safe"
+multiline = """hash # stays
+second line""" # comment
+[owner]
+name = "Justin"
+[database.settings]
+retries = 3
+[[servers]]
+name = "alpha"
+[[servers]]
+name = "beta"'
+    decoded=$(printf '%s\n' 'document: |' "$(printf '%s\n' "$toml" | sed 's/^/  /')" | ./ysh --json '.document | from_toml')
+    assertEquals '{"title":"yaml.sh","enabled":true,"ports":[80,443],"key=part":"safe","multiline":"hash # stays\nsecond line","owner":{"name":"Justin"},"database":{"settings":{"retries":3}},"servers":[{"name":"alpha"},{"name":"beta"}]}' "$decoded"
+    encoded=$(printf '%s\n' "$decoded" | ./ysh -r 'to_toml')
+    assertEquals "$decoded" "$(printf '%s\n' 'document: |' "$(printf '%s' "$encoded" | sed 's/^/  /')" | ./ysh --json '.document | from_toml')"
+
+    ini='name = yaml.sh
+[database]
+host = "localhost"
+[database.pool]
+size = 4'
+    assertEquals '{"name":"yaml.sh","database":{"host":"localhost","pool":{"size":"4"}}}' \
+        "$(printf '%s\n' 'document: |' "$(printf '%s\n' "$ini" | sed 's/^/  /')" | ./ysh --json '.document | from_ini')"
+    assertContains "$(printf '%s\n' 'name: yaml.sh' 'database:' '  host: localhost' | ./ysh -r 'to_ini')" '[database]'
+
+    xml='<root id="7"><name>yaml.sh</name><item>a</item><item>b</item><![CDATA[tail]]></root>'
+    assertEquals '{"root":{"+@id":"7","name":"yaml.sh","item":["a","b"],"+content":"tail"}}' \
+        "$(printf '%s\n' "xml: '$xml'" | ./ysh --json '.xml | from_xml')"
+    assertEquals '<root id="7">tail<name>yaml.sh</name><item>a</item><item>b</item></root>' \
+        "$(printf '%s\n' "xml: '$xml'" | ./ysh -r '.xml | from_xml | to_xml')"
+    assertEquals '<root><empty/></root>' \
+        "$(printf '%s\n' "xml: '<root><empty/></root>'" | ./ysh -r '.xml | from_xml | to_xml')"
+
+    result=$(printf '%s\n' "xml: '<!DOCTYPE root [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><root>&x;</root>'" | ./ysh '.xml | from_xml' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'DTDs and entity declarations are disabled'
+
+    result=$(printf '%s\n' "xml: '<root>&#1;</root>'" | ./ysh '.xml | from_xml' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'invalid XML character reference'
+
+    result=$(printf '%s\n' '"bad<name": value' | ./ysh 'to_xml' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'invalid XML element name'
+}
+
+testConfigurationCliContracts() {
+    prefix=test/.tmp-config-cli-$$
+    toml_file=$prefix.toml
+    schema_file=$prefix.schema.json
+    patch_file=$prefix.patch.json
+    merge_file=$prefix.merge.json
+    target_file=$prefix.target.yml
+    yaml_file=$prefix.yml
+    printf '%s\n' 'title = "yaml.sh"' '[service]' 'port = 8080' > "$toml_file"
+    printf '%s\n' '{"type":"object","required":["service"],"properties":{"service":{"type":"object","required":["port"],"properties":{"port":{"type":"integer","minimum":1,"maximum":65535}}}}}' > "$schema_file"
+    printf '%s\n' '[{"op":"replace","path":"/service/port","value":9090},{"op":"add","path":"/service/enabled","value":true}]' > "$patch_file"
+    printf '%s\n' '{"service":{"port":7070,"enabled":true}}' > "$merge_file"
+    printf '%s\n' 'service:' '  port: 6060' '  enabled: true' > "$target_file"
+    printf '%s\n' 'service:' '  port: 8080 # keep' > "$yaml_file"
+
+    assertEquals '8080' "$(./ysh --json '.service.port' "$toml_file")"
+    assertContains "$(./ysh -p toml -o toml '.' "$toml_file")" '[service]'
+    assertEquals '{"service":{"port":8080}}' "$(./ysh --json --schema "$schema_file" '.' "$yaml_file")"
+    assertEquals '{"service":{"port":8080}}' "$(./ysh --security-disable-file-ops --json --schema "$schema_file" '.' "$yaml_file")"
+    assertEquals '{"service":{"port":9090,"enabled":true}}' "$(./ysh --json --apply-patch "$patch_file" '.' "$yaml_file")"
+    assertEquals '{"service":{"port":7070,"enabled":true}}' "$(./ysh --json --merge-patch "$merge_file" '.' "$yaml_file")"
+    assertEquals '[{"op":"replace","path":"/service/port","value":6060},{"op":"add","path":"/service/enabled","value":true}]' \
+        "$(./ysh --json --generate-patch "$target_file" '.' "$yaml_file")"
+
+    ./ysh --preserve-only -i --apply-patch "$patch_file" '.' "$yaml_file"
+    assertEquals "service:
+  port: 9090 # keep
+  enabled: true" "$(cat "$yaml_file")"
+
+    printf '%s\n' 'service:' '  port: 70000' > "$yaml_file"
+    result=$(./ysh --schema "$schema_file" '.' "$yaml_file" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'schema validation failed at /service/port'
+
+    rm -f "$toml_file" "$schema_file" "$patch_file" "$merge_file" "$target_file" "$yaml_file"
+}
+
 testCliErrors() {
     ./ysh ".key" does-not-exist.yml >/dev/null 2>&1
     assertEquals 1 $?
     ./ysh --document nope ".key" test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
-    ./ysh --output xml ".key" test/test.yml >/dev/null 2>&1
+    ./ysh --output bogus ".key" test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
     ./ysh --unknown ".key" test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
@@ -1498,11 +1668,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.15.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.16.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.15.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.15"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.16.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.16"
     assertContains "$(cat _static/_www/story/index.html)" "<strong>v1.8</strong>"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
@@ -1518,6 +1688,8 @@ testReleaseArtifactsStayInSync() {
     assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
     assertContains "$(cat _static/_www/docs/operators.md)" "| Array to map | Supported |"
     assertContains "$(cat _static/_www/docs/operators.md)" "| Split into documents | Focused |"
+    assertContains "$(cat _static/_www/docs/operators.md)" "| JSON Patch | Supported |"
+    assertContains "$(cat _static/_www/docs/contracts.md)" "205 official valid fixtures"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "parser-boundary matrix"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "fail before producing a graph"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "Kubernetes, Compose, GitHub Actions, GitLab CI"

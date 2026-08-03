@@ -4,6 +4,31 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.16.0] - 2026-08-02
+
+Version 1.16 turns the node graph into a portable configuration contract engine.
+
+### Added
+
+- RFC 6901 JSON Pointer; RFC 6902 patch application and deterministic generation, verified by 108 external corpus assertions; RFC 7396 Merge Patch.
+- A fail-closed JSON Schema 2020-12 profile with local references, path-aware value-free errors, 701 focused official assertions, and shared depth/node limits.
+- TOML 1.0, nested INI, and secure XML data codecs. The TOML decoder and encoder each pass all 205 official valid fixtures; the decoder rejects 462/474 invalid fixtures, with the raw-byte boundary documented and pinned.
+- `-p/--input-format`, TOML/INI/XML output, `--schema`, `--apply-patch`, `--merge-patch`, and `--generate-patch`.
+- `root`, plus explicit evidence for existing string slicing.
+
+### Changed
+
+- Patch, schema, and codec paths operate directly on the existing graph rather than converting through an external runtime.
+- CLI patches feed the source-aware YAML edit compiler, including strict comment-preserving in-place changes and transactional multi-file writes.
+- Release evidence now includes pinned TOML 1.0 and JSON Schema 2020-12 suites. The weekly evidence job owns those networked oracles; ordinary page edits do not run them.
+
+### Boundaries
+
+- Non-YAML input is semantic, one-document conversion; source-aware in-place editing remains YAML-only.
+- XML rejects DTDs and custom entities and uses the documented `+@attribute` / `+content` data shape.
+- JSON Schema uses POSIX ERE, local `$ref`, and the documented validation vocabulary; remote/dynamic references and annotation-driven unevaluated vocabularies are not implied.
+- The portable baseline excludes twelve TOML invalid fixtures that require raw-byte distinctions unavailable consistently across AWK record/string APIs: bare CR, embedded NUL, invalid UTF-8, and UTF-16 input. Hosts that expose NUL reject five more.
+
 ## [1.15.0] - 2026-08-02
 
 Version 1.15 closes the portable utility layer without adding a runtime.

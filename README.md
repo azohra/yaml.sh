@@ -38,6 +38,8 @@ $ ysh --preserve-only --diff '.image.tag = "stable"' deploy/*.yml
 @@ -1,2 +1,2 @@
 -image: app:old # promoted by CI
 +image: app:stable # promoted by CI
+
+$ ysh --schema deploy.schema.json --apply-patch promote.json --diff deploy.yml
 ```
 
 ## Install one file
@@ -66,7 +68,7 @@ Requirements: `/bin/sh` and AWK. That is the whole runtime dependency graph.
 
 Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.
 
-YAML.sh is for that second moment. It keeps the useful paths, streams, filters, construction, updates, environment composition, multi-file transactions, embedded codecs, and guarded local loads. The portable boundary now excludes XML, dates, system execution, and yq's format-heavy CLI—not useful work merely because it looked ambitious.
+YAML.sh is for that second moment. It keeps useful paths, streams, filters, construction, source-aware updates, environment composition, multi-file transactions, configuration codecs, standard patches, and schema gates. It still does not execute commands, access the network, or hide a second runtime.
 
 The constraint is the fun part.
 
@@ -109,7 +111,24 @@ ysh -n 'load("defaults.yml") * load("production.yml")'
 ysh '.object | @yaml | @base64' config.yml
 ```
 
-JSON, YAML, properties, CSV, TSV, Base64, URI, and shell codecs run inside the same file. `eval(EXPR)` handles data-driven YAML.sh expressions. Disable local reads with `--security-disable-file-ops`; use `--shuffle-seed N` for reproducible shuffle.
+Read another configuration format directly:
+
+```sh
+ysh '.database.port' config.toml
+ysh -p ini -o yaml '.' app.ini
+ysh -p xml --json '.catalog.item' catalog.xml
+```
+
+Validate, patch, or produce a standard change set:
+
+```sh
+ysh --schema service.schema.json '.' service.yml
+ysh --apply-patch change.json --preserve-only --diff service.yml
+ysh --merge-patch production.json -i service.yml
+ysh --json --generate-patch desired.yml '.' current.yml > change.json
+```
+
+JSON, YAML, TOML, INI, XML, properties, CSV, TSV, Base64, URI, and shell codecs run inside the same file. `eval(EXPR)` handles data-driven YAML.sh expressions. Disable query-selected local reads with `--security-disable-file-ops`; use `--shuffle-seed N` for reproducible shuffle.
 
 Guard an update with a useful failure:
 
@@ -166,6 +185,7 @@ Every public claim has an owner:
 | --- | --- |
 | Parsed YAML has the documented graph semantics | Pinned YAML Test Suite outcomes plus a fail-closed boundary matrix |
 | Listed yq-shaped forms agree with yq | A form-by-form manifest, differential oracle, and configuration workflows |
+| Standard configuration contracts behave as documented | 108 external JSON Patch assertions, 205/205 TOML 1.0 decoder and encoder fixtures, 462 invalid TOML rejections, and 701 focused JSON Schema 2020-12 assertions |
 | A preview is the candidate that will be committed | Shared check/diff/write plans, drift races, injected failures, and rollback tests |
 | Strict edits keep bytes outside owned spans | Exact source-preservation properties across scalar, flow, block, record, alias, and reorder edits |
 | The one-file runtime stays portable and bounded | Cross-AWK/shell CI plus time, node, depth, document, and memory limits |
@@ -197,7 +217,8 @@ ysh eval-all QUERY FILE...
 
 | Option | Purpose |
 | --- | --- |
-| `-o value|raw|json|yaml` | Select output form |
+| `-p yaml|json|toml|ini|xml` | Select input format; filenames are detected automatically |
+| `-o value|raw|json|yaml|toml|ini|xml` | Select output form |
 | `-r`, `--json`, `-y` | Raw scalar, JSON, or YAML shortcuts |
 | `-i` | Transactionally update one or more real files |
 | `--check` | Report whether the same update would change files: clean `0`, drift `1`, error `2` |
@@ -212,6 +233,9 @@ ysh eval-all QUERY FILE...
 | `--explain`, `--explain=json` | Report value-free mutations and presentation behavior |
 | `--security-disable-env-ops`, `--security-disable-file-ops` | Disable explicit environment or local-file reads |
 | `--shuffle-seed N` | Make portable shuffle reproducible |
+| `--schema FILE` | Validate results with the documented JSON Schema 2020-12 profile |
+| `--apply-patch`, `--merge-patch` | Apply RFC 6902 or RFC 7396 after the query |
+| `--generate-patch FILE` | Generate deterministic RFC 6902 operations to a target document |
 | `--max-input-bytes`, `--max-nodes`, `--max-depth` | Bound hostile input |
 
 Run `ysh --help` for the complete interface.
@@ -222,7 +246,7 @@ Run `ysh --help` for the complete interface.
 make all
 ```
 
-That builds the standalone file, runs ShellCheck, and executes the behavioral suite. The portability matrix covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells. Release evidence adds the operator manifest, parser boundaries, conformance, yq differential, preservation properties, fault injection, and scale.
+That builds the standalone file, runs ShellCheck, and executes the behavioral suite. The portability matrix covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells. Release evidence adds YAML, TOML, and JSON Schema conformance; the operator manifest; parser boundaries; yq differential; preservation properties; fault injection; and scale.
 
 The implementation is intentionally inspectable. Start with the [internals guide](https://yaml.azohra.com/docs/internals/) or [development guide](https://yaml.azohra.com/docs/development/).
 
