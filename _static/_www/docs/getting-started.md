@@ -2,7 +2,15 @@
 
 YAML.sh ships as one executable text file. The released file contains both the portable shell launcher and the AWK engine.
 
-## Install the release
+## Install with Homebrew
+
+```sh
+brew install azohra/tools/ysh
+```
+
+Homebrew installs the same single-file release artifact used by the direct installer.
+
+## Install directly
 
 The hosted installer downloads the release artifact, verifies its pinned SHA-256 digest, then writes it to the install directory:
 

@@ -91,7 +91,14 @@
       <article>
           <h1 id="install-quick-start">Install &amp; quick start</h1>
           <p>YAML.sh ships as one executable text file. The released file contains both the portable shell launcher and the AWK engine.</p>
-          <h2 id="install-the-release"><a href="#install-the-release">Install the release<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h2 id="install-with-homebrew"><a href="#install-with-homebrew">Install with Homebrew<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">brew install azohra/tools/ysh
+</code></pre>
+          </div>
+          <p>Homebrew installs the same single-file release artifact used by the direct installer.</p>
+          <h2 id="install-directly"><a href="#install-directly">Install directly<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>The hosted installer downloads the release artifact, verifies its pinned SHA-256 digest, then writes it to the install directory:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -240,7 +247,8 @@ ysh eval-all -i 'select(fileIndex == 0).version as $version | select(fileIndex &
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
       <ol>
-        <li class="level-2"><a href="#install-the-release">Install the release</a></li>
+        <li class="level-2"><a href="#install-with-homebrew">Install with Homebrew</a></li>
+        <li class="level-2"><a href="#install-directly">Install directly</a></li>
         <li class="level-2"><a href="#requirements">Requirements</a></li>
         <li class="level-2"><a href="#first-query">First query</a></li>
         <li class="level-2"><a href="#bound-hostile-input">Bound hostile input</a></li>
