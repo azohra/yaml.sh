@@ -1,6 +1,6 @@
 # Parser internals
 
-The release remains one shell script, with a semantic graph, source-presentation layer, and repository transaction working together.
+The release remains one shell script, with a semantic graph, source-preservation layer, and batch file coordinator working together.
 
 ```text
 /bin/sh CLI
@@ -20,7 +20,7 @@ source-edit compiler or value / JSON / YAML / metadata / AST / events
 
 ## The shell layer
 
-The `/bin/sh` launcher handles arguments, input, output mode, and edit transactions. It snapshots every source beside the original, evaluates those stable bytes, and prepares each transformed candidate once. `--check`, `--diff`, and `-i` inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement.
+The `/bin/sh` launcher handles arguments, input, output mode, and batch edits. It snapshots every source beside the original, evaluates those stable bytes, and prepares each transformed candidate once. `--check`, `--diff`, and `-i` inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement.
 
 Live inputs are compared with their snapshots after evaluation and again before commit; each changed target is checked immediately before replacement. A mismatch aborts without overwriting the external change. The snapshots are also the rollback material, so a failed batch restores what the query actually read. Each sibling rename is atomic, but the complete multi-file sequence is not one globally atomic filesystem operation.
 
@@ -31,8 +31,8 @@ Embedded AWK programs arrive through here-documents, avoiding small `ARG_MAX` li
 The development sources remain separate:
 
 ```text
-src/ysh.sh       portable CLI launcher and repository transaction
-src/awk/*.awk    ordered parser, graph, query, contract, and source modules
+src/ysh.sh       portable CLI launcher and batch edit coordinator
+src/awk/*.awk    ordered parser, graph, query, validation, and source modules
 src/diff.awk     bounded unified-diff renderer
 ```
 
@@ -85,4 +85,4 @@ ysh --events input.yml
 
 ## Why AWK
 
-AWK provides portable text processing, associative arrays, recursion, and a small enough runtime model to ship the complete implementation as readable source. The constraint is the point: YAML.sh is a serious parser built in an intentionally mischievous medium.
+AWK provides portable text processing, associative arrays, recursion, and a small enough runtime model to ship the complete implementation as readable source. The constraint stays visible in the implementation instead of hiding behind another runtime.

@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The exact YAML syntax and behavior covered by tests.">
+  <meta name="description" content="Supported YAML syntax, resolution, and parser boundaries.">
   <meta name="theme-color" content="#101410">
   <meta property="og:title" content="YAML support · YAML.sh">
-  <meta property="og:description" content="The exact YAML syntax and behavior covered by tests.">
+  <meta property="og:description" content="Supported YAML syntax, resolution, and parser boundaries.">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com/docs/supported_yml/">
   <link rel="icon" href="/favicon.ico">
@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/" aria-current="page">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/" aria-current="page">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -106,7 +106,7 @@
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
           <h1 id="yaml-support">YAML support</h1>
-          <p>YAML.sh parses the syntax below into a real node graph and exercises it in the test suite. The limitations section names the nearby forms it does not support.</p>
+          <p>YAML.sh accepts the syntax below. The parser boundaries section names nearby forms it rejects.</p>
           <h2 id="collections"><a href="#collections">Collections<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
             <li>Nested block mappings using space indentation.</li>
@@ -128,7 +128,7 @@
             <li>Explicit block-scalar indentation indicators from 1 through 9.</li>
             <li>Lexical recognition of strings, nulls, booleans, binary/octal/decimal/hexadecimal integers, floats, and timestamps.</li>
           </ul>
-          <p>Values remain text in default output. Type recognition is used by <code>--type</code> and JSON output.</p>
+          <p>Scalar values print as text in default output. Recognized types also drive numeric evaluation, JSON output, patches, schema validation, and the <code>type</code> operator.</p>
           <h2 id="anchors-aliases-and-merges"><a href="#anchors-aliases-and-merges">Anchors, aliases, and merges<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
             <li>Backward scalar, mapping, and sequence aliases.</li>
@@ -163,30 +163,17 @@
             <li>Exact source lines and columns for block and multiline flow values and keys; generated nodes report 0.</li>
             <li>Anchor, alias, tag, scalar/collection style, and value/key head, line, and foot comments available to queries and setters.</li>
           </ul>
-          <h2 id="intentional-limitations"><a href="#intentional-limitations">Intentional limitations<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h2 id="parser-boundaries"><a href="#parser-boundaries">Parser boundaries<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
             <li>Aliases must refer to an earlier anchor in the same document.</li>
-            <li>Recursive object graphs are rejected because value and JSON output cannot represent cycles safely.</li>
+            <li>Recursive alias graphs are rejected.</li>
             <li>Anchor names may contain Unicode and punctuation except whitespace and flow delimiters.</li>
             <li>Collection-valued mapping keys are rejected. Explicit scalar keys are supported.</li>
             <li>Tags and anchors before scalar keys are accepted, but mapping keys remain text in the graph.</li>
             <li>Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.</li>
-            <li>Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded comments, and supported scalar/collection styles where representable. It does not reconstruct unowned spacing.</li>
-            <li>In-place source plans cover scalar replacements, single- and multiline flow collections, block scalars, direct block inserts/appends/deletes, comment edits, and pure mapping or sequence reorders. Untouched spans remain byte-identical; changed flow spans use stable flow formatting.</li>
-            <li>Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.</li>
-            <li>Sequence slices, scalar interpolation, grouping, <code>ireduce</code>, computed object keys, <code>setpath</code>/<code>delpaths</code>, and POSIX-ERE <code>test</code>/global <code>sub</code> are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.</li>
-            <li><code>style</code> can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. <code>head_comment</code>, <code>line_comment</code>, and <code>foot_comment</code> work on values and generated key references. Full-line block comment edits compile into source spans; ambiguous textual comment placement follows yq's emitter conventions.</li>
-            <li><code>tag</code>, <code>anchor</code>, and <code>alias</code> are writable properties. Anchor renames keep referring aliases valid; duplicate anchors, unsafe removal, missing or forward targets, and recursive aliases are rejected.</li>
-            <li>Multi-file queries compile once. <code>--check</code> reports drift and <code>--diff</code> prints exact prepared candidates without writing. <code>--preserve-only</code> rejects candidates requiring presentation regeneration. File operations evaluate source snapshots, refuse detected live drift, skip no-ops, reject symlinks and duplicate paths, preserve permissions, and roll back commit failures or interrupts.</li>
-            <li>Writable <code>eval-all</code> can bind data from one input and update every selected source file in the same transaction.</li>
-            <li>Merge modifiers append arrays (<code>*+</code>), merge arrays by index (<code>*d</code>), update existing fields (<code>*?</code>), or add new fields (<code>*n</code>).</li>
-            <li>The expression language includes bounded dynamic evaluation, policy-controlled YAML/text/Base64/properties loads, and JSON/YAML/properties/CSV/TSV/Base64/URI/shell codecs. Date/time, XML, system execution, and regex capture objects remain outside the contract.</li>
           </ul>
-          <p>YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond these tested behaviors is required.</p>
-          <h2 id="how-it-is-tested"><a href="#how-it-is-tested">How it is tested<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The pinned YAML Test Suite owns accepted and strict-invalid outcomes. The parser-boundary matrix sits beside it: valid neighboring forms must parse, while malformed directives, collection keys, reserved indicators, malformed escapes, indentation errors, invalid aliases, and merge sources must fail before producing a graph.</p>
-          <p>Focused fixtures then cover graph semantics, query behavior, presentation preservation, repository transactions, resource limits, and common configuration shapes. The <a href="/docs/operators/">operator manifest</a> owns expression-language claims.</p>
-          <p>See <a href="https://github.com/azohra/yaml.sh/blob/main/test/parser-boundaries.sh"><code>test/parser-boundaries.sh</code></a>, <a href="https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh"><code>test/conformance.sh</code></a>, <a href="https://github.com/azohra/yaml.sh/blob/main/test/test.sh"><code>test/test.sh</code></a>, and <a href="https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh"><code>bench/scale.sh</code></a>.</p>
+          <p>Malformed directives, reserved indicators, malformed escapes, indentation errors, invalid aliases, invalid merge sources, duplicate keys, and unsupported complex keys fail before producing a document graph.</p>
+          <p>Expression behavior belongs in the <a href="/docs/queries/">query reference</a>; emitted YAML belongs in <a href="/docs/output/">output and metadata</a>; edit preservation belongs in <a href="/docs/documents/">documents and file edits</a>.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
@@ -198,8 +185,7 @@
         <li class="level-2"><a href="#anchors-aliases-and-merges">Anchors, aliases, and merges</a></li>
         <li class="level-2"><a href="#tags-and-directives">Tags and directives</a></li>
         <li class="level-2"><a href="#streams-and-source-details">Streams and source details</a></li>
-        <li class="level-2"><a href="#intentional-limitations">Intentional limitations</a></li>
-        <li class="level-2"><a href="#how-it-is-tested">How it is tested</a></li>
+        <li class="level-2"><a href="#parser-boundaries">Parser boundaries</a></li>
       </ol>
       <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/supported_yml.md">Edit this page</a>
     </aside>

@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Work across YAML streams and multiple files.">
   <meta name="theme-color" content="#101410">
-  <meta property="og:title" content="Multiple documents · YAML.sh">
+  <meta property="og:title" content="Documents &amp; file edits · YAML.sh">
   <meta property="og:description" content="Work across YAML streams and multiple files.">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com/docs/documents/">
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/docs/docs.css">
   <script src="/docs/docs.js" defer></script>
-  <title>Multiple documents · YAML.sh docs</title>
+  <title>Documents &amp; file edits · YAML.sh docs</title>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/" aria-current="page">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/" aria-current="page">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -105,61 +105,96 @@
     <main id="content" class="doc-content">
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
-          <h1 id="multiple-documents">Multiple documents</h1>
-          <p>YAML streams may contain documents separated by <code>---</code> and terminated by <code>...</code>.</p>
-          <div class="code-block">
-            <div class="code-head"><span>yaml</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-yaml">---
-environment: development
----
-environment: production
-</code></pre>
-          </div>
-          <p>YAML.sh selects the first document by default. Use a zero-based document index for another:</p>
+          <h1 id="documents-file-edits">Documents &amp; file edits</h1>
+          <p>YAML.sh reads YAML streams, edits files without losing unrelated source text, and can prepare several file changes before writing any of them.</p>
+          <h2 id="yaml-document-streams"><a href="#yaml-document-streams">YAML document streams<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Documents in one stream may be separated by <code>---</code> and terminated by <code>...</code>. YAML.sh selects the first document by default. Select another with its zero-based index:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --document 1 '.environment' stream.yml
 # production
 </code></pre>
           </div>
-          <p>The short form is <code>-d</code>:</p>
+          <p>The short form is <code>-d</code>. Use <code>--all-documents</code> to evaluate the expression independently against every document:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh -d 1 '.environment' stream.yml
+            <pre><code class="language-sh">ysh --all-documents '[documentIndex, .metadata.name]' stream.yml
 </code></pre>
           </div>
-          <p>Anchors and tag handles are scoped to their document. Empty explicit documents are represented as null rather than disappearing from the stream.</p>
-          <p>Stream selected values as explicit documents with <code>split_doc</code>:</p>
+          <p>Anchors and tag handles are scoped to one document. Empty explicit documents are represented as null rather than disappearing.</p>
+          <p><code>split_doc</code> marks every selected result as a separate YAML document:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh -o=yaml '.services[] | split_doc' config.yml
 </code></pre>
           </div>
-          <p>YAML.sh already places a document separator between multiple YAML results, so <code>split_doc</code> is idempotent rather than a switch that changes safe output into unsafe concatenation.</p>
-          <p>In-place mode applies the same expression independently to every document:</p>
+          <p>Multiple YAML results are always separated safely, so applying <code>split_doc</code> more than once does not change the output.</p>
+          <h2 id="preview-and-write-an-edit"><a href="#preview-and-write-an-edit">Preview and write an edit<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Use the same expression to inspect, check, or write a change:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh -i '.release.channel = &quot;stable&quot;' stream.yml
+            <pre><code class="language-sh">ysh --diff '.image.tag = &quot;stable&quot;' deploy.yml
+ysh --check '.image.tag = &quot;stable&quot;' deploy.yml
+ysh -i '.image.tag = &quot;stable&quot;' deploy.yml
 </code></pre>
           </div>
-          <p>The update is committed only after the entire stream parses and every document transforms successfully.</p>
-          <p>Several files form one in-place transaction:</p>
+          <p><code>--diff</code> prints the exact candidate without writing. <code>--check</code> stays quiet and exits <code>0</code> when no change is needed, <code>1</code> when the file would change, and <code>2</code> for invalid input or an invalid query. <code>-i</code> writes the candidate.</p>
+          <p>Evaluation finishes before YAML.sh prepares an edit. For supported changes, it rewrites only the source spans it owns:</p>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Edit</th>
+              <th>What stays intact</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td>Scalar replacement</td>
+                <td>Surrounding spacing, quote style, properties, and line comment</td>
+              </tr>
+              <tr>
+                <td>Flow mapping or sequence</td>
+                <td>Source outside the changed collection</td>
+              </tr>
+              <tr>
+                <td>Literal or folded scalar</td>
+                <td>Block style, indentation, and header comment</td>
+              </tr>
+              <tr>
+                <td>Head or foot comment</td>
+                <td>Source outside the owned full-line comment block</td>
+              </tr>
+              <tr>
+                <td>Block insert, append, delete, or reorder</td>
+                <td>Unchanged records and their attached comments</td>
+              </tr>
+              <tr>
+                <td>Alias or merged value</td>
+                <td>Alias and merge occurrences; the owned anchor source is updated</td>
+              </tr>
+            </tbody>
+          </table></div>
+          <p>Changed flow collections use stable formatting inside their span. A change without a safe source plan falls back to stable semantic YAML.</p>
+          <p>Make preservation mandatory with <code>--preserve-only</code>:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --check '.release.channel = &quot;stable&quot;' services/*.yml
-ysh --diff '.release.channel = &quot;stable&quot;' services/*.yml
-ysh -i '.release.channel = &quot;stable&quot;' services/*.yml
+            <pre><code class="language-sh">ysh --preserve-only --diff '.items += [&quot;release&quot;]' config.yml
+ysh --preserve-only -i '.items += [&quot;release&quot;]' config.yml
 </code></pre>
           </div>
-          <p>The query is compiled once and every file is parsed in one AWK process. Check mode reports which files drift; diff mode prints the exact prepared candidates. Both write nothing and return clean <code>0</code>, drift <code>1</code>, or error <code>2</code>.</p>
-          <p>Add <code>--preserve-only</code> to <code>--check</code>, <code>--diff</code>, or <code>-i</code> when source fidelity is a requirement:</p>
+          <p>If the edit would require regeneration, YAML.sh exits with an error before producing or writing a candidate.</p>
+          <h2 id="edit-several-files"><a href="#edit-several-files">Edit several files<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>One command can prepare the same change for several files:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --preserve-only --diff '.release.channel = &quot;stable&quot;' services/*.yml
+            <pre><code class="language-sh">ysh --check '.image.tag = &quot;stable&quot;' services/*.yml
+ysh --diff '.image.tag = &quot;stable&quot;' services/*.yml
+ysh -i '.image.tag = &quot;stable&quot;' services/*.yml
 </code></pre>
           </div>
-          <p>If any changed file would need deterministic YAML regeneration, the complete preflight fails with exit <code>2</code>. In-place mode evaluates source snapshots and verifies the live files still match before replacement. No-op files stay untouched; detected drift aborts, and a commit failure or interrupt rolls back files already changed to the snapshots the query read.</p>
-          <p>Use <code>eval-all</code> when files need to share data. The combined stream keeps <code>filename</code>, <code>fileIndex</code>, and <code>documentIndex</code> on every root:</p>
+          <p>The query is compiled once. Every file is parsed from a snapshot, and every changed candidate is prepared before the first replacement. Files with no changes are left untouched.</p>
+          <p>Before writing, YAML.sh verifies that live files still match the snapshots it evaluated. If a file changed during the run, the operation stops instead of overwriting it. Symlinks, duplicate paths, and names containing newlines are refused. Permissions are preserved.</p>
+          <p>Each file replacement is an atomic same-directory rename. A multi-file batch is not one globally atomic filesystem operation: if a later replacement fails or the process is interrupted, YAML.sh restores files already changed from the snapshots it read. Normal backups and version control still matter.</p>
+          <h2 id="share-data-across-files"><a href="#share-data-across-files">Share data across files<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Use <code>eval-all</code> when documents need to exchange values. <code>filename</code>, <code>fileIndex</code>, and <code>documentIndex</code> identify each input:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">query='select(fileIndex == 0).version as $version | select(fileIndex &gt; 0).release.version = $version'
@@ -167,8 +202,8 @@ ysh eval-all --check &quot;$query&quot; release.yml services/*.yml
 ysh eval-all -i &quot;$query&quot; release.yml services/*.yml
 </code></pre>
           </div>
-          <p>Every source file participates in drift detection; every mutated source participates in commit. A read-only source file that does not change is not replaced.</p>
-          <p>To fold the complete file stream into one document:</p>
+          <p>Every source participates in the snapshot check; only mutated sources are replaced.</p>
+          <p>To fold the complete input stream into one document:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh eval-all '. as $document ireduce ({}; . * $document)' defaults.yml region.yml secrets.yml
@@ -177,6 +212,16 @@ ysh eval-all -i &quot;$query&quot; release.yml services/*.yml
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
+    <aside class="page-nav" aria-label="On this page">
+      <strong>On this page</strong>
+      <ol>
+        <li class="level-2"><a href="#yaml-document-streams">YAML document streams</a></li>
+        <li class="level-2"><a href="#preview-and-write-an-edit">Preview and write an edit</a></li>
+        <li class="level-2"><a href="#edit-several-files">Edit several files</a></li>
+        <li class="level-2"><a href="#share-data-across-files">Share data across files</a></li>
+      </ol>
+      <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/documents.md">Edit this page</a>
+    </aside>
   </div>
   <dialog class="search-dialog" data-search-dialog>
     <form method="dialog" class="search-box"><label for="docs-search">Search the docs</label><button value="close" aria-label="Close search">×</button><input id="docs-search" type="search" autocomplete="off" placeholder="Try “merge files” or “envsubst”"><div class="search-results" aria-live="polite"></div><p><kbd>↑</kbd><kbd>↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close</p></form>

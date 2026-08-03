@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -106,16 +106,15 @@
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
           <h1 id="install-quick-start">Install &amp; quick start</h1>
-          <p>YAML.sh ships as one executable text file. The released file contains both the portable shell launcher and the AWK engine.</p>
-          <h2 id="install-with-homebrew"><a href="#install-with-homebrew">Install with Homebrew<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>YAML.sh ships as one executable text file containing its shell launcher and AWK engine.</p>
+          <h2 id="install"><a href="#install">Install<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>With Homebrew:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">brew install azohra/tools/ysh
 </code></pre>
           </div>
-          <p>Homebrew installs the same single-file release artifact used by the direct installer.</p>
-          <h2 id="install-directly"><a href="#install-directly">Install directly<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The hosted installer downloads the release artifact, verifies its pinned SHA-256 digest, then writes it to the install directory:</p>
+          <p>Or download the release directly. The installer verifies its pinned SHA-256 digest before writing the file:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">curl -fsSL https://yaml.azohra.com/install | sh
@@ -127,13 +126,8 @@
             <pre><code class="language-sh">curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR=&quot;$HOME/.local/bin&quot; sh
 </code></pre>
           </div>
-          <h2 id="requirements"><a href="#requirements">Requirements<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <ul>
-            <li>Read-only commands: a POSIX-style <code>/bin/sh</code> and a compatible AWK.</li>
-            <li>Source-aware <code>--check</code>, <code>--diff</code>, and <code>-i</code>: <code>mktemp</code>, <code>cp</code>, <code>cmp</code>, <code>mv</code>, <code>rm</code>, and <code>wc</code> from the host.</li>
-          </ul>
-          <p>The release suite covers macOS AWK, mawk, original AWK, POSIX-mode gawk, and BusyBox AWK across several POSIX shells. Bash, Python, Ruby, Node.js, Go, <code>jq</code>, and a package manager are not required. Edit mode checks its host utilities before preparing a transaction.</p>
-          <h2 id="first-query"><a href="#first-query">First query<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Read-only commands need a POSIX-compatible <code>/bin/sh</code> and AWK. <code>--check</code>, <code>--diff</code>, and <code>-i</code> also use the host's <code>mktemp</code>, <code>cp</code>, <code>cmp</code>, <code>mv</code>, <code>rm</code>, and <code>wc</code>. Bash, Python, Ruby, Node.js, Go, <code>jq</code>, and another language runtime are not required.</p>
+          <h2 id="read-yaml"><a href="#read-yaml">Read YAML<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Given <code>config.yml</code>:</p>
           <div class="code-block">
             <div class="code-head"><span>yaml</span><button type="button" data-copy>Copy</button></div>
@@ -152,156 +146,81 @@ services:
 # localhost
 </code></pre>
           </div>
-          <p>Select a sequence item:</p>
+          <p>Select a sequence item or filter a stream:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh '.server.ports[1]' config.yml
 # 8443
+
+ysh '.services[] | select(.enabled) | .name' config.yml
+# api
 </code></pre>
           </div>
-          <p>Select a collection:</p>
+          <p>Collections print as compact JSON by default:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh '.services[0]' config.yml
 # {&quot;name&quot;:&quot;api&quot;,&quot;enabled&quot;:true}
 </code></pre>
           </div>
-          <p>Stream and filter nodes:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh '.services[] | select(.enabled) | .name' config.yml
-# api
-</code></pre>
-          </div>
-          <p>Use a default when a path is missing, null, or false:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh '.release.channel // &quot;stable&quot;' config.yml
-# stable
-</code></pre>
-          </div>
-          <p>Slice and label a result:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh '&quot;\(.server.host):\(.server.ports[0:2] | length)&quot;' config.yml
-# localhost:2
-</code></pre>
-          </div>
-          <p>Transform and emit YAML:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh -o=yaml '.release.channel = &quot;stable&quot;' config.yml
-</code></pre>
-          </div>
-          <p>Ask whether the update would change anything:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --check '.release.channel = &quot;stable&quot;' config.yml
-</code></pre>
-          </div>
-          <p>Check mode writes nothing. It exits <code>0</code> when clean, <code>1</code> when the query would change a file, and <code>2</code> when the query or input is invalid. Once the check looks right, update in place:</p>
-          <p>See the exact candidate instead:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --diff '.release.channel = &quot;stable&quot;' config.yml
-</code></pre>
-          </div>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh -i '.release.channel = &quot;stable&quot;' config.yml
-</code></pre>
-          </div>
-          <p>Each in-place replacement is an atomic sibling rename and preserves file permissions. YAML.sh compiles scalar, flow, block-scalar, insert, delete, and reorder changes into non-overlapping source spans. Bytes outside those spans stay intact; changed flow spans use stable flow formatting. Unsupported edits fall back to semantic YAML. Add <code>--preserve-only</code> to make that fallback an error.</p>
-          <p>The same expression can check or update several files as one preflighted transaction:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --check '.release.channel = &quot;stable&quot;' services/*.yml
-ysh --diff '.release.channel = &quot;stable&quot;' services/*.yml
-ysh -i '.release.channel = &quot;stable&quot;' services/*.yml
-</code></pre>
-          </div>
-          <h2 id="bound-hostile-input"><a href="#bound-hostile-input">Bound hostile input<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Defaults are generous; automation can tighten them:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --max-input-bytes 1048576 --max-nodes 20000 --max-depth 64 '.' config.yml
-</code></pre>
-          </div>
-          <h2 id="standard-input"><a href="#standard-input">Standard input<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Omit the file to read YAML from standard input:</p>
+          <p>Omit the file to read standard input:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">printf '%s\n' 'answer: 42' | ysh '.answer'
 </code></pre>
           </div>
-          <p>Use <code>-</code> explicitly when it helps a generated command read clearly:</p>
+          <h2 id="change-yaml"><a href="#change-yaml">Change YAML<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Print transformed YAML without changing the file:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">generate-config | ysh '.release.version' -
+            <pre><code class="language-sh">ysh -o=yaml '.release.channel = &quot;stable&quot;' config.yml
 </code></pre>
           </div>
-          <h2 id="embedded-formats-and-local-files"><a href="#embedded-formats-and-local-files">Embedded formats and local files<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Preview the exact in-place change:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh '.payload | from_json | .name' config.yml
-ysh -n 'load(&quot;defaults.yml&quot;) * load(&quot;production.yml&quot;)'
+            <pre><code class="language-sh">ysh --diff '.release.channel = &quot;stable&quot;' config.yml
 </code></pre>
           </div>
-          <p>The expression language can encode and decode JSON, YAML, TOML, INI, XML, properties, CSV, TSV, Base64, URI, and shell text. Add <code>--security-disable-file-ops</code> when a query must not read paths of its own.</p>
-          <p>Read a format directly by filename or with <code>-p</code>:</p>
+          <p>Then write it:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh -i '.release.channel = &quot;stable&quot;' config.yml
+</code></pre>
+          </div>
+          <p>Common edits retain comments and surrounding formatting. Add <code>--preserve-only</code> to fail rather than regenerate YAML when a change cannot be made safely in the original source. See <a href="/docs/documents/">multiple documents and file edits</a> for check mode, multi-file changes, and exact write guarantees.</p>
+          <h2 id="build-and-convert"><a href="#build-and-convert">Build and convert<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Use <code>-n</code> to create a document without reading input:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh -n -o=yaml '{name: &quot;api&quot;, enabled: true}'
+</code></pre>
+          </div>
+          <p>Input can also be JSON, TOML, INI, or XML:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh '.database.port' config.toml
-ysh -p ini -o yaml '.' app.conf
-ysh -p xml --json '.catalog.item' catalog.xml
-</code></pre>
-          </div>
-          <p>Validate or apply a standard patch without embedding either document in the query:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --schema service.schema.json '.' service.yml
-ysh --apply-patch promote.json --preserve-only --diff service.yml
-</code></pre>
-          </div>
-          <p>See <a href="/docs/contracts/">configuration contracts</a> for JSON Pointer, JSON Patch, Merge Patch, schema diagnostics, and format boundaries.</p>
-          <h2 id="compose-configuration"><a href="#compose-configuration">Compose configuration<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Environment values can stay strings or be parsed as YAML:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">IMAGE_TAG=stable ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
-LIMITS='{cpu: 2, memory: 1Gi}' ysh '.resources = env(LIMITS)' deploy.yml
-</code></pre>
-          </div>
-          <p>Evaluate files independently by listing them, or evaluate one expression across the combined document stream:</p>
-          <div class="code-block">
-            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh '[filename, .name]' one.yml two.yml
-ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
-ysh eval-all -i 'select(fileIndex == 0).version as $version | select(fileIndex &gt; 0).release.version = $version' release.yml services/*.yml
+ysh -p xml -o json '.catalog.item' catalog.xml
 </code></pre>
           </div>
           <h2 id="next-steps"><a href="#next-steps">Next steps<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
-            <li><a href="/docs/queries/">Learn paths, streams, construction, and updates</a></li>
-            <li><a href="/docs/output/">Choose value, JSON, YAML, type, tag, or line output</a></li>
-            <li><a href="/docs/supported_yml/">Explore supported YAML syntax and limits</a></li>
-            <li><a href="/docs/yq-compatibility/">Compare the focused surface with yq</a></li>
+            <li><a href="/docs/recipes/">Copy a practical recipe</a></li>
+            <li><a href="/docs/queries/">Learn the query language</a></li>
+            <li><a href="/docs/documents/">Edit documents and files safely</a></li>
+            <li><a href="/docs/contracts/">Validate, patch, and convert configuration</a></li>
+            <li><a href="/docs/supported_yml/">See supported YAML syntax</a></li>
           </ul>
-          <p>Maintaining a script written for the original command interface? Use the focused <a href="/docs/migration/">legacy migration guide</a>.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
       <ol>
-        <li class="level-2"><a href="#install-with-homebrew">Install with Homebrew</a></li>
-        <li class="level-2"><a href="#install-directly">Install directly</a></li>
-        <li class="level-2"><a href="#requirements">Requirements</a></li>
-        <li class="level-2"><a href="#first-query">First query</a></li>
-        <li class="level-2"><a href="#bound-hostile-input">Bound hostile input</a></li>
-        <li class="level-2"><a href="#standard-input">Standard input</a></li>
-        <li class="level-2"><a href="#embedded-formats-and-local-files">Embedded formats and local files</a></li>
-        <li class="level-2"><a href="#compose-configuration">Compose configuration</a></li>
+        <li class="level-2"><a href="#install">Install</a></li>
+        <li class="level-2"><a href="#read-yaml">Read YAML</a></li>
+        <li class="level-2"><a href="#change-yaml">Change YAML</a></li>
+        <li class="level-2"><a href="#build-and-convert">Build and convert</a></li>
         <li class="level-2"><a href="#next-steps">Next steps</a></li>
       </ol>
       <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/getting-started.md">Edit this page</a>

@@ -10581,6 +10581,7 @@ ysh_usage() {
         printf '%s\n' "$YSH_USAGE_LINE"
     done <<EOF
 YAML.sh v${YSH_VERSION}
+One readable shell file for querying, transforming, and carefully editing YAML.
 
 Usage:
   ysh [options] QUERY [FILE...]
@@ -10589,21 +10590,12 @@ Usage:
   command | ysh [options] QUERY
 
 Examples:
-  ysh ".server.host" config.yml
-  ysh ".services[] | select(.enabled) | .name" config.yml
+  ysh '.server.host' config.yml
+  ysh '.services[] | select(.enabled) | .name' config.yml
+  ysh -i '.image.tag = "stable"' service.yml
+  ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
   ysh -p toml -o yaml '.database' config.toml
   ysh --schema service.schema.json service.yml
-  ysh --apply-patch change.json service.yml
-  ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
-  ysh --check '.image.tag = "stable"' services/*.yml
-  ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
-  ysh eval-all -i 'select(fileIndex == 0).tag as \$tag | select(fileIndex > 0).image.tag = \$tag' release.yml services/*.yml
-  ysh -n -o yaml '{name: "api", enabled: true}'
-  ysh '.services | map(.name) | unique' config.yml
-  ysh ".services | length" config.yml
-  ysh ".missing // \"fallback\"" config.yml
-  ysh ".[\"key.with.dots\"]" config.yml
-  printf "%s\\n" "answer: 42" | ysh ".answer"
 
 Output:
   -p, --input-format FMT  yaml, json, toml, ini, xml, or auto
@@ -10624,15 +10616,15 @@ Documents:
   -d, --document INDEX    select a zero-based YAML document
       --all-documents     evaluate every document in a stream
   -n, --null-input        build output without reading input
-  -i, --inplace           transactionally update YAML files in place
-      --check             preflight changes without writing (0 clean, 1 drift, 2 error)
-      --diff              preview the exact transaction as a unified diff
-      --preserve-only     refuse edits that would regenerate YAML presentation
+  -i, --inplace           update YAML files, rolling back a failed write
+      --check             report whether an edit would change files (0 clean, 1 changed, 2 error)
+      --diff              preview edits as unified diffs without writing
+      --preserve-only     refuse changes that cannot keep comments and formatting
 
 Evaluation:
   -e, --exit-status       fail on no result, null, or false
-      --explain           report selections, mutations, and presentation behavior
-      --explain=json      emit one value-free JSON audit record per input
+      --explain           summarize selections, changes, and formatting behavior
+      --explain=json      emit one JSON Lines summary per input without YAML values
       --security-disable-env-ops
                           disable env(), strenv(), and envsubst
       --security-disable-file-ops
@@ -10655,11 +10647,13 @@ Other:
   -V, --version           print the version
   -h, --help              print this help
 
-QUERY supports yq-style paths, streams, variables, slices, interpolation,
-portable regexes, maps, reducers, sorting, arithmetic, construction,
-assignment, deletion, deep merge, codecs, dynamic eval, and guarded file loads.
+The query language supports paths, streams, variables, slices, interpolation,
+portable regexes, maps, reducers, sorting, arithmetic, construction, assignment,
+deletion, deep merge, codecs, dynamic eval, and guarded file loads. Many paths
+and operators will be familiar to yq users.
 Collections emit JSON by default.
-Common edits preserve comments; other edits emit stable YAML unless --preserve-only is set.
+YAML edits keep comments and formatting when possible; --preserve-only refuses
+the change when they cannot be kept.
 EOF
 }
 

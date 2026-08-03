@@ -165,8 +165,8 @@ function nav_group(label, a, al, b, bl, c, cl, d, dl) {
 
 function print_nav() {
     nav_group("Start", "index", "Overview", "getting-started", "Install & quick start", "recipes", "Recipes", "", "")
-    nav_group("Use", "queries", "Query language", "operators", "Operator manifest", "documents", "Files & documents", "output", "Output & metadata")
-    nav_group("Trust", "contracts", "Config contracts", "supported_yml", "YAML support", "yq-compatibility", "yq compatibility", "security", "Security & limits")
+    nav_group("Use", "queries", "Query language", "operators", "Operator reference", "documents", "Files & documents", "output", "Output & metadata")
+    nav_group("Reference", "contracts", "Validate, patch & convert", "supported_yml", "YAML support", "yq-compatibility", "yq compatibility", "security", "Security & limits")
     nav_group("Build", "internals", "How it works", "development", "Development", "migration", "Migration", "", "")
 }
 

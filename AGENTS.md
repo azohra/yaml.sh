@@ -1,12 +1,13 @@
 # Working on YAML.sh
 
 Read [DESIGN.md](DESIGN.md) before changing behavior. It is the canonical
-product and architecture guidance for maintainers and coding agents.
+product and architecture guidance for every contributor.
 
 ## Non-negotiable constraints
 
 - Keep the released `ysh` artifact to one readable text file.
-- Keep runtime code compatible with POSIX `/bin/sh` and the AWKs covered by CI.
+- Keep runtime code compatible with POSIX `/bin/sh` and the AWK implementations
+  covered by the portability tests.
 - Edit readable sources; never edit generated `ysh` or generated docs directly.
 - Preserve documented v1 behavior unless a necessary break is explicitly
   accepted and prepared as a major release candidate.
@@ -37,4 +38,7 @@ clear subsystem boundaries, not merely into more files.
 
 Lead with useful work and guarantees. Keep prose terse, coherent, and specific.
 YAML.sh should be the subject; mention yq only for familiar syntax, migration,
-or measured compatibility. The story is durable narrative, not release state.
+or measured compatibility. Let the strange, joyful constraint provide the fun;
+let concrete behavior prove the tool is serious. The story is durable narrative,
+not release state. Verification and release machinery belong in maintainer
+material, not the product identity.

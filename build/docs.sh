@@ -17,12 +17,12 @@ description_for() {
     getting-started) printf '%s\n' 'Install one file and solve the first YAML task.' ;;
     recipes) printf '%s\n' 'Copyable solutions for configuration work.' ;;
     queries) printf '%s\n' 'Paths, filters, construction, updates, and context.' ;;
-    contracts) printf '%s\n' 'Validate, patch, compare, and convert configuration without another runtime.' ;;
-    operators) printf '%s\n' 'The audited YAML-oriented operator surface and evidence for every claim.' ;;
+    contracts) printf '%s\n' 'Validate schemas, apply standard patches, and convert configuration formats.' ;;
+    operators) printf '%s\n' 'Operators, supported forms, and practical boundaries.' ;;
     documents) printf '%s\n' 'Work across YAML streams and multiple files.' ;;
     output) printf '%s\n' 'Choose value, JSON, YAML, metadata, AST, or events.' ;;
-    yq-compatibility) printf '%s\n' 'The useful overlap with yq and the deliberate boundary.' ;;
-    supported_yml) printf '%s\n' 'The exact YAML syntax and behavior covered by tests.' ;;
+    yq-compatibility) printf '%s\n' 'What carries over from yq, what differs, and when to use each tool.' ;;
+    supported_yml) printf '%s\n' 'Supported YAML syntax, resolution, and parser boundaries.' ;;
     security) printf '%s\n' 'Bound hostile input and understand the security model.' ;;
     migration) printf '%s\n' 'Move scripts from the pre-v1 interface.' ;;
     internals) printf '%s\n' 'Follow YAML from source text into the node graph.' ;;

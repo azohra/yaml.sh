@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/" aria-current="page">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/" aria-current="page">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -106,7 +106,7 @@
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
           <h1 id="queries">Queries</h1>
-          <p>YAML.sh evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.</p>
+          <p>YAML.sh expressions select values, pass them through filters, build new results, and update documents. An expression may produce no result, one result, or a stream of results.</p>
           <h2 id="paths"><a href="#paths">Paths<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p><code>.</code> selects the document root. Mapping keys and zero-based sequence indexes compose naturally:</p>
           <div class="code-block">
@@ -119,7 +119,7 @@ ysh '.[&quot;key.with.dots&quot;]' config.yml
 </code></pre>
           </div>
           <p>Quoted bracket keys are required when query punctuation belongs to the key.</p>
-          <p>Missing keys and out-of-range indexes produce null, matching yq traversal semantics:</p>
+          <p>Missing keys and out-of-range indexes produce null:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --json '.missing' config.yml
@@ -134,7 +134,7 @@ ysh '.[&quot;key.with.dots&quot;]' config.yml
 ysh '.metadata[]' config.yml
 </code></pre>
           </div>
-          <p>Each result retains its node identity, type, tag, source line, parent, aliases, and resolved merge behavior.</p>
+          <p>Selected results retain their YAML type, tag, source location, aliases, and merge behavior.</p>
           <h2 id="pipe"><a href="#pipe">Pipe<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>The pipe passes every result on its left into the expression on its right:</p>
           <div class="code-block">
@@ -175,7 +175,7 @@ ysh '.services[] | select(.port &gt;= 8000) | .name' config.yml
 ysh '.services[] | .enabled | not' config.yml
 </code></pre>
           </div>
-          <p>Numeric comparisons normalize integers and finite floats. Like yq, equality comparisons operate on scalar values rather than treating whole collections as identical values.</p>
+          <p>Numeric comparisons normalize integers and finite floats. Equality compares scalar values; two mappings or sequences are not treated as equal merely because their contents match.</p>
           <p>Arithmetic uses normal precedence with <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, and <code>%</code>. <code>+</code> also concatenates strings and sequences, shallow-merges mappings, and treats null as an identity value.</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -205,7 +205,7 @@ ysh '.services | has(2)' config.yml
             <li><code>keys</code> returns mapping keys or sequence indexes.</li>
             <li><code>has(KEY)</code> checks a mapping key or sequence index.</li>
             <li><code>kind</code> returns <code>map</code>, <code>seq</code>, or <code>scalar</code>.</li>
-            <li><code>type</code> returns a yq-style tag such as <code>!!map</code>, <code>!!seq</code>, <code>!!str</code>, or <code>!!int</code>.</li>
+            <li><code>type</code> returns a YAML tag such as <code>!!map</code>, <code>!!seq</code>, <code>!!str</code>, or <code>!!int</code>.</li>
           </ul>
           <p>Filters can begin an expression when they operate on the root:</p>
           <div class="code-block">
@@ -239,7 +239,7 @@ ysh -n --json '[&quot;yaml&quot;, &quot;sh&quot;] | join(&quot;.&quot;)'
 ysh -n --json '[&quot;zero&quot;, &quot;one&quot;] | array_to_map'
 </code></pre>
           </div>
-          <p>Focused helpers cover common selection and reshaping jobs:</p>
+          <p>Additional helpers cover common selection and reshaping jobs:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh '.services | filter(.enabled) | first' config.yml
@@ -265,7 +265,7 @@ ysh '.services[] | select(.name | test(&quot;^[a-z]+$&quot;))' config.yml
 ysh '.name | sub(&quot;-&quot;; &quot;_&quot;)' config.yml
 </code></pre>
           </div>
-          <p>This portable regex subset does not promise yq/RE2 flags, named captures, or replacement backreferences.</p>
+          <p>The portable regex subset does not include flags, named captures, or replacement backreferences.</p>
           <h2 id="variables-dynamic-keys-and-reducers"><a href="#variables-dynamic-keys-and-reducers">Variables, dynamic keys, and reducers<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Bind a result with <code>as $name</code>. The expression after the pipe keeps the original current input and can refer to that value repeatedly:</p>
           <div class="code-block">
@@ -392,7 +392,7 @@ ysh '.payload | from_json | .items | @csv' config.yml
 ysh '.secret | @base64' config.yml
 </code></pre>
           </div>
-          <p>CSV and TSV decoding treats the first row as headers and parses scalar cells. Properties use dotted paths and decode values as strings. TOML, INI, and XML use the <a href="/docs/contracts/">configuration contract</a> documented for each format.</p>
+          <p>CSV and TSV decoding treats the first row as headers and parses scalar cells. Properties use dotted paths and decode values as strings. TOML, INI, and XML use the <a href="/docs/contracts/">data profiles</a> documented for each format.</p>
           <p><code>eval(EXPR)</code> runs a string through YAML.sh's expression parser. <code>load</code>, <code>load_str</code>, <code>load_base64</code>, and <code>load_props</code> read a named local file:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -425,7 +425,7 @@ ysh '.message | envsubst(nu, ff)' config.yml
             <pre><code class="language-sh">ysh -i 'with(.kind; select(. == &quot;Deployment&quot;) or error(&quot;expected Deployment&quot;)) | .spec.replicas = 3' deploy.yml
 </code></pre>
           </div>
-          <p>If any input fails the guard, a repository transaction writes nothing.</p>
+          <p>If any input fails the guard, the command writes nothing.</p>
           <h2 id="files-and-documents"><a href="#files-and-documents">Files and documents<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>List files to evaluate the query independently over each one. <code>--all-documents</code> evaluates every document in one YAML stream. <code>eval-all</code>/<code>ea</code> evaluates once across all documents and files, enabling slurp and practical cross-file merge:</p>
           <div class="code-block">
@@ -436,7 +436,7 @@ ysh ea '[.]' one.yml two.yml
 ysh ea 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
 </code></pre>
           </div>
-          <p>It can also update every mutated source file as one transaction. This query reads the version from the first file and writes it into the rest:</p>
+          <p>It can also use one file to update others. This query reads the version from the first file and writes it into the rest:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">query='select(fileIndex == 0).version as $version | select(fileIndex &gt; 0).release.version = $version'
@@ -444,7 +444,7 @@ ysh ea --check &quot;$query&quot; release.yml services/*.yml
 ysh ea -i &quot;$query&quot; release.yml services/*.yml
 </code></pre>
           </div>
-          <p>Whole-stream reduction can fold any number of files into one result:</p>
+          <p>Whole-stream reduction can fold several files into one result:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh ea '. as $document ireduce ({}; . * $document)' defaults.yml region.yml secrets.yml
@@ -489,7 +489,7 @@ ysh -o=yaml 'del(.metadata.internal)' config.yml
 ysh -o=yaml 'delpaths([[&quot;metadata&quot;, &quot;annotations&quot;], [&quot;metadata&quot;, &quot;managedFields&quot;]])' deploy.yml
 </code></pre>
           </div>
-          <p>Use <code>--check</code> for a quiet preflight or <code>--diff</code> to see the exact prepared transaction. Both write nothing and return <code>0</code> when clean, <code>1</code> for drift, and <code>2</code> for an invalid query or input. Use <code>-i</code> to commit those candidates transactionally. No-op files are not replaced. Changed live inputs are refused, and a commit failure restores the evaluated snapshots.</p>
+          <p>Use <code>--check</code> for a quiet answer or <code>--diff</code> to preview the exact change. Both write nothing and return <code>0</code> when no change is needed, <code>1</code> when files would change, and <code>2</code> for an invalid query or input. Use <code>-i</code> to write the same candidate.</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --check '.image.tag = &quot;stable&quot;' services/*.yml
@@ -497,13 +497,13 @@ ysh --diff '.image.tag = &quot;stable&quot;' services/*.yml
 ysh -i '.image.tag = &quot;stable&quot;' services/*.yml
 </code></pre>
           </div>
-          <p>Scalar edits, owned flow and block-scalar spans, full-line comment edits, direct block inserts/appends/deletes, and pure mapping or sequence reorders preserve source outside the compiled edit spans. Add <code>--preserve-only</code> when semantic regeneration should be an error:</p>
+          <p>Common scalar, collection, comment, insert, delete, and reorder edits preserve unrelated source text. Add <code>--preserve-only</code> when regeneration should be an error:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --preserve-only --diff '.items += [&quot;release&quot;]' config.yml
 </code></pre>
           </div>
-          <p>Changed flow collections use stable flow formatting inside their owned span. Strict mode can still reject a semantically valid transform when spans overlap or shared aliases would need to be materialized. That refusal is the contract, not a parser failure.</p>
+          <p>See <a href="/docs/documents/">documents and file edits</a> for the preservation matrix, multi-file behavior, and write guarantees.</p>
           <h2 id="merged-and-aliased-nodes"><a href="#merged-and-aliased-nodes">Merged and aliased nodes<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Expressions follow aliases and mapping merge sources automatically. Explicit entries override merged entries; in a merge sequence, the first source containing a key wins.</p>
           <p>Aliases are genuine shared graph references. Updating through an alias or an inherited merge value therefore updates the referenced source node too. Use construction to materialize an independent value when shared identity is not what you want.</p>
@@ -516,7 +516,7 @@ ysh -o=yaml '.release tag = &quot;!release&quot;' config.yml
           </div>
           <p>Anchor renames update aliases that already reference the same node. Removing a referenced anchor, creating a duplicate anchor, or constructing a recursive alias fails. <code>explode(.)</code> clones the value with aliases and merge keys materialized.</p>
           <h2 id="presentation"><a href="#presentation">Presentation<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p><code>style</code>, <code>head_comment</code>, <code>line_comment</code>, and <code>foot_comment</code> inspect YAML presentation metadata. Their yq-shaped property forms edit values and generated key references:</p>
+          <p><code>style</code>, <code>head_comment</code>, <code>line_comment</code>, and <code>foot_comment</code> inspect YAML presentation metadata. Their property forms edit values and generated key references:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh '.image | line_comment' deploy.yml
@@ -528,9 +528,8 @@ ysh -o=yaml '.notes style = &quot;literal&quot;' deploy.yml
 </code></pre>
           </div>
           <p>Scalar styles can be reset or set to plain, single, double, literal, or folded. Collections can be reset to block output or set to flow. Block comment edits participate in strict source preservation; comments inside changed flow spans may require semantic emission.</p>
-          <h2 id="current-expression-boundary"><a href="#current-expression-boundary">Current expression boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>This is a useful yq-shaped language, not the complete yq language. Date/time, XML, system execution, regex flags/captures, and yq's complete format/flag surface remain outside it. Slices target sequences; interpolation is intentionally scalar-oriented. See the <a href="/docs/operators/">operator manifest</a> for the audited form-by-form boundary.</p>
-          <p>Supported transformations are tested against their expected graph behavior. For arbitrary yq programs, use yq. Choose YAML.sh when the one-file runtime, source-aware edits, guarded repository transaction, or inspectable execution model is the point.</p>
+          <h2 id="language-boundary"><a href="#language-boundary">Language boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>The language does not currently include date/time operators, system execution, or regex flags and capture objects. Slices target sequences, and interpolation accepts scalar results. XML is supported as a data codec rather than as a family of query operators. See the <a href="/docs/operators/">operator reference</a> for the complete surface and <a href="/docs/yq-compatibility/">yq compatibility</a> when adapting an existing yq expression.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
@@ -555,7 +554,7 @@ ysh -o=yaml '.notes style = &quot;literal&quot;' deploy.yml
         <li class="level-2"><a href="#assign-and-delete">Assign and delete</a></li>
         <li class="level-2"><a href="#merged-and-aliased-nodes">Merged and aliased nodes</a></li>
         <li class="level-2"><a href="#presentation">Presentation</a></li>
-        <li class="level-2"><a href="#current-expression-boundary">Current expression boundary</a></li>
+        <li class="level-2"><a href="#language-boundary">Language boundary</a></li>
       </ol>
       <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/queries.md">Edit this page</a>
     </aside>

@@ -8,7 +8,7 @@ Start from the task. Every example uses the released `ysh` file and ordinary YAM
 ysh '.server.port' config.yml
 ```
 
-Use `-r` when another command needs unquoted scalar text:
+Scalar output is unquoted by default. `-r` is an optional spelling for that mode when a script benefits from making the intent explicit:
 
 ```sh
 host=$(ysh -r '.server.host' config.yml)
@@ -35,7 +35,7 @@ Preview the exact write first:
 ysh --diff '.image.tag = "stable"' deploy.yml
 ```
 
-Exit status is `0` for clean, `1` for drift, and `2` for an invalid query or input. Use `--check` when a file list is enough. Then commit the same prepared update:
+Exit status is `0` when no change is needed, `1` when the file would change, and `2` for an invalid query or input. Use `--check` when a quiet answer is enough. Then write the same update:
 
 ```sh
 ysh -i '.image.tag = "stable"' deploy.yml
@@ -50,9 +50,9 @@ ysh --preserve-only --diff '.image.tag = "stable"' deploy.yml
 ysh --preserve-only -i '.image.tag = "stable"' deploy.yml
 ```
 
-The command fails instead of falling back to regenerated YAML.
+The command fails instead of falling back to regenerated YAML. See [documents and file edits](documents.md) for the complete preservation and write behavior.
 
-Update a repository as one transaction:
+Apply the same checked edit to several files:
 
 ```sh
 ysh --check '.image.tag = "stable"' services/*.yml
@@ -70,7 +70,7 @@ ysh --diff "$query" deploy.yml
 ysh -i "$query" deploy.yml
 ```
 
-`error(MESSAGE)` aborts the complete transaction. Boolean `and` and `or` short-circuit, so the error runs only when its guard fails.
+`error(MESSAGE)` aborts the complete command. Boolean `and` and `or` short-circuit, so the error runs only when its guard fails.
 
 ## Set values from the environment
 
@@ -105,7 +105,7 @@ Gate a document with a local schema:
 ysh --schema service.schema.json '.' service.yml
 ```
 
-Preview and apply the same RFC 6902 patch through the YAML source compiler:
+Preview and apply the same RFC 6902 patch while preserving supported YAML source details:
 
 ```sh
 ysh --apply-patch change.json --preserve-only --diff service.yml
@@ -118,7 +118,7 @@ Generate the patch first when you have a desired document:
 ysh --json --generate-patch desired.yml '.' current.yml > change.json
 ```
 
-See [configuration contracts](contracts.md) for Merge Patch, structured schema errors, and direct TOML/INI/XML conversion.
+See [validate, patch, and convert](contracts.md) for Merge Patch, structured schema errors, and direct TOML/INI/XML conversion.
 
 ## Load local configuration
 
@@ -135,7 +135,7 @@ Use `--security-disable-file-ops` when the query must not choose local paths. Lo
 ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
 ```
 
-The right mapping wins at scalar leaves. This focused `eval-all` workflow covers configuration layering; it is not yq's entire stream engine.
+The right mapping wins at scalar leaves.
 
 Choose how arrays and keys merge:
 
@@ -157,7 +157,7 @@ ysh eval-all --check "$query" release.yml services/*.yml
 ysh eval-all -i "$query" release.yml services/*.yml
 ```
 
-All mutated files preflight and commit together. Unchanged files are not replaced.
+All changed candidates are prepared before writing. Unchanged files are not replaced.
 
 ## Work across every document
 

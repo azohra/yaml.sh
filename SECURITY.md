@@ -4,9 +4,9 @@ Only the latest release receives security fixes. Report suspected
 vulnerabilities privately through this repository's GitHub Security Advisories,
 not a public issue.
 
-YAML.sh parses documents as data and queries as programs. It does not run shell
+YAML.sh parses documents as data and queries as programs. Queries cannot execute
 commands, access the network, load plugins, or construct application objects
-from YAML tags. It is not a sandbox or a security boundary.
+from YAML tags. YAML.sh is not a sandbox or a security boundary.
 
 For untrusted documents, use a fixed query and set `--max-input-bytes`,
 `--max-nodes`, and `--max-depth` for the host. For queries from another trust

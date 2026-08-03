@@ -11,7 +11,7 @@ The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, ru
 ## Source layout
 
 ```text
-src/ysh.sh              POSIX shell CLI and transaction coordinator
+src/ysh.sh              POSIX shell CLI and batch edit coordinator
 src/awk/00-core.awk     common diagnostics and text primitives
 src/awk/10-codecs.awk   configuration and utility codecs
 src/awk/20-*.awk        YAML source, graph, parser, and resolver
@@ -26,10 +26,11 @@ src/diff.awk            bounded unified-diff renderer
 test/test.sh            behavioral suite
 test/public-contract.tsv named product capabilities, roles, and evidence
 test/public-contract.sh  public-contract integrity gate
+test/operator-manifest.tsv exact operator forms and behavioral owners
 test/conformance.sh     pinned YAML Test Suite gate
 test/conformance-outcomes.tsv exact result for every upstream YAML case
 test/differential.sh    pinned yq comparison gate
-test/operator-manifest.sh audited operator/form contract
+test/operator-manifest.sh operator-manifest integrity gate
 test/yq-corpus-base.tsv hand-written differential cases
 test/generate-yq-corpus.sh stable family labels for the curated differential cases
 test/fuzz.sh            grammar-guided replayable properties
@@ -76,6 +77,6 @@ Expression operators must preserve node references unless they intentionally com
 
 ## Portability
 
-Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly as drift detection.
+Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
 
 Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.

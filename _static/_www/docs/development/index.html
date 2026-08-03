@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -116,7 +116,7 @@
           <h2 id="source-layout"><a href="#source-layout">Source layout<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>text</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-text">src/ysh.sh              POSIX shell CLI and transaction coordinator
+            <pre><code class="language-text">src/ysh.sh              POSIX shell CLI and batch edit coordinator
 src/awk/00-core.awk     common diagnostics and text primitives
 src/awk/10-codecs.awk   configuration and utility codecs
 src/awk/20-*.awk        YAML source, graph, parser, and resolver
@@ -131,10 +131,11 @@ src/diff.awk            bounded unified-diff renderer
 test/test.sh            behavioral suite
 test/public-contract.tsv named product capabilities, roles, and evidence
 test/public-contract.sh  public-contract integrity gate
+test/operator-manifest.tsv exact operator forms and behavioral owners
 test/conformance.sh     pinned YAML Test Suite gate
 test/conformance-outcomes.tsv exact result for every upstream YAML case
 test/differential.sh    pinned yq comparison gate
-test/operator-manifest.sh audited operator/form contract
+test/operator-manifest.sh operator-manifest integrity gate
 test/yq-corpus-base.tsv hand-written differential cases
 test/generate-yq-corpus.sh stable family labels for the curated differential cases
 test/fuzz.sh            grammar-guided replayable properties
@@ -174,7 +175,7 @@ _static/_www/install    installer
           <h2 id="add-expression-behavior"><a href="#add-expression-behavior">Add expression behavior<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Expression operators must preserve node references unless they intentionally compute a new value. Add tests for precedence, empty streams, null traversal, scalar and collection inputs, multi-result output, and parity with the equivalent yq expression where one exists.</p>
           <h2 id="portability"><a href="#portability">Portability<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform <code>/bin/sh</code>. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly as drift detection.</p>
+          <p>Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform <code>/bin/sh</code>. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.</p>
           <p>Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>

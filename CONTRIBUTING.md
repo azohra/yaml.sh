@@ -1,6 +1,8 @@
 # Contributing
 
-Thanks for improving YAML.sh. Keep changes compatible with POSIX `/bin/sh` and the AWK implementations covered by CI; the standalone executable must not require a third-party runtime.
+Thanks for improving YAML.sh. Keep changes compatible with POSIX `/bin/sh` and
+the AWK implementations covered by the portability tests; the standalone
+executable must not require a third-party runtime.
 
 Read [the design](DESIGN.md) first. It defines the product premise, invariants, architecture, evidence standard, and compatibility rules used to evaluate changes.
 

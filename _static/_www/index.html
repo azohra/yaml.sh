@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Query, patch, validate, convert, and source-edit configuration with one portable shell script.">
+  <meta name="description" content="Query, transform, validate, and edit YAML with one readable sh + awk file.">
   <meta name="theme-color" content="#101410">
   <meta property="og:type" content="website">
   <meta property="og:title" content="YAML.sh — YAML in shell. No, really.">
@@ -12,7 +12,7 @@
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="YAML.sh — YAML in shell, no really">
+  <meta property="og:image:alt" content="YAML.sh — YAML in shell. No, really.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="YAML.sh — YAML in shell. No, really.">
   <meta name="twitter:description" content="A serious YAML tool in one delightfully questionable medium.">
@@ -52,104 +52,94 @@
         <ul class="hero-facts" aria-label="YAML.sh highlights">
           <li><strong>1</strong> file</li>
           <li><strong>sh + awk</strong> runtime</li>
-          <li><strong>source-aware</strong> edits</li>
+          <li><strong>keeps</strong> comments</li>
         </ul>
       </div>
 
       <div class="terminal-card" aria-label="YAML.sh example">
         <div class="terminal-bar">
           <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span>config.yml — ysh</span>
+          <span>reading.yml — ysh</span>
           <span class="terminal-badge">POSIX</span>
         </div>
         <div class="terminal-body">
           <div class="yaml-preview" aria-label="Example YAML input">
-            <p><span class="line-no">1</span><span class="key">services</span>:</p>
-            <p><span class="line-no">2</span>&nbsp;&nbsp;- <span class="key">name</span>: <span class="string">api</span></p>
-            <p><span class="line-no">3</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">enabled</span>: <span class="number">true</span></p>
-            <p><span class="line-no">4</span>&nbsp;&nbsp;- <span class="key">name</span>: <span class="string">worker</span></p>
-            <p><span class="line-no">5</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">enabled</span>: <span class="number">false</span></p>
-            <p><span class="line-no">6</span>&nbsp;&nbsp;- <span class="key">name</span>: <span class="string">web</span></p>
-            <p><span class="line-no">7</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">enabled</span>: <span class="number">true</span></p>
+            <p><span class="line-no">1</span><span class="key">books</span>:</p>
+            <p><span class="line-no">2</span>&nbsp;&nbsp;- <span class="key">title</span>: <span class="string">Piranesi</span></p>
+            <p><span class="line-no">3</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">read</span>: <span class="number">true</span></p>
+            <p><span class="line-no">4</span>&nbsp;&nbsp;- <span class="key">title</span>: <span class="string">Dune</span></p>
+            <p><span class="line-no">5</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">read</span>: <span class="number">false</span></p>
+            <p><span class="line-no">6</span>&nbsp;&nbsp;- <span class="key">title</span>: <span class="string">Kindred</span></p>
+            <p><span class="line-no">7</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">read</span>: <span class="number">true</span></p>
           </div>
           <div class="terminal-command">
-            <span class="prompt">$</span> ysh <span class="query">'.services[] | select(.enabled) | .name'</span> config.yml
+            <span class="prompt">$</span> ysh <span class="query">'.books[] | select(.read) | .title'</span> reading.yml
           </div>
-          <div class="terminal-output">api<br>web</div>
+          <div class="terminal-output">Piranesi<br>Kindred</div>
         </div>
         <div class="terminal-footer">
-          <span>node graph → resolver → expression stream</span>
-          <span class="success">● parsed</span>
+          <span>2 matches</span>
+          <span class="success">● done</span>
         </div>
       </div>
     </section>
 
     <section class="ticker" aria-label="Core capabilities">
       <div>
-        <span>MAP + REDUCE</span><b>◆</b>
+        <span>QUERY + TRANSFORM</span><b>◆</b>
         <span>COMMENTS SURVIVE</span><b>◆</b>
-        <span>PIPES + SELECT</span><b>◆</b>
         <span>ANCHORS + ALIASES</span><b>◆</b>
-        <span>MERGE KEYS</span><b>◆</b>
-        <span>TAGS + TYPES</span><b>◆</b>
-        <span>EMPTY COLLECTIONS</span><b>◆</b>
         <span>DIFF BEFORE WRITE</span><b>◆</b>
-        <span>STRICT PRESERVATION</span><b>◆</b>
-        <span>FLOW + BLOCK SURGERY</span><b>◆</b>
-        <span>SCHEMA + STANDARD PATCHES</span><b>◆</b>
-        <span>TOML + INI + XML</span><b>◆</b>
-        <span>TRIM + SPLIT DOC</span><b>◆</b>
-        <span>CROSS-FILE UPDATES</span><b>◆</b>
-        <span>TRANSACTIONAL EDITS</span>
+        <span>ONE READABLE FILE</span>
       </div>
     </section>
 
     <section class="architecture section-shell" id="architecture">
       <div class="section-heading">
-        <p class="kicker">Structure all the way through</p>
-          <h2>The graph is the program.</h2>
-          <p>Mappings, sequences, tags, anchors, aliases, and source ownership stay attached while expressions read, validate, reshape, and update them.</p>
+        <p class="kicker">Built for the whole job</p>
+          <h2>Find it. Change it. Keep the comments.</h2>
+          <p>Run expressions over YAML structure, preview the result, and write it back without needlessly reformatting the file.</p>
       </div>
-      <div class="pipeline" aria-label="YAML.sh processing pipeline">
+      <div class="pipeline" aria-label="YAML.sh workflow">
         <article>
           <span class="step">01</span>
-          <h3>Read</h3>
-          <p>Portable AWK recognizes mappings, sequences, flow nodes, scalars, tags, anchors, and documents.</p>
+          <h3>Query</h3>
+          <p>Select, filter, map, reduce, and combine values across files and YAML documents.</p>
         </article>
         <span class="pipeline-arrow" aria-hidden="true">→</span>
         <article>
           <span class="step">02</span>
-          <h3>Resolve</h3>
-          <p>Aliases and merge sources connect through node identity, with precedence and recursion validation.</p>
+          <h3>Change</h3>
+          <p>Build, update, delete, validate, patch, and convert while YAML types and relationships stay intact.</p>
         </article>
         <span class="pipeline-arrow" aria-hidden="true">→</span>
         <article>
           <span class="step">03</span>
-          <h3>Program</h3>
-          <p>Paths, reducers, schemas, standard patches, codecs, and repository transactions operate on real node references with identity and type intact.</p>
+          <h3>Review</h3>
+          <p>Check or diff first. Write only when ready, and require preservation when formatting must stay put.</p>
         </article>
       </div>
     </section>
 
     <section class="playground section-shell" id="playground">
       <div class="section-heading compact">
-        <p class="kicker">Tiny commands. Serious YAML.</p>
+        <p class="kicker">Small command. Deep YAML.</p>
         <h2>Meet the CLI.</h2>
       </div>
       <div class="demo-window">
         <div class="demo-tabs" role="tablist" aria-label="CLI examples">
-          <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Program</button>
-          <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">Contracts</button>
+          <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Query</button>
+          <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">Validate</button>
           <button id="tab-merge" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge">Update</button>
           <button id="tab-inspect" role="tab" aria-selected="false" aria-controls="panel-inspect" data-demo="inspect">Inspect</button>
         </div>
         <div class="demo-panel" id="panel-query" role="tabpanel" aria-labelledby="tab-query">
-          <p class="demo-label">Compose files without inviting another runtime.</p>
+          <p class="demo-label">Combine two YAML files with one expression.</p>
           <pre><code><span class="prompt">$</span> ysh ea 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
 {"replicas":3,"region":"west"}</code></pre>
         </div>
         <div class="demo-panel" id="panel-json" role="tabpanel" aria-labelledby="tab-json" hidden>
-          <p class="demo-label">Validate and apply a standard patch through the same graph.</p>
+          <p class="demo-label">Validate a file, apply a standard patch, and preview the result.</p>
           <pre><code><span class="prompt">$</span> ysh --schema deploy.schema.json --apply-patch promote.json --diff deploy.yml
 --- a/deploy.yml
 +++ b/deploy.yml
@@ -158,7 +148,7 @@
 +  tag: stable</code></pre>
         </div>
         <div class="demo-panel" id="panel-merge" role="tabpanel" aria-labelledby="tab-merge" hidden>
-          <p class="demo-label">See the candidate. Keep the comments. Then write.</p>
+          <p class="demo-label">Preview exactly what will change. Keep the comments. Then write.</p>
           <pre><code><span class="prompt">$</span> ysh --preserve-only --diff '.image.tag = "stable"' services/api.yml
 --- a/services/api.yml
 +++ b/services/api.yml
@@ -182,7 +172,7 @@ node  1  mapping  line=1</code></pre>
         <article class="feature feature-large">
           <p class="feature-index">01 / PORTABLE</p>
           <h2>Portable on purpose.</h2>
-          <p>Read anywhere with <code>/bin/sh</code> and AWK. Check and write with ordinary host file utilities. No acquired runtime hiding under the floorboards.</p>
+          <p>Query with <code>/bin/sh</code> and AWK. Check and write with ordinary host file utilities. No extra language runtime required.</p>
           <div class="compat-row"><span>macOS AWK</span><span>mawk + original AWK</span><span>BusyBox + POSIX gawk</span></div>
         </article>
         <article class="feature">
@@ -191,10 +181,10 @@ node  1  mapping  line=1</code></pre>
           <p>Use <code>.["key.with.dots"]</code> when punctuation belongs to the YAML—not the query.</p>
         </article>
         <article class="feature feature-accent">
-          <p class="feature-index">03 / TESTED</p>
+          <p class="feature-index">03 / DOCUMENTED</p>
           <h3>Know what works.</h3>
-          <p>YAML, TOML, JSON Schema, patches, source preservation, and yq overlap each have a pinned, inspectable evidence gate.</p>
-          <a href="/docs/contracts/">Open configuration contracts <span aria-hidden="true">→</span></a>
+          <p>See the supported YAML syntax, query language, schema profile, patches, formats, and security limits.</p>
+          <a href="/docs/supported_yml/">See YAML support <span aria-hidden="true">→</span></a>
         </article>
         <article class="feature">
           <p class="feature-index">04 / HACKABLE</p>
@@ -202,9 +192,9 @@ node  1  mapping  line=1</code></pre>
           <p>The shipped executable contains the complete shell launcher and AWK engine. Read it, copy it, bend it.</p>
         </article>
         <article class="feature">
-          <p class="feature-index">05 / OBSERVABLE</p>
+          <p class="feature-index">05 / CAREFUL</p>
           <h3>Edit YAML. Keep the comments.</h3>
-          <p>Edits compile into owned source spans after evaluation. Flow collections, block scalars, records, comments, and reorders stay surgical; <code>--preserve-only</code> refuses the rest.</p>
+          <p>Common scalar, collection, block, comment, and reorder edits leave unrelated text alone. <code>--preserve-only</code> refuses the rest.</p>
         </article>
       </div>
     </section>
@@ -215,7 +205,7 @@ node  1  mapping  line=1</code></pre>
         <h2 id="story-title">The YAML parser that got out of hand.</h2>
       </div>
       <div>
-        <p>An old Bash experiment became a serious YAML tool in one increasingly unreasonable day. This is the story of the constraint, the evidence, and what building it with Codex made possible.</p>
+        <p>An old Bash experiment grew into one improbably capable shell file in one increasingly unreasonable day. This is how the constraint shaped the tool, and what building it with Codex made possible.</p>
         <a href="/story/">Read the story <span aria-hidden="true">→</span></a>
       </div>
     </section>

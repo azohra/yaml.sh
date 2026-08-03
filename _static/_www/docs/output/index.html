@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/" aria-current="page">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/" aria-current="page">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -148,40 +148,7 @@
           <p>Multiple results are separated with <code>---</code>, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.</p>
           <p>Set YAML indentation from one through nine spaces with <code>-I N</code> or <code>--indent=N</code>. Use <code>--unwrap-scalar=false</code> when default value output should retain a scalar's YAML quoting, tag, and line comment.</p>
           <p>The emitter is semantic. It uses a stable layout while retaining recorded head, line, and foot comments plus supported scalar/collection styles. Blank lines, spacing, directive spelling, and exact scalar formatting are not reconstructed unless a source edit owns that presentation.</p>
-          <p>For edits, evaluation finishes before YAML.sh compiles a source plan. The plan must contain non-overlapping owned spans; only then is a candidate emitted.</p>
-          <div class="table-wrap"><table>
-            <thead><tr>
-              <th>Edit</th>
-              <th>Source behavior</th>
-            </tr></thead>
-            <tbody>
-              <tr>
-                <td>Scalar replacement</td>
-                <td>Keeps surrounding spacing, quote style, properties, and line comment</td>
-              </tr>
-              <tr>
-                <td>Flow mapping or sequence</td>
-                <td>Rewrites the changed collection span; keeps bytes and closing comments outside it</td>
-              </tr>
-              <tr>
-                <td>Literal/folded scalar</td>
-                <td>Keeps block style, indentation, and header comment while replacing content</td>
-              </tr>
-              <tr>
-                <td>Head or foot comment</td>
-                <td>Inserts, replaces, or removes the owned full-line block comment span</td>
-              </tr>
-              <tr>
-                <td>Block insert, append, delete, or reorder</td>
-                <td>Moves or removes the complete record span with its attached comments</td>
-              </tr>
-              <tr>
-                <td>Alias or merged value</td>
-                <td>Updates the owned anchor source; alias and merge occurrences stay intact</td>
-              </tr>
-            </tbody>
-          </table></div>
-          <p>Stable flow formatting may normalize whitespace and key quoting inside a changed flow span. Multiline flow spans with internal comments are refused in strict mode because compacting them would discard comment ownership. A structural change without a safe source plan uses the semantic emitter, or fails before candidate output under <code>--preserve-only</code>.</p>
+          <p>In-place edits use the original source when a change has a safe, non-overlapping edit plan. See <a href="/docs/documents/">documents and file edits</a> for the preservation matrix, strict mode, and multi-file write behavior.</p>
           <h2 id="toml-ini-and-xml"><a href="#toml-ini-and-xml">TOML, INI, and XML<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Use <code>-o toml</code>, <code>-o ini</code>, or <code>-o xml</code> for semantic conversion:</p>
           <div class="code-block">
@@ -191,8 +158,7 @@ ysh -p toml -o yaml '.' config.toml
 ysh -p xml -o json '.' catalog.xml
 </code></pre>
           </div>
-          <p>TOML and INI require a mapping root. XML requires one root-element mapping and uses the documented <code>+@attribute</code> / <code>+content</code> shape. These emitters do not reconstruct comments or original layout. See <a href="/docs/contracts/">configuration contracts</a> for exact boundaries.</p>
-          <p>With several inputs, source snapshots are evaluated and every changed candidate is built before the first replacement. Live files must still match those snapshots before reporting or commit, and each changed target is checked again immediately before replacement. No-op files are not replaced. The snapshots allow rollback if a later commit fails or the process is interrupted. Permission bits survive; symlinks, duplicate paths, and newline-containing names are refused.</p>
+          <p>TOML and INI require a mapping root. XML requires one root-element mapping and uses the documented <code>+@attribute</code> / <code>+content</code> shape. These emitters do not reconstruct comments or original layout. See <a href="/docs/contracts/">validate, patch, and convert</a> for exact boundaries.</p>
           <h2 id="type"><a href="#type">Type<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -259,15 +225,15 @@ ysh -p xml -o json '.' catalog.xml
 </code></pre>
           </div>
           <p>The report includes parsed/generated node counts, result and mutation counts, mutation paths, whether presentation was preserved or regenerated, the compiled <code>source_edits</code> count, and the final plan's <code>changed</code> boolean. Values are intentionally omitted. A mutate-then-revert expression may record operations while <code>changed</code> remains false.</p>
-          <p>For <code>eval-all</code>, <code>parsed_nodes</code>, results, and mutations belong to each input; <code>generated_nodes</code> is transaction-wide because the query is evaluated once across the combined stream.</p>
+          <p>For <code>eval-all</code>, <code>parsed_nodes</code>, results, and mutations belong to each input; <code>generated_nodes</code> covers the complete batch because the query is evaluated once across the combined stream.</p>
           <p>Use <code>--explain=json</code> for JSON Lines, with one value-free audit record per input:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --explain=json -i '.image.tag = &quot;stable&quot;' services/*.yml 2&gt;changes.jsonl
 </code></pre>
           </div>
-          <p>Transaction reports are released only after every file commits. An aborted or rolled-back transaction emits an error and no audit records.</p>
-          <p>Add <code>--check</code> to run the same transformation without writing. JSON explain mode remains pure JSON Lines; exit status reports clean <code>0</code>, drift <code>1</code>, or error <code>2</code>.</p>
+          <p>Reports are emitted only after every file is written. An aborted or rolled-back batch emits an error and no audit records.</p>
+          <p>Add <code>--check</code> to run the same transformation without writing. JSON explain mode remains pure JSON Lines; exit status reports no change <code>0</code>, changes needed <code>1</code>, or error <code>2</code>.</p>
           <p>Use <code>--diff</code> to put the prepared unified diff on stdout while keeping the value-free explanation on stderr:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
