@@ -1,6 +1,6 @@
 # YAML support
 
-YAML.sh parses the syntax below into a real node graph and exercises it in the test suite. The limitations section names the nearby forms it does not support.
+YAML.sh accepts the syntax below. The parser boundaries section names nearby forms it rejects.
 
 ## Collections
 
@@ -23,7 +23,7 @@ YAML.sh parses the syntax below into a real node graph and exercises it in the t
 - Explicit block-scalar indentation indicators from 1 through 9.
 - Lexical recognition of strings, nulls, booleans, binary/octal/decimal/hexadecimal integers, floats, and timestamps.
 
-Values remain text in default output. Type recognition is used by `--type` and JSON output.
+Scalar values print as text in default output. Recognized types also drive numeric evaluation, JSON output, patches, schema validation, and the `type` operator.
 
 ## Anchors, aliases, and merges
 
@@ -61,31 +61,15 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Exact source lines and columns for block and multiline flow values and keys; generated nodes report 0.
 - Anchor, alias, tag, scalar/collection style, and value/key head, line, and foot comments available to queries and setters.
 
-## Intentional limitations
+## Parser boundaries
 
 - Aliases must refer to an earlier anchor in the same document.
-- Recursive object graphs are rejected because value and JSON output cannot represent cycles safely.
+- Recursive alias graphs are rejected.
 - Anchor names may contain Unicode and punctuation except whitespace and flow delimiters.
 - Collection-valued mapping keys are rejected. Explicit scalar keys are supported.
 - Tags and anchors before scalar keys are accepted, but mapping keys remain text in the graph.
 - Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.
-- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded comments, and supported scalar/collection styles where representable. It does not reconstruct unowned spacing.
-- In-place source plans cover scalar replacements, single- and multiline flow collections, block scalars, direct block inserts/appends/deletes, comment edits, and pure mapping or sequence reorders. Untouched spans remain byte-identical; changed flow spans use stable flow formatting.
-- Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
-- Sequence slices, scalar interpolation, grouping, `ireduce`, computed object keys, `setpath`/`delpaths`, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
-- `style` can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. `head_comment`, `line_comment`, and `foot_comment` work on values and generated key references. Full-line block comment edits compile into source spans; ambiguous textual comment placement follows yq's emitter conventions.
-- `tag`, `anchor`, and `alias` are writable properties. Anchor renames keep referring aliases valid; duplicate anchors, unsafe removal, missing or forward targets, and recursive aliases are rejected.
-- Multi-file queries compile once. `--check` reports drift and `--diff` prints exact prepared candidates without writing. `--preserve-only` rejects candidates requiring presentation regeneration. File operations evaluate source snapshots, refuse detected live drift, skip no-ops, reject symlinks and duplicate paths, preserve permissions, and roll back commit failures or interrupts.
-- Writable `eval-all` can bind data from one input and update every selected source file in the same transaction.
-- Merge modifiers append arrays (`*+`), merge arrays by index (`*d`), update existing fields (`*?`), or add new fields (`*n`).
-- The expression language includes bounded dynamic evaluation, policy-controlled YAML/text/Base64/properties loads, and JSON/YAML/properties/CSV/TSV/Base64/URI/shell codecs. Date/time, XML, system execution, and regex capture objects remain outside the contract.
 
-YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond these tested behaviors is required.
+Malformed directives, reserved indicators, malformed escapes, indentation errors, invalid aliases, invalid merge sources, duplicate keys, and unsupported complex keys fail before producing a document graph.
 
-## How it is tested
-
-The pinned YAML Test Suite owns accepted and strict-invalid outcomes. The parser-boundary matrix sits beside it: valid neighboring forms must parse, while malformed directives, collection keys, reserved indicators, malformed escapes, indentation errors, invalid aliases, and merge sources must fail before producing a graph.
-
-Focused fixtures then cover graph semantics, query behavior, presentation preservation, repository transactions, resource limits, and common configuration shapes. The [operator manifest](operators.md) owns expression-language claims.
-
-See [`test/parser-boundaries.sh`](https://github.com/azohra/yaml.sh/blob/main/test/parser-boundaries.sh), [`test/conformance.sh`](https://github.com/azohra/yaml.sh/blob/main/test/conformance.sh), [`test/test.sh`](https://github.com/azohra/yaml.sh/blob/main/test/test.sh), and [`bench/scale.sh`](https://github.com/azohra/yaml.sh/blob/main/bench/scale.sh).
+Expression behavior belongs in the [query reference](queries.md); emitted YAML belongs in [output and metadata](output.md); edit preservation belongs in [documents and file edits](documents.md).

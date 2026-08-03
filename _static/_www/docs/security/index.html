@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/" aria-current="page">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/" aria-current="page">Security & limits</a></li>
@@ -106,8 +106,8 @@
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
           <h1 id="security-limits">Security &amp; limits</h1>
-          <p>YAML.sh parses data and runs an explicit query program. It never evaluates YAML as shell, runs commands, opens network connections, or executes application-specific tag constructors.</p>
-          <h2 id="the-small-security-model"><a href="#the-small-security-model">The small security model<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>YAML.sh parses data and runs an explicit query program. Queries cannot execute commands, open network connections, or construct application objects from YAML tags; YAML input is never evaluated as shell.</p>
+          <h2 id="trust-the-query-separately-from-the-document"><a href="#trust-the-query-separately-from-the-document">Trust the query separately from the document<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
             <li>No system execution, network, or plugin operators.</li>
             <li>No application-specific object construction from YAML tags.</li>
@@ -117,7 +117,7 @@
             <li>Check, diff, and in-place writes reject symlinks and duplicate inputs, evaluate source snapshots, then refuse detected live-file drift.</li>
             <li>Input bytes, graph nodes, and nesting depth have hard configurable ceilings.</li>
           </ul>
-          <p>This is a narrower attack surface than a general automation language. It is not a sandbox: a query can still read allowed files and consume CPU and memory up to the configured limits.</p>
+          <p>Documents are data; queries are programs. A fixed query can inspect an untrusted document within configured resource limits. Do not assume an untrusted query is safe merely because it cannot launch a command: it can still inspect its inputs, use enabled ambient reads, and consume CPU and memory. YAML.sh is not a sandbox.</p>
           <h2 id="bound-input"><a href="#bound-input">Bound input<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -148,12 +148,12 @@
               </tr>
             </tbody>
           </table></div>
-          <p>Scale tests parse 125,000 payload nodes and 1,500 documents under a 224 MiB RSS ceiling. Set lower limits for smaller workloads or tighter environments.</p>
+          <p>Defaults are 16 MiB of input, 100,000 graph and expression nodes, and 256 levels of collection depth. Set lower limits when the expected documents are smaller.</p>
           <h2 id="disable-environment-access"><a href="#disable-environment-access">Disable environment access<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Expressions only read environment variables when they use an environment operator. Disable those operators entirely when the expression comes from another trust boundary:</p>
+          <p>Expressions only read environment variables when they use an environment operator. Disable those operators entirely when the query does not need them:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --security-disable-env-ops &quot;$UNTRUSTED_QUERY&quot; config.yml
+            <pre><code class="language-sh">ysh --security-disable-env-ops '.services | length' config.yml
 </code></pre>
           </div>
           <p>The flag makes <code>env</code>, <code>strenv</code>, and <code>envsubst</code> fail rather than returning an empty value.</p>
@@ -170,20 +170,20 @@ USER_NAME=&quot;$UNTRUSTED_NAME&quot; ysh '.users[strenv(USER_NAME)]' config.yml
           </div>
           <p>Use <code>--security-disable-env-ops</code> when even that environment read is inappropriate.</p>
           <h2 id="disable-file-access-and-dynamic-evaluation"><a href="#disable-file-access-and-dynamic-evaluation">Disable file access and dynamic evaluation<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Loads are useful for bootstrapping configuration, but they follow paths supplied by the query. Disable the entire class when a query crosses a trust boundary:</p>
+          <p>Loads follow paths supplied by the query. Disable the entire class when local-file access is unnecessary:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh --security-disable-file-ops &quot;$UNTRUSTED_QUERY&quot; config.yml
+            <pre><code class="language-sh">ysh --security-disable-file-ops '.services | length' config.yml
 </code></pre>
           </div>
           <p>The flag makes every <code>load*</code> operator fail. It does not affect the input files named on the command line. <code>load</code> parses YAML, <code>load_props</code> parses properties, <code>load_str</code> returns text, and <code>load_base64</code> decodes RFC 4648 text. Loaded content is subject to <code>--max-input-bytes</code>.</p>
-          <p><code>eval(EXPR)</code> treats its string as code in YAML.sh's expression language. Disable it when expressions or data may cross a trust boundary:</p>
+          <p><code>eval(EXPR)</code> treats its string as code in YAML.sh's expression language. Disable it unless dynamic expressions are required:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --security-disable-eval &quot;$QUERY&quot; config.yml
 </code></pre>
           </div>
-          <p>For a restricted query runner, combine all three switches:</p>
+          <p>For a fixed query that needs no ambient reads or dynamic code, combine all three switches:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh \
@@ -193,11 +193,11 @@ USER_NAME=&quot;$UNTRUSTED_NAME&quot; ysh '.users[strenv(USER_NAME)]' config.yml
   &quot;$QUERY&quot; config.yml
 </code></pre>
           </div>
-          <p>This removes the explicit ambient-read and dynamic-code capabilities. It does not turn the remaining query language into a hardened sandbox.</p>
+          <p>This removes the explicit ambient-read and dynamic-code capabilities. It does not make an untrusted query safe.</p>
           <h2 id="in-place-writes"><a href="#in-place-writes">In-place writes<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p><code>--check</code>, <code>--diff</code>, and <code>-i</code> require one or more real files. YAML.sh snapshots and transforms the complete set before replacing anything and creates candidates only for files that actually change. It preserves permissions and refuses symlinks, duplicate paths, and newline-containing names. A changed live input aborts rather than being overwritten. A commit failure or interrupt restores the evaluated snapshots.</p>
+          <p><code>--check</code>, <code>--diff</code>, and <code>-i</code> require one or more real files. YAML.sh snapshots and transforms the complete set before replacing anything and creates candidates only for files that actually change. It preserves permissions and refuses symlinks, duplicate paths, and newline-containing names. If a live input changes during the run, the operation aborts rather than overwriting it. A write failure or interrupt restores files already changed from the evaluated snapshots.</p>
           <p><code>--diff</code> prints changed values; treat its output like file contents. Use <code>--explain=json</code> when logs need paths and decisions without values. Add <code>--preserve-only</code> when regenerated presentation would be unsafe or too noisy to review.</p>
-          <p>Each replacement is an atomic same-directory rename. The multi-file sequence is preflighted and rollback-capable, not globally atomic or power-loss durable. Another process can still race after the final comparison. Keep normal backups and version control; guards do not make a logically wrong query correct.</p>
+          <p>Each file replacement is an atomic same-directory rename. A multi-file batch is not globally atomic or power-loss durable. Another process can still race after the final comparison. Keep normal backups and version control; guards do not make a logically wrong query correct.</p>
           <h2 id="reporting-a-vulnerability"><a href="#reporting-a-vulnerability">Reporting a vulnerability<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Do not open a public issue for an undisclosed vulnerability. Follow the repository <a href="https://github.com/azohra/yaml.sh/security/policy">security policy</a>.</p>
       </article>
@@ -206,7 +206,7 @@ USER_NAME=&quot;$UNTRUSTED_NAME&quot; ysh '.users[strenv(USER_NAME)]' config.yml
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
       <ol>
-        <li class="level-2"><a href="#the-small-security-model">The small security model</a></li>
+        <li class="level-2"><a href="#trust-the-query-separately-from-the-document">Trust the query separately from the document</a></li>
         <li class="level-2"><a href="#bound-input">Bound input</a></li>
         <li class="level-2"><a href="#disable-environment-access">Disable environment access</a></li>
         <li class="level-2"><a href="#treat-queries-as-programs">Treat queries as programs</a></li>

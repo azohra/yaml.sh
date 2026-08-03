@@ -67,7 +67,7 @@ The following v0.x flags are not accepted in v1:
 - `-T`, because the transpiled representation is gone.
 - `-q` and `-Q`, because the positional query replaces them.
 - `-s`, `-l`, `-L`, and `-c`, because node selection uses one query grammar. The old `-I` meaning is gone; modern `-I N` controls YAML indentation.
-- The v0.x meaning of `-i`. Modern YAML.sh uses `-i` for atomic yq-style file updates and preserves rich presentation for common edits.
+- The v0.x meaning of `-i`. Modern YAML.sh uses `-i` for in-place updates. Each file replacement is an atomic same-directory rename, and common edits preserve comments and formatting.
 - `--next`, because `--document N` addresses a document directly.
 
 If a script depends on v0.x behavior, pin `v0.4.0` while migrating.

@@ -50,18 +50,7 @@ Set YAML indentation from one through nine spaces with `-I N` or `--indent=N`. U
 
 The emitter is semantic. It uses a stable layout while retaining recorded head, line, and foot comments plus supported scalar/collection styles. Blank lines, spacing, directive spelling, and exact scalar formatting are not reconstructed unless a source edit owns that presentation.
 
-For edits, evaluation finishes before YAML.sh compiles a source plan. The plan must contain non-overlapping owned spans; only then is a candidate emitted.
-
-| Edit | Source behavior |
-| --- | --- |
-| Scalar replacement | Keeps surrounding spacing, quote style, properties, and line comment |
-| Flow mapping or sequence | Rewrites the changed collection span; keeps bytes and closing comments outside it |
-| Literal/folded scalar | Keeps block style, indentation, and header comment while replacing content |
-| Head or foot comment | Inserts, replaces, or removes the owned full-line block comment span |
-| Block insert, append, delete, or reorder | Moves or removes the complete record span with its attached comments |
-| Alias or merged value | Updates the owned anchor source; alias and merge occurrences stay intact |
-
-Stable flow formatting may normalize whitespace and key quoting inside a changed flow span. Multiline flow spans with internal comments are refused in strict mode because compacting them would discard comment ownership. A structural change without a safe source plan uses the semantic emitter, or fails before candidate output under `--preserve-only`.
+In-place edits use the original source when a change has a safe, non-overlapping edit plan. See [documents and file edits](documents.md) for the preservation matrix, strict mode, and multi-file write behavior.
 
 ## TOML, INI, and XML
 
@@ -73,9 +62,7 @@ ysh -p toml -o yaml '.' config.toml
 ysh -p xml -o json '.' catalog.xml
 ```
 
-TOML and INI require a mapping root. XML requires one root-element mapping and uses the documented `+@attribute` / `+content` shape. These emitters do not reconstruct comments or original layout. See [configuration contracts](contracts.md) for exact boundaries.
-
-With several inputs, source snapshots are evaluated and every changed candidate is built before the first replacement. Live files must still match those snapshots before reporting or commit, and each changed target is checked again immediately before replacement. No-op files are not replaced. The snapshots allow rollback if a later commit fails or the process is interrupted. Permission bits survive; symlinks, duplicate paths, and newline-containing names are refused.
+TOML and INI require a mapping root. XML requires one root-element mapping and uses the documented `+@attribute` / `+content` shape. These emitters do not reconstruct comments or original layout. See [validate, patch, and convert](contracts.md) for exact boundaries.
 
 ## Type
 
@@ -143,7 +130,7 @@ ysh --explain -i '.image.tag = "stable"' deploy.yml
 
 The report includes parsed/generated node counts, result and mutation counts, mutation paths, whether presentation was preserved or regenerated, the compiled `source_edits` count, and the final plan's `changed` boolean. Values are intentionally omitted. A mutate-then-revert expression may record operations while `changed` remains false.
 
-For `eval-all`, `parsed_nodes`, results, and mutations belong to each input; `generated_nodes` is transaction-wide because the query is evaluated once across the combined stream.
+For `eval-all`, `parsed_nodes`, results, and mutations belong to each input; `generated_nodes` covers the complete batch because the query is evaluated once across the combined stream.
 
 Use `--explain=json` for JSON Lines, with one value-free audit record per input:
 
@@ -151,9 +138,9 @@ Use `--explain=json` for JSON Lines, with one value-free audit record per input:
 ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 
-Transaction reports are released only after every file commits. An aborted or rolled-back transaction emits an error and no audit records.
+Reports are emitted only after every file is written. An aborted or rolled-back batch emits an error and no audit records.
 
-Add `--check` to run the same transformation without writing. JSON explain mode remains pure JSON Lines; exit status reports clean `0`, drift `1`, or error `2`.
+Add `--check` to run the same transformation without writing. JSON explain mode remains pure JSON Lines; exit status reports no change `0`, changes needed `1`, or error `2`.
 
 Use `--diff` to put the prepared unified diff on stdout while keeping the value-free explanation on stderr:
 

@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="How an old Bash experiment became a serious one-file YAML processor—and what building it with Codex made possible.">
+  <meta name="description" content="How an unreasonable Bash experiment grew a graph, a language, and careful YAML edits without growing out of one file.">
   <meta name="theme-color" content="#101410">
   <meta property="og:type" content="article">
   <meta property="og:title" content="The YAML parser that got out of hand · YAML.sh">
-  <meta property="og:description" content="How an old Bash experiment became a serious one-file YAML processor—and what building it with Codex made possible.">
+  <meta property="og:description" content="How an unreasonable Bash experiment grew a graph, a language, and careful YAML edits without growing out of one file.">
   <meta property="og:url" content="https://yaml.azohra.com/story/">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <meta property="article:published_time" content="2026-08-02">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The YAML parser that got out of hand · YAML.sh">
-  <meta name="twitter:description" content="An unreasonable shell experiment became a measured, yq-shaped YAML tool.">
+  <meta name="twitter:description" content="An unreasonable shell experiment grew into an improbably capable YAML tool.">
   <meta name="twitter:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com/story/">
   <link rel="icon" href="/favicon.ico">
@@ -41,13 +41,13 @@
     <header class="story-hero section-shell">
       <p class="eyebrow"><span class="status-dot"></span> Field note · August 2, 2026</p>
       <h1>The YAML parser<br> that got <span>out of hand.</span></h1>
-      <p class="story-dek">How an old Bash experiment became a serious one-file YAML processor—and what building it with Codex made possible.</p>
+      <p class="story-dek">How an unreasonable Bash experiment grew a graph, a language, and careful YAML edits without growing out of one file.</p>
       <div class="story-meta">
         <span>Justin Watts</span>
         <span aria-hidden="true">◆</span>
         <span>7 minute read</span>
         <span aria-hidden="true">◆</span>
-        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.17.0">YAML.sh v1.17</a>
+        <span>One POSIX shell file</span>
       </div>
     </header>
 
@@ -56,11 +56,11 @@
         <div class="story-opening">
           <p>In 2018, I wrote a YAML parser in Bash. It was funny, useful, and—at the centre—a bad parser design.</p>
           <p>Frank Vumbaca helped turn the first experiment into something people could actually use. He added blocks, lists, stdin support, documentation, and years of patient fixes. Then the repository mostly sat still. It kept doing its small job while I went on to other things.</p>
-          <p>I came back eight years later intending to do a full audit, close the old issues, replace Travis, rename the default branch, and ship a respectable release. Then I asked Codex a more dangerous question: if we were willing to break the CLI, how much better could this become?</p>
+          <p>I came back eight years later intending to tidy it up and ship a respectable release. Then I asked a more dangerous question: if we were willing to break the CLI, how much better could this become?</p>
         </div>
 
-        <section id="useful-stunt">
-          <h2>A useful stunt</h2>
+        <section id="the-ceiling">
+          <h2>The joke had a ceiling</h2>
           <p>The original YAML.sh translated YAML into flattened paths and values. That was a sensible shape for shell scripts: easy to print, easy to grep, and just enough structure to query a configuration file.</p>
           <p>It was also the ceiling. Once a mapping, sequence, alias, tag, or empty collection had been flattened, important relationships were gone. Every new feature had to reconstruct meaning the parser had already thrown away. Editing YAML without mangling it was almost impossible.</p>
           <p>I asked whether there was a better parsing design I had missed. There was. The missing idea was not a smarter regular expression. It was an intermediate representation that respected YAML.</p>
@@ -71,84 +71,53 @@
           </div>
         </section>
 
-        <section id="permission-to-break-it">
-          <h2>Permission to break it</h2>
+        <section id="give-yaml-a-shape">
+          <h2>Give YAML a shape</h2>
           <p>That change broke the old CLI. I decided that was fine. Compatibility with a clever limitation was less valuable than making the premise useful.</p>
           <p>We also stopped requiring Bash. The released program is one POSIX shell file with its AWK parser and evaluator embedded. The <code>.sh</code> name still fits: the shell owns the executable, arguments, files, and process behaviour; AWK does the work it is unusually good at. Calling it <code>yaml.awk</code> would describe an implementation detail while hiding the way people actually use it.</p>
-          <p>The goal became precise: make a genuinely useful YAML tool in one readable shell executable. A real graph, a compact language, and source-aware changes—without acquiring a language runtime, package manager, YAML library, or plugin system. Familiar yq-shaped syntax made the language approachable, but the delightful constraint remained the reason to build it.</p>
-          <p>Once that premise was clear, breaking the interface was not reckless. It was the cost of making the product coherent.</p>
+          <p>The goal became simple: make an improbably capable YAML tool in one readable shell executable. Give it a proper graph, a compact language, and edits that respect the file people wrote—without acquiring a language runtime, package manager, YAML library, or plugin system.</p>
           <blockquote>
             <p>“The point is to have fun.”</p>
           </blockquote>
         </section>
 
-        <section id="tool-took-shape">
-          <h2>The tool took shape</h2>
-          <p>Once the node graph existed, each capability made the next one possible. Traversal became an expression stream. Expressions became writable transformations. A source layer learned to preserve comments, whitespace, and style. File handling grew into preflighted multi-file transactions with rollback.</p>
-          <p>The releases trace that architecture becoming useful. Each one made a specific part of the premise real while keeping the runtime to one POSIX shell file and AWK.</p>
-          <ol class="story-timeline" aria-label="Release milestones">
-            <li><strong>v1.0</strong><span>Replace flattened paths with a proper YAML node graph.</span></li>
-            <li><strong>v1.1</strong><span>Add read-only streams, filters, defaults, and yq-shaped traversal.</span></li>
-            <li><strong>v1.2</strong><span>Turn queries into writable transformations.</span></li>
-            <li><strong>v1.3</strong><span>Grow collection programming, reducers, and presentation-aware writes.</span></li>
-            <li><strong>v1.4</strong><span>Measure compatibility instead of describing it vaguely.</span></li>
-            <li><strong>v1.5</strong><span>Close the pinned YAML outcomes and harden runtime limits and portability.</span></li>
-            <li><strong>v1.6</strong><span>Add practical language depth without losing the one-file runtime.</span></li>
-            <li><strong>v1.7</strong><span>Bring in environment composition, context, and multi-file evaluation.</span></li>
-            <li><strong>v1.8</strong><span>Make graph metadata writable, edits explainable, and the docs properly static.</span></li>
-            <li><strong>v1.9</strong><span>Make multi-file edits explainable, rollback-safe, and transactional.</span></li>
-            <li><strong>v1.10</strong><span>Make the repository the unit of work: one query, one process, one preflight.</span></li>
-            <li><strong>v1.11</strong><span>Make prepared edits exact, reviewable, and strict about source fidelity.</span></li>
-            <li><strong>v1.12</strong><span>Refuse stale writes by committing only the source bytes the query actually read.</span></li>
-            <li><strong>v1.13</strong><span>Compile flow, block, record, and reorder changes into owned source spans.</span></li>
-            <li><strong>v1.14</strong><span>Audit the useful yq surface, close portable gaps, and optimize measured parser work.</span></li>
-            <li><strong>v1.15</strong><span>Close the portable utility layer: codecs, guarded loads, dynamic expressions, reproducible shuffle, and complete source metadata.</span></li>
-            <li><strong>v1.16</strong><span>Turn the graph into a configuration contract engine: standard patches, schema gates, and semantic TOML, INI, and XML.</span></li>
-            <li><strong>v1.17</strong><span>Refound the product around its own graph, source compiler, transaction model, and exact public contract.</span></li>
-          </ol>
+        <section id="teach-it-to-change-things">
+          <h2>Teach it to change things</h2>
+          <p>Once the graph existed, each idea made the next one possible. Traversal became an expression stream. Expressions became transformations. Variables, reducers, filters, merges, paths, metadata, and multi-file evaluation grew from the same small model.</p>
+          <p>Reading YAML is forgiving. Writing it is where tools reveal their manners. People leave comments, choose quotes, arrange keys, and use whitespace to make configuration legible. A semantically correct rewrite can still be a terrible edit.</p>
+          <p>So YAML.sh learned to track where nodes came from. Simple changes replace only the source they own, leaving comments, formatting, ordering, and unrelated text alone. <code>--diff</code> previews the result. <code>--preserve-only</code> refuses a change when that promise cannot be kept. Updating several files uses the same prepared results and rolls back if a write fails.</p>
         </section>
 
-        <section id="make-it-real">
-          <h2>Make it real</h2>
-          <p>The hard part was not producing more code. The hard part was deciding what evidence would let us believe it.</p>
-          <p>We compared YAML.sh with the official YAML Test Suite and with yq itself. We exercised common configuration shapes, generated expressions, hostile inputs, large documents, deep collections, and presentation-preserving mutations. A supported behaviour needed a test; nearby unsupported behaviour needed an explicit error instead of a confident misparse.</p>
-          <p>That distinction matters. A large generated comparison corpus does not mean YAML.sh contains all of yq. Passing the expected YAML Test Suite outcomes does not mean every corner of the YAML specification is implemented. Evidence describes the tested contract; it does not dissolve the boundary around it.</p>
-          <p>By v1.16, that contract was large enough to be useful and specific enough to audit. One command can validate a document, apply a standard patch, preview the exact repository transaction, preserve comments, refuse presentation loss, abort on source drift, roll back a broken commit, and leave a value-free audit trail.</p>
-          <p>The capability audit stopped treating corpus size as the feature. We walked yq’s YAML-oriented catalog, attached evidence to every area, and followed approachable gaps. The tool grew from collection helpers into source-aware repository work, guarded local composition, JSON Pointer and Patch, Merge Patch, a JSON Schema profile, and semantic TOML, INI, and XML codecs. The runtime stayed one POSIX shell file with AWK inside.</p>
-          <dl class="story-evidence">
-            <div><dt>YAML outcomes</dt><dd>282 / 282</dd><dd>expected YAML Test Suite cases</dd></div>
-            <div><dt>invalid outcomes</dt><dd>91 / 91</dd><dd>strict-invalid cases rejected</dd></div>
-            <div><dt>TOML 1.0</dt><dd>205 / 205</dd><dd>decoder and encoder fixtures</dd></div>
-            <div><dt>schema profile</dt><dd>701</dd><dd>official 2020-12 assertions</dd></div>
-            <div><dt>write faults</dt><dd>guarded</dd><dd>drift, failure, and interruption</dd></div>
-            <div><dt>language runtimes</dt><dd>0</dd><dd>the reader is POSIX sh + AWK</dd></div>
-          </dl>
+        <section id="one-file-got-ambitious">
+          <h2>One file got ambitious</h2>
+          <p>The graph did not stop at YAML traversal. It became the shared shape for JSON Pointer and Patch, Merge Patch, a focused JSON Schema validator, and TOML, INI, and XML conversion. The query language picked up codecs, guarded local loads, reproducible shuffle, dynamic expressions, and access to source details such as comments and columns.</p>
+          <p>None of that changed the delivery model. Download <code>ysh</code>, make it executable, and read it if you are curious. The shell handles arguments and files; the embedded AWK handles parsing and evaluation.</p>
+          <p>The restraint moved elsewhere: every supported behavior needed an exact example or test, and nearby unsupported syntax had to fail clearly instead of producing a plausible mistake. The YAML Test Suite and yq were useful external checks, but neither became the product definition.</p>
         </section>
 
         <section id="building-with-codex">
-          <h2>Building with Codex</h2>
-          <p>Codex made the feedback loop unusually short. A product question could become an implementation, meet the YAML Test Suite and yq, expose the next missing idea, and return to the design while the context was still fresh.</p>
-          <p>That mattered because YAML.sh is a project made of boundaries: portability against convenience, fidelity against size, and ambition against a runtime people can still read. Moving quickly through code and evidence let us explore those boundaries without making the premise vague.</p>
-          <p>I came away less interested in how much code an agent can produce than in how much more thoroughly a small project can test its ideas. The constraint still shaped the tool. Codex made it possible to ask harder questions of it.</p>
+          <h2>A very fast second act</h2>
+          <p>Codex made this second act move unusually quickly. A design question could become working code, meet external examples, expose the next missing idea, and return to the design while the thought was still fresh.</p>
+          <p>The interesting part was not code volume. It was being able to push much harder on the constraint without relaxing it. The one-file premise kept shaping the tool; the faster loop made it possible to ask more ambitious questions.</p>
         </section>
 
         <section id="where-it-fits">
           <h2>Where it fits</h2>
-          <p>By v1.17, the comparison with yq had done its job. It gave the language a familiar shape and supplied a demanding oracle, but it was too small a frame for the result.</p>
-          <p>YAML.sh is a serious YAML tool in a mischievous medium. It arrives as readable source, retains YAML identity and presentation, previews exact changes, refuses fidelity loss on demand, updates several files from shared data, rolls back partial commits, and explains changed paths without recording values. Those properties grew naturally from taking the one-file shell constraint further than seemed sensible.</p>
-          <p>Yq remains broader and faster for many semantic transformations. YAML.sh has its own answer for work where runtime reach, source ownership, reviewable writes, and inspectability matter at the same time.</p>
+          <p>The unreasonable constraint eventually became a useful shape of its own.</p>
+          <p>YAML.sh is a serious YAML tool in a mischievous medium. It arrives as readable source, keeps the character of a YAML file, previews changes, refuses formatting loss on demand, updates several files from shared data, and rolls back failed writes. Those properties grew naturally from taking the one-file shell constraint further than seemed sensible.</p>
+          <p>It fits when one readable file, careful edits, and a surprisingly deep language matter at the same time.</p>
         </section>
 
         <section id="constraint">
           <h2>The constraint is the fun part</h2>
           <p>YAML in shell still sounds like a bad idea. I like that. Good constraints create a shape you would not reach by chasing generality, and a little absurdity can provide enough energy to stay with the boring work that makes an idea dependable.</p>
-          <p>The premise survived the rewrite: one readable file, no acquired language runtime, real configuration work. Everything else was allowed to change.</p>
+          <p>The premise survived the rewrite: one readable file, no extra language runtime, useful YAML work. Everything else was allowed to change.</p>
           <p>The point was to have fun. The trick was refusing to use fun as an excuse to be sloppy.</p>
         </section>
 
         <nav class="story-links" aria-label="Continue exploring YAML.sh">
           <a href="https://github.com/azohra/yaml.sh"><span>Read the source</span><b aria-hidden="true">↗</b></a>
-          <a href="/docs/yq-compatibility/"><span>Inspect the yq capability map</span><b aria-hidden="true">→</b></a>
+          <a href="/docs/recipes/"><span>Try a few recipes</span><b aria-hidden="true">→</b></a>
           <a href="/docs/supported_yml/"><span>Explore YAML support</span><b aria-hidden="true">→</b></a>
           <a href="/docs/getting-started/"><span>Install one file</span><b aria-hidden="true">→</b></a>
         </nav>
@@ -158,11 +127,11 @@
         <a class="story-back" href="/">← YAML.sh</a>
         <strong>On this page</strong>
         <ol>
-          <li><a href="#useful-stunt">A useful stunt</a></li>
-          <li><a href="#permission-to-break-it">Permission to break it</a></li>
-          <li><a href="#tool-took-shape">The tool took shape</a></li>
-          <li><a href="#make-it-real">Make it real</a></li>
-          <li><a href="#building-with-codex">Building with Codex</a></li>
+          <li><a href="#the-ceiling">The joke had a ceiling</a></li>
+          <li><a href="#give-yaml-a-shape">Give YAML a shape</a></li>
+          <li><a href="#teach-it-to-change-things">Teach it to change things</a></li>
+          <li><a href="#one-file-got-ambitious">One file got ambitious</a></li>
+          <li><a href="#building-with-codex">A very fast second act</a></li>
           <li><a href="#where-it-fits">Where it fits</a></li>
           <li><a href="#constraint">The constraint is the fun part</a></li>
         </ol>

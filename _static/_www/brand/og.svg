@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
-  <title id="title">YAML.sh — YAML in shell, no really</title>
-  <desc id="desc">YAML.sh wordmark and a source-aware YAML diff.</desc>
+  <title id="title">YAML.sh — YAML in shell. No, really.</title>
+  <desc id="desc">YAML.sh wordmark and an edit that keeps its YAML comment.</desc>
   <defs>
     <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
       <path d="M50 0H0V50" fill="none" stroke="#d8ff45" stroke-opacity=".055"/>
@@ -30,5 +30,5 @@
     <text x="28" y="292" fill="#d8ff45" font-family="ui-monospace,monospace" font-size="23" font-weight="700">+ tag: stable # keep this</text>
     <text x="28" y="360" fill="#899684" font-family="ui-monospace,monospace" font-size="17">untouched bytes stay untouched</text>
   </g>
-  <text x="57" y="574" fill="#71806b" font-family="ui-monospace,monospace" font-size="17">PORTABLE · SOURCE-AWARE · REVIEWABLE</text>
+  <text x="57" y="574" fill="#71806b" font-family="ui-monospace,monospace" font-size="17">QUERY · TRANSFORM · KEEP THE COMMENTS</text>
 </svg>

@@ -6,27 +6,28 @@ All notable changes to YAML.sh are documented here.
 
 ## [1.17.0] - 2026-08-03
 
-Version 1.17 refounds YAML.sh around its own product: a portable node graph, source-aware compiler, and guarded repository transaction in one readable executable.
+Version 1.17 makes YAML.sh easier to understand, restrict, and maintain without changing documented v1 behavior.
 
 ### Added
 
-- `DESIGN.md`, repository-level agent guidance, and a machine-readable public contract that names each capability, product role, status, and exact evidence owner.
-- An exact 373-case YAML Test Suite outcome manifest, replacing separate pass-count proxy lists.
 - `--security-disable-eval`, so environment reads, query-selected file reads, and dynamic expression evaluation are independently controllable.
 - Edit-mode dependency preflight with a precise diagnostic for missing host file utilities.
 
 ### Changed
 
-- Development AWK is organized into ordered parser, graph, evaluator, contract, emitter, and source modules while the release remains the same single-file interface.
-- The evaluator's central 1,200-line branch was replaced by explicit operator-family dispatch. Sparse graph metadata lowers the 125,000-node parser peak by about 10 MiB on the release machine without slowing the workload.
-- Runtime and security documentation now distinguishes read-only `/bin/sh` + AWK use, edit-mode host utilities, trusted documents, query programs, and restricted capabilities.
-- README, website, docs, evergreen SVG brand art, and project story return to YAML.sh's actual premise: **YAML in shell. No, really.** Yq remains a syntax influence and differential oracle rather than the product definition.
-- CI classifies product guidance and security policy changes correctly; release evidence validates the public contract directly.
-- Release fuzzing runs the complete 672-combination structural matrix once per AWK instead of repeating the same shape four times with different scalar values.
+- Help and documentation lead with useful YAML work, explain the runtime dependencies plainly, and distinguish trusted documents from query programs and optional local access.
+- The website and project story centre the one-file YAML tool instead of release machinery, corpus totals, or comparison with another product.
+
+### Maintenance
+
+- Development AWK is organized into ordered parser, graph, evaluator, validation, emitter, and source-edit modules while the release remains one executable.
+- Explicit operator-family dispatch replaces the evaluator's central 1,200-line branch. Sparse graph metadata lowers peak memory on the 125,000-node parser workload by about 10 MiB on the release machine without slowing it.
+- `DESIGN.md`, contributor guidance, and a machine-readable capability map make product decisions and their exact evidence easier to inspect.
+- A case-by-case YAML Test Suite outcome manifest replaces separate pass-count lists, and the structural fuzz matrix no longer repeats identical shapes with different scalar values.
 
 ### Compatibility
 
-- The v1 CLI and documented query behavior remain compatible. The new security switch is opt-in, so this is a minor release rather than a manufactured major version.
+- The v1 CLI and documented query behavior remain compatible. The new security switch is opt-in.
 
 ## [1.16.0] - 2026-08-02
 

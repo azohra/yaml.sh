@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -106,12 +106,12 @@
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
           <h1 id="yaml-in-shell-no-really">YAML in shell. No, really.</h1>
-          <p>YAML.sh is a serious YAML tool built in an intentionally mischievous medium: one readable POSIX shell executable with portable AWK inside. It queries, transforms, validates, converts, inspects, and edits YAML without acquiring another language runtime.</p>
+          <p>YAML.sh queries, transforms, validates, and edits YAML in one readable POSIX shell file with portable AWK inside. Common edits keep the comments and formatting around them.</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-sh">ysh '.services[] | select(.enabled) | .name' config.yml
-ysh --preserve-only --diff '.release.channel = &quot;stable&quot;' services/*.yml
-ysh --schema service.schema.json --apply-patch promote.json --diff service.yml
+            <pre><code class="language-sh">ysh '.books[] | select(.read) | .title' reading.yml
+ysh --preserve-only --diff '.theme = &quot;midnight&quot;' settings.yml
+ysh --schema settings.schema.json '.' settings.yml
 </code></pre>
           </div>
           <h2 id="start-with-the-job"><a href="#start-with-the-job">Start with the job<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
@@ -119,29 +119,26 @@ ysh --schema service.schema.json --apply-patch promote.json --diff service.yml
             <li><a href="/docs/getting-started/">Install one file and run the first query</a>.</li>
             <li><a href="/docs/recipes/">Copy a recipe for filtering, updates, composition, or validation</a>.</li>
             <li><a href="/docs/queries/">Learn paths, streams, construction, and updates</a>.</li>
-            <li><a href="/docs/contracts/">Validate, patch, compare, and convert configuration</a>.</li>
+            <li><a href="/docs/contracts/">Validate, patch, and convert configuration</a>.</li>
             <li><a href="/docs/documents/">Check, compose, and update files or document streams</a>.</li>
             <li><a href="/docs/output/">Choose value, JSON, YAML, metadata, AST, or events</a>.</li>
           </ul>
-          <h2 id="the-product"><a href="#the-product">The product<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The released <code>ysh</code> contains a POSIX shell launcher and portable AWK engine. It needs no package manager, language runtime, YAML library, plugin host, or opaque binary.</p>
-          <p>Its useful shape comes from four parts:</p>
+          <h2 id="what-it-can-do"><a href="#what-it-can-do">What it can do<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
-            <li><strong>A real graph.</strong> Mappings, sequences, tags, anchors, aliases, merges, source locations, and empty collections retain their meaning.</li>
-            <li><strong>A compact language.</strong> Familiar paths, pipes, filters, reducers, construction, and updates operate on writable node streams.</li>
-            <li><strong>A source compiler.</strong> Common changes become owned edit spans, so unrelated bytes and attached comments survive. <code>--preserve-only</code> makes that a precondition.</li>
-            <li><strong>A repository transaction.</strong> Check, diff, and write share prepared candidates. Multi-file updates use snapshots, detect drift, skip no-ops, and retain rollback material.</li>
+            <li><strong>Query and transform.</strong> Use paths, pipes, filters, reducers, construction, and updates across files and YAML documents.</li>
+            <li><strong>Edit carefully.</strong> Preview changes with <code>--check</code> or <code>--diff</code>; use <code>--preserve-only</code> when comments and formatting must stay put.</li>
+            <li><strong>Validate, patch, and convert.</strong> Apply JSON Schema, JSON Patch, and Merge Patch, or move between YAML, JSON, TOML, INI, XML, properties, CSV, and TSV.</li>
+            <li><strong>Inspect strange input.</strong> View types, source locations, parser events, an AST, or an explanation of an edit.</li>
           </ul>
-          <p>Yq-shaped syntax is a useful interface influence and comparison oracle. It is not the reason YAML.sh exists.</p>
+          <p>The released <code>ysh</code> contains the complete shell launcher and AWK engine. Copy one file, read it, and run it without another language runtime.</p>
           <h2 id="know-the-boundary"><a href="#know-the-boundary">Know the boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The docs separate product claims from test volume:</p>
           <ul>
             <li><a href="/docs/supported_yml/">YAML support</a> records accepted and rejected syntax.</li>
-            <li><a href="/docs/operators/">Operator manifest</a> classifies the yq-shaped surface with named evidence.</li>
-            <li><a href="/docs/contracts/">Configuration contracts</a> define schemas, patches, and non-YAML codecs.</li>
-            <li><a href="/docs/security/">Security and limits</a> defines capabilities, resource ceilings, and write guarantees.</li>
+            <li><a href="/docs/queries/">Queries</a> defines the expression language.</li>
+            <li><a href="/docs/contracts/">Validate, patch, and convert</a> defines schemas, patches, and non-YAML formats.</li>
+            <li><a href="/docs/security/">Security and limits</a> explains optional capabilities, resource ceilings, and write behavior.</li>
           </ul>
-          <p>Unsupported neighboring input should fail clearly instead of returning a plausible lie.</p>
+          <p>Unsupported syntax fails clearly rather than returning a plausible result.</p>
           <h2 id="open-the-hood"><a href="#open-the-hood">Open the hood<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -150,8 +147,7 @@ ysh --ast config.yml
 ysh --explain=json --diff '.image.tag = &quot;stable&quot;' services/*.yml 2&gt;changes.jsonl
 </code></pre>
           </div>
-          <p>The <a href="/docs/internals/">internals guide</a> follows a document through the graph, evaluator, emitter, and source compiler. The <a href="/docs/development/">development guide</a> explains how exact capabilities map to fixtures, properties, and external oracles.</p>
-          <p>YAML.sh is built for fun. The contract is serious.</p>
+          <p>The <a href="/docs/internals/">internals guide</a> follows a document through parsing, evaluation, output, and careful source edits. The <a href="/docs/development/">development guide</a> explains the codebase and test suite.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
@@ -159,7 +155,7 @@ ysh --explain=json --diff '.image.tag = &quot;stable&quot;' services/*.yml 2&gt;
       <strong>On this page</strong>
       <ol>
         <li class="level-2"><a href="#start-with-the-job">Start with the job</a></li>
-        <li class="level-2"><a href="#the-product">The product</a></li>
+        <li class="level-2"><a href="#what-it-can-do">What it can do</a></li>
         <li class="level-2"><a href="#know-the-boundary">Know the boundary</a></li>
         <li class="level-2"><a href="#open-the-hood">Open the hood</a></li>
       </ol>

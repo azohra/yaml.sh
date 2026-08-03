@@ -1,18 +1,16 @@
 # Install & quick start
 
-YAML.sh ships as one executable text file. The released file contains both the portable shell launcher and the AWK engine.
+YAML.sh ships as one executable text file containing its shell launcher and AWK engine.
 
-## Install with Homebrew
+## Install
+
+With Homebrew:
 
 ```sh
 brew install azohra/tools/ysh
 ```
 
-Homebrew installs the same single-file release artifact used by the direct installer.
-
-## Install directly
-
-The hosted installer downloads the release artifact, verifies its pinned SHA-256 digest, then writes it to the install directory:
+Or download the release directly. The installer verifies its pinned SHA-256 digest before writing the file:
 
 ```sh
 curl -fsSL https://yaml.azohra.com/install | sh
@@ -24,14 +22,9 @@ Choose another destination without `sudo`:
 curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR="$HOME/.local/bin" sh
 ```
 
-## Requirements
+Read-only commands need a POSIX-compatible `/bin/sh` and AWK. `--check`, `--diff`, and `-i` also use the host's `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc`. Bash, Python, Ruby, Node.js, Go, `jq`, and another language runtime are not required.
 
-- Read-only commands: a POSIX-style `/bin/sh` and a compatible AWK.
-- Source-aware `--check`, `--diff`, and `-i`: `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc` from the host.
-
-The release suite covers macOS AWK, mawk, original AWK, POSIX-mode gawk, and BusyBox AWK across several POSIX shells. Bash, Python, Ruby, Node.js, Go, `jq`, and a package manager are not required. Edit mode checks its host utilities before preparing a transaction.
-
-## First query
+## Read YAML
 
 Given `config.yml`:
 
@@ -51,145 +44,70 @@ ysh '.server.host' config.yml
 # localhost
 ```
 
-Select a sequence item:
+Select a sequence item or filter a stream:
 
 ```sh
 ysh '.server.ports[1]' config.yml
 # 8443
+
+ysh '.services[] | select(.enabled) | .name' config.yml
+# api
 ```
 
-Select a collection:
+Collections print as compact JSON by default:
 
 ```sh
 ysh '.services[0]' config.yml
 # {"name":"api","enabled":true}
 ```
 
-Stream and filter nodes:
-
-```sh
-ysh '.services[] | select(.enabled) | .name' config.yml
-# api
-```
-
-Use a default when a path is missing, null, or false:
-
-```sh
-ysh '.release.channel // "stable"' config.yml
-# stable
-```
-
-Slice and label a result:
-
-```sh
-ysh '"\(.server.host):\(.server.ports[0:2] | length)"' config.yml
-# localhost:2
-```
-
-Transform and emit YAML:
-
-```sh
-ysh -o=yaml '.release.channel = "stable"' config.yml
-```
-
-Ask whether the update would change anything:
-
-```sh
-ysh --check '.release.channel = "stable"' config.yml
-```
-
-Check mode writes nothing. It exits `0` when clean, `1` when the query would change a file, and `2` when the query or input is invalid. Once the check looks right, update in place:
-
-See the exact candidate instead:
-
-```sh
-ysh --diff '.release.channel = "stable"' config.yml
-```
-
-```sh
-ysh -i '.release.channel = "stable"' config.yml
-```
-
-Each in-place replacement is an atomic sibling rename and preserves file permissions. YAML.sh compiles scalar, flow, block-scalar, insert, delete, and reorder changes into non-overlapping source spans. Bytes outside those spans stay intact; changed flow spans use stable flow formatting. Unsupported edits fall back to semantic YAML. Add `--preserve-only` to make that fallback an error.
-
-The same expression can check or update several files as one preflighted transaction:
-
-```sh
-ysh --check '.release.channel = "stable"' services/*.yml
-ysh --diff '.release.channel = "stable"' services/*.yml
-ysh -i '.release.channel = "stable"' services/*.yml
-```
-
-## Bound hostile input
-
-Defaults are generous; automation can tighten them:
-
-```sh
-ysh --max-input-bytes 1048576 --max-nodes 20000 --max-depth 64 '.' config.yml
-```
-
-## Standard input
-
-Omit the file to read YAML from standard input:
+Omit the file to read standard input:
 
 ```sh
 printf '%s\n' 'answer: 42' | ysh '.answer'
 ```
 
-Use `-` explicitly when it helps a generated command read clearly:
+## Change YAML
+
+Print transformed YAML without changing the file:
 
 ```sh
-generate-config | ysh '.release.version' -
+ysh -o=yaml '.release.channel = "stable"' config.yml
 ```
 
-## Embedded formats and local files
+Preview the exact in-place change:
 
 ```sh
-ysh '.payload | from_json | .name' config.yml
-ysh -n 'load("defaults.yml") * load("production.yml")'
+ysh --diff '.release.channel = "stable"' config.yml
 ```
 
-The expression language can encode and decode JSON, YAML, TOML, INI, XML, properties, CSV, TSV, Base64, URI, and shell text. Add `--security-disable-file-ops` when a query must not read paths of its own.
+Then write it:
 
-Read a format directly by filename or with `-p`:
+```sh
+ysh -i '.release.channel = "stable"' config.yml
+```
+
+Common edits retain comments and surrounding formatting. Add `--preserve-only` to fail rather than regenerate YAML when a change cannot be made safely in the original source. See [multiple documents and file edits](documents.md) for check mode, multi-file changes, and exact write guarantees.
+
+## Build and convert
+
+Use `-n` to create a document without reading input:
+
+```sh
+ysh -n -o=yaml '{name: "api", enabled: true}'
+```
+
+Input can also be JSON, TOML, INI, or XML:
 
 ```sh
 ysh '.database.port' config.toml
-ysh -p ini -o yaml '.' app.conf
-ysh -p xml --json '.catalog.item' catalog.xml
-```
-
-Validate or apply a standard patch without embedding either document in the query:
-
-```sh
-ysh --schema service.schema.json '.' service.yml
-ysh --apply-patch promote.json --preserve-only --diff service.yml
-```
-
-See [configuration contracts](contracts.md) for JSON Pointer, JSON Patch, Merge Patch, schema diagnostics, and format boundaries.
-
-## Compose configuration
-
-Environment values can stay strings or be parsed as YAML:
-
-```sh
-IMAGE_TAG=stable ysh '.image.tag = strenv(IMAGE_TAG)' deploy.yml
-LIMITS='{cpu: 2, memory: 1Gi}' ysh '.resources = env(LIMITS)' deploy.yml
-```
-
-Evaluate files independently by listing them, or evaluate one expression across the combined document stream:
-
-```sh
-ysh '[filename, .name]' one.yml two.yml
-ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
-ysh eval-all -i 'select(fileIndex == 0).version as $version | select(fileIndex > 0).release.version = $version' release.yml services/*.yml
+ysh -p xml -o json '.catalog.item' catalog.xml
 ```
 
 ## Next steps
 
-- [Learn paths, streams, construction, and updates](queries.md)
-- [Choose value, JSON, YAML, type, tag, or line output](output.md)
-- [Explore supported YAML syntax and limits](supported_yml.md)
-- [Compare the focused surface with yq](yq-compatibility.md)
-
-Maintaining a script written for the original command interface? Use the focused [legacy migration guide](migration.md).
+- [Copy a practical recipe](recipes.md)
+- [Learn the query language](queries.md)
+- [Edit documents and files safely](documents.md)
+- [Validate, patch, and convert configuration](contracts.md)
+- [See supported YAML syntax](supported_yml.md)

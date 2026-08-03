@@ -52,8 +52,8 @@ if grep -En 'href="[[:alnum:]_-]+\.md([#"]|$)' "$PUBLISHED"/*.html "$PUBLISHED"/
     exit 1
 fi
 
-if ! grep -Fq '<code>|=</code>' "$GENERATED/yq-compatibility/index.html" ||
-    grep -Fq '<td>=<code>' "$GENERATED/yq-compatibility/index.html"; then
+if ! grep -Fq '<code>|=</code>' "$GENERATED/operators/index.html" ||
+    grep -Fq '<td>=<code>' "$GENERATED/operators/index.html"; then
     printf '%s\n' 'A pipe inside inline code broke a generated documentation table.' >&2
     exit 1
 fi

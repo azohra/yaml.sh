@@ -1,6 +1,6 @@
 # Queries
 
-YAML.sh evaluates a focused yq-style language over streams of writable node references. Paths select nodes; pipes and comma expressions shape streams; assignments change the graph.
+YAML.sh expressions select values, pass them through filters, build new results, and update documents. An expression may produce no result, one result, or a stream of results.
 
 ## Paths
 
@@ -16,7 +16,7 @@ ysh '.["key.with.dots"]' config.yml
 
 Quoted bracket keys are required when query punctuation belongs to the key.
 
-Missing keys and out-of-range indexes produce null, matching yq traversal semantics:
+Missing keys and out-of-range indexes produce null:
 
 ```sh
 ysh --json '.missing' config.yml
@@ -32,7 +32,7 @@ ysh '.services[].name' config.yml
 ysh '.metadata[]' config.yml
 ```
 
-Each result retains its node identity, type, tag, source line, parent, aliases, and resolved merge behavior.
+Selected results retain their YAML type, tag, source location, aliases, and merge behavior.
 
 ## Pipe
 
@@ -80,7 +80,7 @@ ysh '.services[] | select(.enabled and .tier == "backend") | .name' config.yml
 ysh '.services[] | .enabled | not' config.yml
 ```
 
-Numeric comparisons normalize integers and finite floats. Like yq, equality comparisons operate on scalar values rather than treating whole collections as identical values.
+Numeric comparisons normalize integers and finite floats. Equality compares scalar values; two mappings or sequences are not treated as equal merely because their contents match.
 
 Arithmetic uses normal precedence with `+`, `-`, `*`, `/`, and `%`. `+` also concatenates strings and sequences, shallow-merges mappings, and treats null as an identity value.
 
@@ -111,7 +111,7 @@ ysh '.services | has(2)' config.yml
 - `keys` returns mapping keys or sequence indexes.
 - `has(KEY)` checks a mapping key or sequence index.
 - `kind` returns `map`, `seq`, or `scalar`.
-- `type` returns a yq-style tag such as `!!map`, `!!seq`, `!!str`, or `!!int`.
+- `type` returns a YAML tag such as `!!map`, `!!seq`, `!!str`, or `!!int`.
 
 Filters can begin an expression when they operate on the root:
 
@@ -146,7 +146,7 @@ ysh -n --json '["yaml", "sh"] | join(".")'
 ysh -n --json '["zero", "one"] | array_to_map'
 ```
 
-Focused helpers cover common selection and reshaping jobs:
+Additional helpers cover common selection and reshaping jobs:
 
 ```sh
 ysh '.services | filter(.enabled) | first' config.yml
@@ -173,7 +173,7 @@ ysh '.services[] | select(.name | test("^[a-z]+$"))' config.yml
 ysh '.name | sub("-"; "_")' config.yml
 ```
 
-This portable regex subset does not promise yq/RE2 flags, named captures, or replacement backreferences.
+The portable regex subset does not include flags, named captures, or replacement backreferences.
 
 ## Variables, dynamic keys, and reducers
 
@@ -238,7 +238,7 @@ ysh '.payload | from_json | .items | @csv' config.yml
 ysh '.secret | @base64' config.yml
 ```
 
-CSV and TSV decoding treats the first row as headers and parses scalar cells. Properties use dotted paths and decode values as strings. TOML, INI, and XML use the [configuration contract](contracts.md) documented for each format.
+CSV and TSV decoding treats the first row as headers and parses scalar cells. Properties use dotted paths and decode values as strings. TOML, INI, and XML use the [data profiles](contracts.md) documented for each format.
 
 `eval(EXPR)` runs a string through YAML.sh's expression parser. `load`, `load_str`, `load_base64`, and `load_props` read a named local file:
 
@@ -276,7 +276,7 @@ ysh '.message | envsubst(nu, ff)' config.yml
 ysh -i 'with(.kind; select(. == "Deployment") or error("expected Deployment")) | .spec.replicas = 3' deploy.yml
 ```
 
-If any input fails the guard, a repository transaction writes nothing.
+If any input fails the guard, the command writes nothing.
 
 ## Files and documents
 
@@ -289,7 +289,7 @@ ysh ea '[.]' one.yml two.yml
 ysh ea 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
 ```
 
-It can also update every mutated source file as one transaction. This query reads the version from the first file and writes it into the rest:
+It can also use one file to update others. This query reads the version from the first file and writes it into the rest:
 
 ```sh
 query='select(fileIndex == 0).version as $version | select(fileIndex > 0).release.version = $version'
@@ -297,7 +297,7 @@ ysh ea --check "$query" release.yml services/*.yml
 ysh ea -i "$query" release.yml services/*.yml
 ```
 
-Whole-stream reduction can fold any number of files into one result:
+Whole-stream reduction can fold several files into one result:
 
 ```sh
 ysh ea '. as $document ireduce ({}; . * $document)' defaults.yml region.yml secrets.yml
@@ -345,7 +345,7 @@ ysh -o=yaml 'setpath(["spec", "replicas"]; 4)' deploy.yml
 ysh -o=yaml 'delpaths([["metadata", "annotations"], ["metadata", "managedFields"]])' deploy.yml
 ```
 
-Use `--check` for a quiet preflight or `--diff` to see the exact prepared transaction. Both write nothing and return `0` when clean, `1` for drift, and `2` for an invalid query or input. Use `-i` to commit those candidates transactionally. No-op files are not replaced. Changed live inputs are refused, and a commit failure restores the evaluated snapshots.
+Use `--check` for a quiet answer or `--diff` to preview the exact change. Both write nothing and return `0` when no change is needed, `1` when files would change, and `2` for an invalid query or input. Use `-i` to write the same candidate.
 
 ```sh
 ysh --check '.image.tag = "stable"' services/*.yml
@@ -353,13 +353,13 @@ ysh --diff '.image.tag = "stable"' services/*.yml
 ysh -i '.image.tag = "stable"' services/*.yml
 ```
 
-Scalar edits, owned flow and block-scalar spans, full-line comment edits, direct block inserts/appends/deletes, and pure mapping or sequence reorders preserve source outside the compiled edit spans. Add `--preserve-only` when semantic regeneration should be an error:
+Common scalar, collection, comment, insert, delete, and reorder edits preserve unrelated source text. Add `--preserve-only` when regeneration should be an error:
 
 ```sh
 ysh --preserve-only --diff '.items += ["release"]' config.yml
 ```
 
-Changed flow collections use stable flow formatting inside their owned span. Strict mode can still reject a semantically valid transform when spans overlap or shared aliases would need to be materialized. That refusal is the contract, not a parser failure.
+See [documents and file edits](documents.md) for the preservation matrix, multi-file behavior, and write guarantees.
 
 ## Merged and aliased nodes
 
@@ -378,7 +378,7 @@ Anchor renames update aliases that already reference the same node. Removing a r
 
 ## Presentation
 
-`style`, `head_comment`, `line_comment`, and `foot_comment` inspect YAML presentation metadata. Their yq-shaped property forms edit values and generated key references:
+`style`, `head_comment`, `line_comment`, and `foot_comment` inspect YAML presentation metadata. Their property forms edit values and generated key references:
 
 ```sh
 ysh '.image | line_comment' deploy.yml
@@ -391,8 +391,6 @@ ysh -o=yaml '.notes style = "literal"' deploy.yml
 
 Scalar styles can be reset or set to plain, single, double, literal, or folded. Collections can be reset to block output or set to flow. Block comment edits participate in strict source preservation; comments inside changed flow spans may require semantic emission.
 
-## Current expression boundary
+## Language boundary
 
-This is a useful yq-shaped language, not the complete yq language. Date/time, XML, system execution, regex flags/captures, and yq's complete format/flag surface remain outside it. Slices target sequences; interpolation is intentionally scalar-oriented. See the [operator manifest](operators.md) for the audited form-by-form boundary.
-
-Supported transformations are tested against their expected graph behavior. For arbitrary yq programs, use yq. Choose YAML.sh when the one-file runtime, source-aware edits, guarded repository transaction, or inspectable execution model is the point.
+The language does not currently include date/time operators, system execution, or regex flags and capture objects. Slices target sequences, and interpolation accepts scalar results. XML is supported as a data codec rather than as a family of query operators. See the [operator reference](operators.md) for the complete surface and [yq compatibility](yq-compatibility.md) when adapting an existing yq expression.

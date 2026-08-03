@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
-  <title id="title">YAML.sh — YAML in shell, no really</title>
-  <desc id="desc">A YAML.sh wordmark beside a source-aware YAML query.</desc>
+  <title id="title">YAML.sh — YAML in shell. No, really.</title>
+  <desc id="desc">A YAML.sh wordmark beside an edit that keeps its YAML comment.</desc>
   <defs>
     <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
       <path d="M48 0H0V48" fill="none" stroke="#d8ff45" stroke-opacity=".055"/>
@@ -13,7 +13,7 @@
   <text x="108" y="139" text-anchor="middle" fill="#101410" font-family="ui-monospace,monospace" font-size="62" font-weight="900">Y</text>
   <text x="61" y="249" fill="#f5f1e8" font-family="ui-sans-serif,system-ui,sans-serif" font-size="106" font-weight="850" letter-spacing="-7">YAML<tspan fill="#d8ff45">.sh</tspan></text>
   <path d="M64 280h470" stroke="#d8ff45" stroke-width="7"/>
-  <text x="64" y="330" fill="#a8b2a3" font-family="ui-monospace,monospace" font-size="27" font-weight="700">YAML in shell. no, really.</text>
+  <text x="64" y="330" fill="#a8b2a3" font-family="ui-monospace,monospace" font-size="27" font-weight="700">YAML in shell. No, really.</text>
   <g transform="translate(640 73)">
     <rect width="500" height="274" rx="12" fill="#1a211a" stroke="#445040" stroke-width="2"/>
     <path d="M0 54h500" stroke="#445040"/>

@@ -11,7 +11,7 @@ The compatibility contract includes documented:
 - output values and formats
 - supported YAML interpretation
 - the one-file POSIX `/bin/sh` plus AWK reader runtime
-- the documented host file utilities used by source-aware edit modes
+- the documented host file utilities used by file-edit modes
 
 Undocumented internals and rejected malformed or unsupported input are outside that contract.
 

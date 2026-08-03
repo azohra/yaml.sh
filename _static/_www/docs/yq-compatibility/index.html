@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The useful overlap with yq and the deliberate boundary.">
+  <meta name="description" content="What carries over from yq, what differs, and when to use each tool.">
   <meta name="theme-color" content="#101410">
-  <meta property="og:title" content="yq compatibility · YAML.sh">
-  <meta property="og:description" content="The useful overlap with yq and the deliberate boundary.">
+  <meta property="og:title" content="Coming from yq · YAML.sh">
+  <meta property="og:description" content="What carries over from yq, what differs, and when to use each tool.">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com/docs/yq-compatibility/">
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/docs/docs.css">
   <script src="/docs/docs.js" defer></script>
-  <title>yq compatibility · YAML.sh docs</title>
+  <title>Coming from yq · YAML.sh docs</title>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/" aria-current="page">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/" aria-current="page">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -105,149 +105,79 @@
     <main id="content" class="doc-content">
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
-          <h1 id="yq-compatibility">yq compatibility</h1>
-          <p>YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell and portable AWK program. This is a capability map, not a claim that YAML.sh is a drop-in yq replacement.</p>
-          <h2 id="the-useful-core"><a href="#the-useful-core">The useful core<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h1 id="coming-from-yq">Coming from yq</h1>
+          <p>YAML.sh uses familiar yq-style paths, pipes, filters, construction, and assignment. Many everyday expressions transfer directly; YAML.sh is not a drop-in replacement for every yq program or CLI flag.</p>
+          <h2 id="expressions-that-usually-transfer"><a href="#expressions-that-usually-transfer">Expressions that usually transfer<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh '.services[].name' config.yml
+ysh '.services[] | select(.enabled) | .name' config.yml
+ysh '.image.tag = &quot;stable&quot;' config.yml
+ysh '.metadata | with_entries(.value |= upcase)' config.yml
+</code></pre>
+          </div>
+          <p>The closest overlap covers:</p>
+          <ul>
+            <li>paths, indexes, optional and recursive traversal, pipes, unions, and sequence slices;</li>
+            <li>filters, scalar comparisons, boolean operators, defaults, and error guards;</li>
+            <li>arrays, objects, variables, reducers, assignment, deletion, scoped updates, and deep merges;</li>
+            <li>mapping and sequence helpers for entries, sorting, grouping, uniqueness, selection, and reshaping;</li>
+            <li>environment values, file and document context, aliases, anchors, tags, styles, and comments;</li>
+            <li>multi-document and multi-file evaluation, including writable <code>eval-all</code>.</li>
+          </ul>
+          <p>Check the <a href="/docs/operators/">operator reference</a> before moving a large expression. A familiar operator name may have a deliberately smaller set of accepted inputs.</p>
+          <h2 id="important-differences"><a href="#important-differences">Important differences<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="table-wrap"><table>
             <thead><tr>
               <th>Area</th>
-              <th>Status</th>
-              <th>Included</th>
+              <th>YAML.sh behavior</th>
             </tr></thead>
             <tbody>
               <tr>
-                <td>Traverse and streams</td>
-                <td>Strong</td>
-                <td>paths, dynamic keys, indexes, optional traversal, recursive descent, pipes, unions, slices</td>
+                <td>Collections and equality</td>
+                <td><code>==</code> and <code>!=</code> compare scalar values; mappings and sequences do not use structural equality.</td>
               </tr>
               <tr>
-                <td>Select and logic</td>
-                <td>Strong</td>
-                <td><code>select</code>, <code>filter</code>, comparisons, short-circuiting <code>and</code>/<code>or</code>, <code>not</code>, <code>//</code>, <code>any</code>, <code>all</code>, <code>error</code> guards</td>
+                <td>Regular expressions</td>
+                <td><code>test</code> and global <code>sub</code> use the host AWK's POSIX ERE engine. Flags, capture objects, and replacement backreferences are not supported.</td>
               </tr>
               <tr>
-                <td>Build and mutate</td>
-                <td>Strong</td>
-                <td>arrays, computed keys, reducers, <code>=</code>, <code>|=</code>, compound updates, <code>setpath</code>, <code>delpaths</code>, <code>del</code>, <code>with</code>, deep merge and <code>*+</code>/<code>*d</code>/<code>*?</code>/<code>*n</code> policies</td>
+                <td>Date and time</td>
+                <td>Date/time query operators are not currently implemented. TOML date/time values can still be decoded and encoded.</td>
               </tr>
               <tr>
-                <td>Collections</td>
-                <td>Strong</td>
-                <td><code>map</code>, <code>map_values</code>, entries, sort/group/unique/min/max families, recursive key sorting, flatten, reverse, <code>array_to_map</code>, add, first, pick, omit, pivot</td>
+                <td>XML</td>
+                <td>XML is a data codec with a documented <code>+@attribute</code> / <code>+content</code> shape, not XPath or yq's full XML flag surface.</td>
               </tr>
               <tr>
-                <td>Context</td>
-                <td>Strong</td>
-                <td><code>path</code>, <code>parent</code>, <code>key</code>, exact block/flow <code>line</code> and <code>column</code>, <code>tag</code>, <code>filename</code>, <code>fileIndex</code>, <code>documentIndex</code></td>
-              </tr>
-              <tr>
-                <td>Environment</td>
-                <td>Strong</td>
-                <td><code>env</code>, <code>strenv</code>, <code>envsubst</code>, defaults, <code>nu</code>/<code>ne</code>/<code>ff</code>, security disable switch</td>
-              </tr>
-              <tr>
-                <td>Files and documents</td>
-                <td>Strong</td>
-                <td>one-process multi-file evaluation; all-document mode; whole-stream reduction; <code>split_doc</code>; writable cross-file <code>eval-all</code>; exact no-write diffs; snapshot-guarded transactions</td>
-              </tr>
-              <tr>
-                <td>Portable utilities</td>
-                <td>Focused</td>
-                <td>JSON, YAML, TOML, INI, secure XML data, properties, CSV, TSV, Base64, URI, and shell codecs; dynamic <code>eval</code>; guarded loads; reproducible shuffle</td>
-              </tr>
-              <tr>
-                <td>Configuration contracts</td>
-                <td>Focused</td>
-                <td>RFC 6901 Pointer, RFC 6902 Patch application/generation, RFC 7396 Merge Patch, path-aware JSON Schema profile</td>
-              </tr>
-              <tr>
-                <td>Strings</td>
-                <td>Focused</td>
-                <td>interpolation, string slicing, trim, string conversion, split/join, case, contains/prefix/suffix, POSIX <code>test</code> and <code>sub</code></td>
-              </tr>
-              <tr>
-                <td>YAML graph</td>
-                <td>Strong</td>
-                <td>anchors and aliases retain identity; <code>tag</code>, <code>anchor</code>, and <code>alias</code> are writable; <code>explode</code> materializes relationships</td>
-              </tr>
-              <tr>
-                <td>YAML presentation</td>
-                <td>Strong</td>
-                <td>exact source coordinates; writable value/key head, line, and foot comments; compiled scalar, flow, block, record, comment, and reorder spans</td>
-              </tr>
-            </tbody>
-          </table></div>
-          <p>“Strong” means the common forms documented and tested here. It does not mean every polymorphic combination accepted by yq.</p>
-          <h2 id="where-yaml-sh-wins"><a href="#where-yaml-sh-wins">Where YAML.sh wins<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>YAML.sh is optimized for a different boundary:</p>
-          <ul>
-            <li>The executable is readable source: one POSIX shell file with its portable AWK engine embedded.</li>
-            <li>It runs where <code>/bin/sh</code> and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.</li>
-            <li>Input bytes, graph nodes, collection depth, embedded parses, and dynamic evaluation are bounded. Environment and file operators have separate disable switches.</li>
-            <li><code>--ast</code> and <code>--events</code> expose the parser directly when a strange document needs explaining.</li>
-            <li><code>--check</code>, <code>--diff</code>, and <code>-i</code> share one prepared edit plan. Previewed bytes are committed bytes; net-zero updates are no-ops.</li>
-            <li><code>--preserve-only</code> turns source fidelity into an enforceable precondition instead of a best-effort promise.</li>
-            <li>Source plans preserve bytes outside changed spans and carry record comments through mapping and sequence moves—useful behavior that ordinary semantic serialization cannot promise.</li>
-            <li>Multi-file queries compile once. Writable <code>eval-all</code> can read one file, mutate several others, refuse detected source drift, skip no-ops, and roll back commit failures from the evaluated snapshots.</li>
-            <li><code>--explain=json</code> produces one value-free audit record per input for automation or logs.</li>
-            <li>Parser outcomes, invalid input, yq comparisons, TOML and JSON Schema oracles, presentation edits, and useful scale are covered by repeatable tests.</li>
-          </ul>
-          <p>yq remains the better choice for date arithmetic, broad XML controls, polished platform packaging, and its ecosystem. YAML.sh is strongest when inspectability, runtime reach, exact source-aware repository edits, standard contract workflows, and a small controllable security model matter most.</p>
-          <h2 id="deliberate-boundary"><a href="#deliberate-boundary">Deliberate boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <div class="table-wrap"><table>
-            <thead><tr>
-              <th>Boundary</th>
-              <th>Contract</th>
-            </tr></thead>
-            <tbody>
-              <tr>
-                <td>Non-YAML source editing</td>
-                <td>TOML, INI, and XML are semantic one-document codecs. Exact source-aware editing remains YAML-only.</td>
-              </tr>
-              <tr>
-                <td>XML application features</td>
-                <td>The secure data profile has no DTD, custom entities, XInclude, XPath, or network/file resolution.</td>
-              </tr>
-              <tr>
-                <td>TOML raw-byte rejection</td>
-                <td>The portable baseline excludes twelve invalid byte-level fixtures after host record decoding; all 205 decoder and encoder fixtures and 462 other invalid fixtures are pinned. Hosts that expose NUL reject five more.</td>
-              </tr>
-              <tr>
-                <td>JSON Schema</td>
-                <td>The documented 2020-12 profile uses local references and POSIX ERE. Dynamic/remote references and unevaluated annotation vocabularies are outside it.</td>
-              </tr>
-              <tr>
-                <td>Date/time and timezone operators</td>
-                <td>Portable AWK has no cross-platform timezone database or reliable host date API.</td>
+                <td>Other formats</td>
+                <td>TOML, INI, and XML are semantic one-document codecs. Presentation-preserving in-place edits are YAML-only.</td>
               </tr>
               <tr>
                 <td>System execution</td>
-                <td>Expressions never launch commands.</td>
+                <td>Expressions do not launch commands.</td>
               </tr>
               <tr>
-                <td>Regex captures and flags</td>
-                <td><code>test</code> and global <code>sub</code> use the platform's POSIX ERE engine.</td>
-              </tr>
-              <tr>
-                <td>Complete yq CLI flag parity</td>
-                <td>YAML.sh has useful input/output selection but does not reproduce colors, XML tuning flags, shell completion, or plugin surfaces.</td>
+                <td>CLI surface</td>
+                <td>YAML.sh does not reproduce yq's color, shell-completion, XML-tuning, or complete format-specific flag surface.</td>
               </tr>
             </tbody>
           </table></div>
-          <p>Properties use dotted paths and CSV/TSV use header-row object decoding. XML uses the documented <code>+@attribute</code> / <code>+content</code> graph. Dynamic expressions speak YAML.sh's documented language, and file reads can be disabled with <code>--security-disable-file-ops</code>. Anchor renames keep existing aliases valid even where yq leaves their displayed alias name unchanged.</p>
-          <h2 id="compared-with-yq"><a href="#compared-with-yq">Compared with yq<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The <a href="/docs/operators/">operator manifest</a> audits every YAML-oriented yq area and names the evidence behind each status. The differential suite then compares those forms with pinned yq v4.53.3 across generated variations, configuration workflows, metadata, and cross-file programs. See <a href="/docs/supported_yml/">YAML support</a> for parser coverage and limits.</p>
-          <p>If a form is not in the query guide or tests, treat it as unsupported even when a nearby form works.</p>
+          <p>If a form is absent from the <a href="/docs/queries/">query guide</a> and <a href="/docs/operators/">operator reference</a>, treat it as unsupported even when a nearby yq form works.</p>
+          <h2 id="what-is-specifically-yaml-sh"><a href="#what-is-specifically-yaml-sh">What is specifically YAML.sh<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>YAML.sh's main constraint is also its main difference: the complete executable is one readable POSIX shell file with portable AWK inside.</p>
+          <p>For in-place YAML edits, <code>--diff</code>, <code>--check</code>, and <code>-i</code> use the same prepared candidate. Common changes preserve comments and unrelated formatting, while <code>--preserve-only</code> turns preservation into a requirement. Multi-file edits are prepared from snapshots before writing and refuse files that change during the run. See <a href="/docs/documents/">documents and file edits</a> for the exact behavior.</p>
+          <p><code>--ast</code> and <code>--events</code> expose how YAML was parsed. Input size, graph size, and nesting have configurable limits, and environment access, query-selected file reads, and dynamic evaluation can be disabled separately.</p>
+          <p>Use yq when a script needs its complete language, flags, packaging, or ecosystem. Use YAML.sh when the one-file implementation, portable runtime, YAML-preserving edits, or inspectable parser is the interesting part.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
       <ol>
-        <li class="level-2"><a href="#the-useful-core">The useful core</a></li>
-        <li class="level-2"><a href="#where-yaml-sh-wins">Where YAML.sh wins</a></li>
-        <li class="level-2"><a href="#deliberate-boundary">Deliberate boundary</a></li>
-        <li class="level-2"><a href="#compared-with-yq">Compared with yq</a></li>
+        <li class="level-2"><a href="#expressions-that-usually-transfer">Expressions that usually transfer</a></li>
+        <li class="level-2"><a href="#important-differences">Important differences</a></li>
+        <li class="level-2"><a href="#what-is-specifically-yaml-sh">What is specifically YAML.sh</a></li>
       </ol>
       <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/yq-compatibility.md">Edit this page</a>
     </aside>
