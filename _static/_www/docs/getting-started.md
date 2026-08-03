@@ -110,7 +110,7 @@ ysh --diff '.release.channel = "stable"' config.yml
 ysh -i '.release.channel = "stable"' config.yml
 ```
 
-In-place output is atomic and preserves file permissions. Common replacements, inserts, deletes, sequence reorders, and block appends retain comments, blank lines, directives, properties, layout, and quote style. Unsupported presentation edits fall back to stable semantic YAML. Add `--preserve-only` to make that fallback an error.
+Each in-place replacement is an atomic sibling rename and preserves file permissions. Common replacements, inserts, deletes, sequence reorders, and block appends retain comments, blank lines, directives, properties, layout, and quote style. Unsupported presentation edits fall back to stable semantic YAML. Add `--preserve-only` to make that fallback an error.
 
 The same expression can check or update several files as one preflighted transaction:
 

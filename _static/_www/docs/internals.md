@@ -20,7 +20,11 @@ presentation patcher or value / JSON / YAML / metadata / AST / events
 
 ## The shell layer
 
-The `/bin/sh` launcher handles arguments, input, output mode, and edit transactions. It prepares every transformed candidate once; `--check`, `--diff`, and `-i` inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement. A bounded embedded AWK renderer produces unified diffs without adding a runtime dependency. Rollback siblings remain until every replacement succeeds.
+The `/bin/sh` launcher handles arguments, input, output mode, and edit transactions. It snapshots every source beside the original, evaluates those stable bytes, and prepares each transformed candidate once. `--check`, `--diff`, and `-i` inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement.
+
+Live inputs are compared with their snapshots after evaluation and again before commit; each changed target is checked immediately before replacement. A mismatch aborts without overwriting the external change. The snapshots are also the rollback material, so a failed batch restores what the query actually read. Each sibling rename is atomic, but the complete multi-file sequence is not one globally atomic filesystem operation.
+
+A bounded embedded AWK renderer produces unified diffs without adding a runtime dependency.
 
 Embedded AWK programs arrive through here-documents, avoiding small `ARG_MAX` limits in minimal systems. Query text travels through the POSIX environment so AWK never rewrites backslashes before lexing interpolation or regex syntax.
 

@@ -23,6 +23,8 @@ selection	expressions.yml	.services[] | select(.tier == "backend") | .name
 selection	expressions.yml	.services[] | select(.tier != "backend") | .name
 selection	expressions.yml	.services[] | select(.enabled and .tier == "backend") | .name
 selection	expressions.yml	.services[] | select(.enabled or .port == 9090) | .name
+selection	expressions.yml	true or error("must not run")
+selection	expressions.yml	false and error("must not run")
 selection	expressions.yml	.services[] | .enabled | not
 collections	expressions.yml	.services | length
 collections	expressions.yml	.metadata | length

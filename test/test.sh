@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.11.0" "$(./ysh --version)"
+    assertEquals "v1.12.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -128,6 +128,19 @@ testExpressionBooleanFilters() {
     assertEquals "$(printf "%s\n" api web)" "$(./ysh '.services[] | select(.enabled and .port < 9000) | .name' test/expressions.yml)"
     assertEquals "$(printf "%s\n" false true false)" "$(./ysh '.services[] | .enabled | not' test/expressions.yml)"
     assertEquals "$(printf "%s\n" api web)" "$(./ysh '.services[] | select(.enabled) | .name' test/expressions.yml)"
+}
+
+testExpressionErrorGuards() {
+    assertEquals 'true' "$(./ysh -n --json 'true or error("must not run")')"
+    assertEquals 'false' "$(./ysh -n --json 'false and error("must not run")')"
+
+    result=$(./ysh -n 'false or error("guard failed")' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'guard failed'
+
+    result=$(printf '%s\n' 'kind: Service' | ./ysh 'with(.kind; select(. == "Deployment") or error("expected Deployment"))' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" 'expected Deployment'
 }
 
 testExpressionAlternativeDefaults() {
@@ -749,6 +762,75 @@ testInplaceTransactionRollsBackCommitFailure() {
     rm -f "$report_file" "$state_file" "$second_file" "$first_file"
 }
 
+testInplaceTransactionRefusesEvaluationDrift() {
+    target_file=test/.tmp-inplace-evaluation-drift-$$.yml
+    report_file=test/.tmp-inplace-evaluation-drift-report-$$
+    printf '%s\n' 'name: original' > "$target_file"
+    real_awk=$(command -v awk)
+
+    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_AWK=$real_awk \
+        YSH_AWK_MUTATE_FILE=$target_file YSH_AWK_MUTATE_CONTENT='name: external' \
+        ./ysh -i '.name = "candidate"' "$target_file" >/dev/null 2> "$report_file"
+    assertNotEquals 0 $?
+    assertEquals 'name: external' "$(cat "$target_file")"
+    assertContains "$(cat "$report_file")" 'input changed during evaluation'
+    assertContains "$(cat "$report_file")" 'no files written'
+
+    set -- "test/.$(basename "$target_file").ysh-new."* "test/.$(basename "$target_file").ysh-snapshot."*
+    assertFalse "transaction files must be removed" "[ -e \"$1\" ]"
+    assertFalse "transaction files must be removed" "[ -e \"$2\" ]"
+    rm -f "$report_file" "$target_file"
+}
+
+testInplaceTransactionRefusesCommitDriftAndRollsBack() {
+    first_file=test/.tmp-inplace-commit-drift-first-$$.yml
+    second_file=test/.tmp-inplace-commit-drift-second-$$.yml
+    state_file=test/.tmp-inplace-commit-drift-state-$$
+    report_file=test/.tmp-inplace-commit-drift-report-$$
+    printf '%s\n' 'name: first' > "$first_file"
+    printf '%s\n' 'name: second' > "$second_file"
+    real_mv=$(command -v mv)
+
+    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_MV=$real_mv YSH_MV_STATE=$state_file \
+        YSH_MUTATE_AFTER_MV_AT=1 YSH_MUTATE_FILE=$second_file YSH_MUTATE_CONTENT='name: external' \
+        ./ysh -i '.name = "candidate"' "$first_file" "$second_file" >/dev/null 2> "$report_file"
+    assertNotEquals 0 $?
+    assertEquals 'name: first' "$(cat "$first_file")"
+    assertEquals 'name: external' "$(cat "$second_file")"
+    assertContains "$(cat "$report_file")" 'changed before replacement'
+
+    rm -f "$report_file" "$state_file" "$second_file" "$first_file"
+}
+
+testInplaceTransactionKeepsLogicalFilenamesAndRejectsAliases() {
+    target_file=test/.tmp-inplace-logical-file-$$.yml
+    alias_file=./test/../test/.tmp-inplace-logical-file-$$.yml
+    printf '%s\n' 'name: original' > "$target_file"
+
+    ./ysh -i '.source = filename' "$target_file"
+    assertEquals 0 $?
+    assertEquals "$target_file" "$(./ysh '.source' "$target_file")"
+
+    result=$(./ysh -i '.name = "duplicate"' "$target_file" "$alias_file" 2>&1)
+    assertEquals 2 $?
+    assertContains "$result" 'same input more than once'
+    assertEquals original "$(./ysh '.name' "$target_file")"
+
+    rm -f "$target_file"
+}
+
+testInplaceTransactionRejectsNewlineFilenames() {
+    target_file=$(printf 'test/.tmp-inplace-newline-%s\ncontinued.yml' "$$")
+    printf '%s\n' 'name: original' > "$target_file"
+
+    result=$(./ysh -i '.name = "candidate"' "$target_file" 2>&1)
+    assertEquals 2 $?
+    assertContains "$result" 'does not support newlines in filenames'
+    assertEquals 'name: original' "$(cat "$target_file")"
+
+    rm -f "$target_file"
+}
+
 testInplaceTransformsAllDocuments() {
     inplace_file=test/.tmp-inplace-multi-$$.yml
     cp test/test.yml "$inplace_file"
@@ -1195,11 +1277,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.11.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.12.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.11.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.11"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.12.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.12"
     assertNotContains "$(cat _static/_www/story/index.html)" "v1.8"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
@@ -1215,7 +1297,7 @@ testReleaseArtifactsStayInSync() {
     assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "282 accepted cases"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "91 strict-invalid cases"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,628 categorized programs"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,630 categorized programs"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "6 layouts × 7 collection sizes × 2 states × 8"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "Repository transaction suite"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "Kubernetes, Compose, GitHub Actions, GitLab CI"

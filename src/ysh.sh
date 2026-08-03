@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.11.0
+YSH_VERSION=1.12.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -104,6 +104,7 @@ ysh_invoke_awk() {
         -v batch_files_mode="$YSH_BATCH_FILES" \
         -v transaction_batch_mode="$YSH_TRANSACTION_BATCH" \
         -v combined_files_mode="$YSH_COMBINED_FILES" \
+        -v logical_input_list="$YSH_LOGICAL_INPUT_LIST" \
         -v null_input_mode="$YSH_NULL_INPUT" \
         -v inplace_mode="$YSH_INPLACE" \
         -v preserve_only_mode="$YSH_PRESERVE_ONLY" \
@@ -185,7 +186,7 @@ ysh_run_files() {
 }
 
 ysh_cleanup_transaction() {
-    for YSH_CLEANUP_LIST in "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST"; do
+    for YSH_CLEANUP_LIST in "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST" "$YSH_TRANSACTION_SNAPSHOT_LIST"; do
         if [ -n "$YSH_CLEANUP_LIST" ] && [ -f "$YSH_CLEANUP_LIST" ]; then
             while IFS= read -r YSH_CLEANUP_FILE; do
                 [ -z "$YSH_CLEANUP_FILE" ] || rm -f "$YSH_CLEANUP_FILE"
@@ -193,6 +194,7 @@ ysh_cleanup_transaction() {
         fi
     done
     for YSH_CLEANUP_LIST in "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST" \
+        "$YSH_TRANSACTION_SNAPSHOT_LIST" "$YSH_TRANSACTION_IDENTITY_LIST" \
         "$YSH_TRANSACTION_REPORT" "$YSH_TRANSACTION_CALL_LOG" "$YSH_TRANSACTION_OUTPUT" "$YSH_TRANSACTION_CHANGE_LIST" \
         "$YSH_TRANSACTION_FINAL_CHANGE_LIST" "$YSH_TRANSACTION_COMMITTED_INPUT_LIST" "$YSH_TRANSACTION_COMMITTED_OLD_LIST"; do
         [ -z "$YSH_CLEANUP_LIST" ] || rm -f "$YSH_CLEANUP_LIST"
@@ -257,6 +259,10 @@ ysh_split_transaction_output() {
                 ysh_error "transaction output has too many inputs"
                 return 1
             fi
+            if ! IFS= read -r YSH_FRAME_SNAPSHOT <&5; then
+                ysh_error "transaction output has too many snapshots"
+                return 1
+            fi
             YSH_FRAME_WRITE=$YSH_FRAME_CHANGED
             YSH_FRAME_SEEN=1
             if [ "$YSH_FRAME_WRITE" -eq 1 ]; then
@@ -275,12 +281,8 @@ ysh_split_transaction_output() {
                     return 1
                 fi
                 printf '%s\n' "$YSH_FRAME_TARGET" >> "$YSH_TRANSACTION_NEW_LIST"
-                if ! YSH_FRAME_OLD=$(umask 077 && mktemp "${YSH_FRAME_DIR}/.${YSH_FRAME_NAME}.ysh-old.XXXXXX") 2>/dev/null; then
-                    ysh_error "could not create rollback copy beside: $YSH_FRAME_INPUT"
-                    return 1
-                fi
-                printf '%s\n' "$YSH_FRAME_OLD" >> "$YSH_TRANSACTION_OLD_LIST"
-                if ! cp -p "$YSH_FRAME_INPUT" "$YSH_FRAME_TARGET"; then
+                printf '%s\n' "$YSH_FRAME_SNAPSHOT" >> "$YSH_TRANSACTION_OLD_LIST"
+                if ! cp -p "$YSH_FRAME_SNAPSHOT" "$YSH_FRAME_TARGET"; then
                     ysh_error "could not preserve input metadata: $YSH_FRAME_INPUT"
                     return 1
                 fi
@@ -303,11 +305,35 @@ ysh_split_transaction_output() {
             fi
             ;;
         esac
-    done < "$YSH_TRANSACTION_OUTPUT" 4< "$YSH_TRANSACTION_INPUT_LIST"
+    done < "$YSH_TRANSACTION_OUTPUT" 4< "$YSH_TRANSACTION_INPUT_LIST" 5< "$YSH_TRANSACTION_SNAPSHOT_LIST"
     if [ "$YSH_FRAME_COUNT" -ne "$YSH_TRANSACTION_FILE_COUNT" ]; then
         ysh_error "transaction output is missing files"
         return 1
     fi
+}
+
+ysh_validate_transaction_inputs() {
+    YSH_VALIDATE_INPUT_COUNT=$(wc -l < "$YSH_TRANSACTION_INPUT_LIST")
+    YSH_VALIDATE_SNAPSHOT_COUNT=$(wc -l < "$YSH_TRANSACTION_SNAPSHOT_LIST")
+    if [ "$YSH_VALIDATE_INPUT_COUNT" -ne "$YSH_TRANSACTION_FILE_COUNT" ] ||
+        [ "$YSH_VALIDATE_SNAPSHOT_COUNT" -ne "$YSH_TRANSACTION_FILE_COUNT" ]; then
+        ysh_error "transaction snapshot set is incomplete"
+        return 1
+    fi
+    while IFS= read -r YSH_VALIDATE_INPUT && IFS= read -r YSH_VALIDATE_SNAPSHOT <&4; do
+        if [ -L "$YSH_VALIDATE_INPUT" ]; then
+            ysh_error "transaction target became a symbolic link: $YSH_VALIDATE_INPUT"
+            return 1
+        fi
+        if [ ! -f "$YSH_VALIDATE_INPUT" ]; then
+            ysh_error "transaction target is no longer a regular file: $YSH_VALIDATE_INPUT"
+            return 1
+        fi
+        if ! cmp -s "$YSH_VALIDATE_SNAPSHOT" "$YSH_VALIDATE_INPUT"; then
+            ysh_error "transaction input changed during evaluation: $YSH_VALIDATE_INPUT"
+            return 1
+        fi
+    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_SNAPSHOT_LIST"
 }
 
 ysh_rollback_transaction() {
@@ -335,6 +361,8 @@ ysh_close_transaction() {
     YSH_TRANSACTION_INPUT_LIST=
     YSH_TRANSACTION_NEW_LIST=
     YSH_TRANSACTION_OLD_LIST=
+    YSH_TRANSACTION_SNAPSHOT_LIST=
+    YSH_TRANSACTION_IDENTITY_LIST=
     YSH_TRANSACTION_REPORT=
     YSH_TRANSACTION_CALL_LOG=
     YSH_TRANSACTION_OUTPUT=
@@ -409,6 +437,8 @@ ysh_run_edit_transaction() {
     YSH_TRANSACTION_INPUT_LIST=
     YSH_TRANSACTION_NEW_LIST=
     YSH_TRANSACTION_OLD_LIST=
+    YSH_TRANSACTION_SNAPSHOT_LIST=
+    YSH_TRANSACTION_IDENTITY_LIST=
     YSH_TRANSACTION_REPORT=
     YSH_TRANSACTION_CALL_LOG=
     YSH_TRANSACTION_OUTPUT=
@@ -421,6 +451,8 @@ ysh_run_edit_transaction() {
     YSH_TRANSACTION_INPUT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-inputs.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_NEW_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-new.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_OLD_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-old.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_SNAPSHOT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-snapshots.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_IDENTITY_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-identities.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_REPORT=$(mktemp "${TMPDIR:-/tmp}/ysh-report.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_CALL_LOG=$(mktemp "${TMPDIR:-/tmp}/ysh-call-log.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-output.XXXXXX") || { ysh_close_transaction; return 1; }
@@ -444,6 +476,13 @@ ysh_run_edit_transaction() {
     YSH_NORMALIZED_INPUT_FILES=
     YSH_OUTPUT_MODE=yaml
     for YSH_TRANSACTION_INPUT do
+        case "$YSH_TRANSACTION_INPUT" in
+        *'
+'*)
+            ysh_error "--inplace does not support newlines in filenames"
+            return 2
+            ;;
+        esac
         if [ "$YSH_TRANSACTION_INPUT" = "-" ]; then
             ysh_error "--inplace requires real input files"
             return 2
@@ -457,24 +496,65 @@ ysh_run_edit_transaction() {
             return 1
         fi
         case "$YSH_TRANSACTION_INPUT" in
+        */*)
+            YSH_TRANSACTION_DIR=${YSH_TRANSACTION_INPUT%/*}
+            YSH_TRANSACTION_NAME=${YSH_TRANSACTION_INPUT##*/}
+            [ -n "$YSH_TRANSACTION_DIR" ] || YSH_TRANSACTION_DIR=/
+            ;;
+        *)
+            YSH_TRANSACTION_DIR=.
+            YSH_TRANSACTION_NAME=$YSH_TRANSACTION_INPUT
+            ;;
+        esac
+        if ! YSH_TRANSACTION_PHYSICAL_DIR=$(CDPATH='' cd -- "$YSH_TRANSACTION_DIR" 2>/dev/null && pwd -P); then
+            ysh_error "could not resolve input directory: $YSH_TRANSACTION_INPUT"
+            return 1
+        fi
+        YSH_TRANSACTION_IDENTITY=$YSH_TRANSACTION_PHYSICAL_DIR/$YSH_TRANSACTION_NAME
+        case "$YSH_TRANSACTION_INPUT" in
         */*) ;;
         *) YSH_TRANSACTION_INPUT=./$YSH_TRANSACTION_INPUT ;;
         esac
         while IFS= read -r YSH_TRANSACTION_EXISTING; do
-            if [ "$YSH_TRANSACTION_EXISTING" = "$YSH_TRANSACTION_INPUT" ]; then
+            if [ "$YSH_TRANSACTION_EXISTING" = "$YSH_TRANSACTION_IDENTITY" ]; then
                 ysh_error "--inplace received the same input more than once: $YSH_TRANSACTION_INPUT"
                 return 2
             fi
-        done < "$YSH_TRANSACTION_INPUT_LIST"
+        done < "$YSH_TRANSACTION_IDENTITY_LIST"
+        printf '%s\n' "$YSH_TRANSACTION_IDENTITY" >> "$YSH_TRANSACTION_IDENTITY_LIST"
         printf '%s\n' "$YSH_TRANSACTION_INPUT" >> "$YSH_TRANSACTION_INPUT_LIST"
+        case "$YSH_TRANSACTION_INPUT" in
+        */*)
+            YSH_SNAPSHOT_DIR=${YSH_TRANSACTION_INPUT%/*}
+            YSH_SNAPSHOT_NAME=${YSH_TRANSACTION_INPUT##*/}
+            ;;
+        *)
+            YSH_SNAPSHOT_DIR=.
+            YSH_SNAPSHOT_NAME=$YSH_TRANSACTION_INPUT
+            ;;
+        esac
+        if ! YSH_TRANSACTION_SNAPSHOT=$(umask 077 && mktemp "${YSH_SNAPSHOT_DIR}/.${YSH_SNAPSHOT_NAME}.ysh-snapshot.XXXXXX") 2>/dev/null; then
+            ysh_error "could not create source snapshot beside: $YSH_TRANSACTION_INPUT"
+            return 1
+        fi
+        printf '%s\n' "$YSH_TRANSACTION_SNAPSHOT" >> "$YSH_TRANSACTION_SNAPSHOT_LIST"
+        if ! cp -p "$YSH_TRANSACTION_INPUT" "$YSH_TRANSACTION_SNAPSHOT"; then
+            ysh_error "could not snapshot input file: $YSH_TRANSACTION_INPUT"
+            return 1
+        fi
         if [ -z "$YSH_NORMALIZED_INPUT_FILES" ]; then
-            YSH_NORMALIZED_INPUT_FILES=$YSH_TRANSACTION_INPUT
+            YSH_NORMALIZED_INPUT_FILES=$YSH_TRANSACTION_SNAPSHOT
         else
             YSH_NORMALIZED_INPUT_FILES="${YSH_NORMALIZED_INPUT_FILES}
-${YSH_TRANSACTION_INPUT}"
+${YSH_TRANSACTION_SNAPSHOT}"
         fi
         YSH_TRANSACTION_FILE_COUNT=$((YSH_TRANSACTION_FILE_COUNT + 1))
     done
+
+    if ! ysh_validate_transaction_inputs; then
+        ysh_error "transaction aborted before evaluation"
+        return 1
+    fi
 
     YSH_SAVED_IFS=$IFS
     IFS='
@@ -487,6 +567,7 @@ ${YSH_TRANSACTION_INPUT}"
     YSH_FILE_INDEX=0
     YSH_BATCH_FILES=1
     YSH_TRANSACTION_BATCH=1
+    YSH_LOGICAL_INPUT_LIST=$YSH_TRANSACTION_INPUT_LIST
     : > "$YSH_TRANSACTION_CALL_LOG"
     if ! ysh_run_awk "$@" > "$YSH_TRANSACTION_OUTPUT" 2> "$YSH_TRANSACTION_CALL_LOG"; then
         ysh_emit_transaction_errors "$YSH_TRANSACTION_CALL_LOG"
@@ -508,6 +589,14 @@ ${YSH_TRANSACTION_INPUT}"
         return 1
     fi
     ysh_append_transaction_log
+
+    if ! ysh_validate_transaction_inputs; then
+        ysh_error "transaction aborted because an input changed; no files written"
+        if [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ] || [ "$YSH_PRESERVE_ONLY" -eq 1 ]; then
+            return 2
+        fi
+        return 1
+    fi
 
     if [ "$YSH_CHECK" -eq 1 ]; then
         YSH_CHECK_STATUS=0
@@ -532,8 +621,9 @@ ${YSH_TRANSACTION_INPUT}"
         if [ "$YSH_TRANSACTION_CHANGED" -eq 0 ]; then
             continue
         fi
-        if ! cp -p "$YSH_TRANSACTION_INPUT" "$YSH_TRANSACTION_OLD"; then
-            ysh_error "could not preserve rollback copy: $YSH_TRANSACTION_INPUT"
+        if [ -L "$YSH_TRANSACTION_INPUT" ] || [ ! -f "$YSH_TRANSACTION_INPUT" ] ||
+            ! cmp -s "$YSH_TRANSACTION_OLD" "$YSH_TRANSACTION_INPUT"; then
+            ysh_error "transaction input changed before replacement: $YSH_TRANSACTION_INPUT"
             YSH_TRANSACTION_STATUS=1
             break
         fi
@@ -582,8 +672,11 @@ ysh_main() {
     YSH_TRANSACTION_INPUT_LIST=
     YSH_TRANSACTION_NEW_LIST=
     YSH_TRANSACTION_OLD_LIST=
+    YSH_TRANSACTION_SNAPSHOT_LIST=
+    YSH_TRANSACTION_IDENTITY_LIST=
     YSH_TRANSACTION_REPORT=
     YSH_TRANSACTION_CALL_LOG=
+    YSH_LOGICAL_INPUT_LIST=
     YSH_MAX_INPUT_BYTES=${YSH_MAX_INPUT_BYTES:-16777216}
     YSH_MAX_NODES=${YSH_MAX_NODES:-100000}
     YSH_MAX_DEPTH=${YSH_MAX_DEPTH:-256}
@@ -591,6 +684,7 @@ ysh_main() {
     YSH_POSITIONAL_ONE=
     YSH_POSITIONAL_TWO=
     YSH_POSITIONAL_REST=
+    YSH_POSITIONAL_REST_HAS_NEWLINE=0
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -768,6 +862,10 @@ ysh_main() {
                 elif [ "$YSH_POSITIONAL_COUNT" -eq 2 ]; then
                     YSH_POSITIONAL_TWO=$1
                 else
+                    case "$1" in
+                    *'
+'*) YSH_POSITIONAL_REST_HAS_NEWLINE=1 ;;
+                    esac
                     if [ -z "$YSH_POSITIONAL_REST" ]; then
                         YSH_POSITIONAL_REST=$1
                     else
@@ -802,6 +900,10 @@ $1"
             elif [ "$YSH_POSITIONAL_COUNT" -eq 2 ]; then
                 YSH_POSITIONAL_TWO=$1
             else
+                case "$1" in
+                *'
+'*) YSH_POSITIONAL_REST_HAS_NEWLINE=1 ;;
+                esac
                 if [ -z "$YSH_POSITIONAL_REST" ]; then
                     YSH_POSITIONAL_REST=$1
                 else
@@ -847,6 +949,20 @@ $1"
     fi
     if [ -n "$YSH_INPUT_FILE" ]; then
         YSH_INPUT_FILENAME=$YSH_INPUT_FILE
+    fi
+
+    if [ "$YSH_INPLACE" -eq 1 ]; then
+        case "$YSH_INPUT_FILE" in
+        *'
+'*)
+            ysh_error "--inplace does not support newlines in filenames"
+            return 2
+            ;;
+        esac
+        if [ "$YSH_POSITIONAL_REST_HAS_NEWLINE" -eq 1 ]; then
+            ysh_error "--inplace does not support newlines in filenames"
+            return 2
+        fi
     fi
 
     if [ -n "$YSH_POSITIONAL_REST" ]; then

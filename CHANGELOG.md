@@ -4,6 +4,26 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.12.0] - 2026-08-02
+
+Version 1.12 makes repository updates conditional on the files that were actually evaluated.
+
+### Added
+
+- `error(MESSAGE)` matches yq's explicit query-abort behavior and composes with short-circuiting `and`/`or` for validation guards.
+- Content-drift checks before candidate reporting, before commit, and immediately before each changed file is replaced.
+
+### Changed
+
+- Check, diff, and in-place operations parse preserved source snapshots. Candidates and rollback material now come from the same evaluated bytes.
+- Rollback restores the pre-evaluation snapshots instead of copying possibly changed live inputs during commit.
+- Equivalent path spellings are detected as duplicate transaction inputs; newline-containing input names are rejected explicitly.
+
+### Boundaries
+
+- Each sibling-file rename is atomic; a multi-file commit is preflighted and rollback-capable, not one globally atomic filesystem operation.
+- An unrelated writer can still race after the final comparison, and POSIX shell cannot promise power-loss durability. Use version control and normal backups.
+
 ## [1.11.0] - 2026-08-02
 
 Version 1.11 makes edits reviewable before they become writes.

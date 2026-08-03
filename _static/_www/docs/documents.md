@@ -48,7 +48,7 @@ Add `--preserve-only` to `--check`, `--diff`, or `-i` when source fidelity is a 
 ysh --preserve-only --diff '.release.channel = "stable"' services/*.yml
 ```
 
-If any changed file would need deterministic YAML regeneration, the complete preflight fails with exit `2`. In-place mode replaces nothing until all candidates pass; no-op files stay untouched, and a commit failure or interrupt rolls back files already changed.
+If any changed file would need deterministic YAML regeneration, the complete preflight fails with exit `2`. In-place mode evaluates source snapshots and verifies the live files still match before replacement. No-op files stay untouched; detected drift aborts, and a commit failure or interrupt rolls back files already changed to the snapshots the query read.
 
 Use `eval-all` when files need to share data. The combined stream keeps `filename`, `fileIndex`, and `documentIndex` on every root:
 
@@ -58,4 +58,4 @@ ysh eval-all --check "$query" release.yml services/*.yml
 ysh eval-all -i "$query" release.yml services/*.yml
 ```
 
-Every mutated source file participates in the same preflight and commit. A read-only source file that does not change is not replaced.
+Every source file participates in drift detection; every mutated source participates in commit. A read-only source file that does not change is not replaced.

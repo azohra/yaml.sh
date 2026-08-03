@@ -225,6 +225,14 @@ ysh '.message | envsubst(nu, ff)' config.yml
 
 `to_number` converts numeric strings. `with(PATH; UPDATE)` applies an update in a selected context while returning the original input.
 
+`error(MESSAGE)` aborts evaluation with the message. Combine it with short-circuiting boolean operators to make a precondition executable while `with` retains the document:
+
+```sh
+ysh -i 'with(.kind; select(. == "Deployment") or error("expected Deployment")) | .spec.replicas = 3' deploy.yml
+```
+
+If any input fails the guard, a repository transaction writes nothing.
+
 ## Files and documents
 
 List files to evaluate the query independently over each one. `--all-documents` evaluates every document in one YAML stream. `eval-all`/`ea` evaluates once across all documents and files, enabling slurp and practical cross-file merge:
@@ -282,7 +290,7 @@ ysh -o=yaml 'setpath(["spec", "replicas"]; 4)' deploy.yml
 ysh -o=yaml 'delpaths([["metadata", "annotations"], ["metadata", "managedFields"]])' deploy.yml
 ```
 
-Use `--check` for a quiet preflight or `--diff` to see the exact prepared transaction. Both write nothing and return `0` when clean, `1` for drift, and `2` for an invalid query or input. Use `-i` to commit those candidates transactionally. No-op files are not replaced, and a commit failure restores the originals.
+Use `--check` for a quiet preflight or `--diff` to see the exact prepared transaction. Both write nothing and return `0` when clean, `1` for drift, and `2` for an invalid query or input. Use `-i` to commit those candidates transactionally. No-op files are not replaced. Changed live inputs are refused, and a commit failure restores the evaluated snapshots.
 
 ```sh
 ysh --check '.image.tag = "stable"' services/*.yml

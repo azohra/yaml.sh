@@ -2387,6 +2387,11 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             argument = expression_parse_stream()
             expression_expect("right_parenthesis")
             expression = expression_new("explode", argument, 0, "")
+        } else if (name == "error") {
+            expression_expect("left_parenthesis")
+            argument = expression_parse_stream()
+            expression_expect("right_parenthesis")
+            expression = expression_new("error", argument, 0, "")
         } else if (name == "select" || name == "has" || name == "del" || name == "map" || name == "map_values" || name == "with_entries" ||
             name == "contains" || name == "startswith" || name == "endswith" || name == "split" || name == "join" ||
             name == "sort_by" || name == "group_by" || name == "unique_by" || name == "min_by" || name == "max_by" ||
@@ -4064,6 +4069,15 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
     if (kind == "empty") {
         return output
     }
+    if (kind == "error") {
+        key = "aborted"
+        argument_stream = expression_evaluate(expression_left[expression], input)
+        if (expression_stream_count[argument_stream]) {
+            node = resolve_alias(expression_stream_node[argument_stream, 1])
+            key = node_kind[node] == "scalar" ? node_value[node] : ""
+        }
+        fail(key)
+    }
     if (kind == "env" || kind == "strenv") {
         if (disable_env_ops) {
             fail("environment operations are disabled")
@@ -4798,7 +4812,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
-    if (kind == "compare" || kind == "and" || kind == "or") {
+    if (kind == "compare") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             single = expression_stream_single(expression_stream_node[input, i])
             left_stream = expression_evaluate(expression_left[expression], single)
@@ -4807,14 +4821,39 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
                 for (collection = 1; collection <= expression_stream_count[right_stream]; collection++) {
                     node = expression_stream_node[left_stream, j]
                     child = expression_stream_node[right_stream, collection]
-                    if (kind == "compare") {
-                        matched = expression_compare(node, child, expression_value[expression])
-                    } else if (kind == "and") {
-                        matched = expression_truthy(node) && expression_truthy(child)
-                    } else {
-                        matched = expression_truthy(node) || expression_truthy(child)
-                    }
+                    matched = expression_compare(node, child, expression_value[expression])
                     expression_stream_push(output, expression_boolean(matched))
+                }
+            }
+        }
+        return output
+    }
+    if (kind == "and" || kind == "or") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            single = expression_stream_single(expression_stream_node[input, i])
+            left_stream = expression_evaluate(expression_left[expression], single)
+            if (!expression_stream_count[left_stream]) {
+                if (kind == "and") {
+                    expression_stream_push(output, expression_boolean(0))
+                } else {
+                    right_stream = expression_evaluate(expression_right[expression], single)
+                    for (collection = 1; collection <= expression_stream_count[right_stream]; collection++) {
+                        expression_stream_push(output, expression_boolean(expression_truthy(expression_stream_node[right_stream, collection])))
+                    }
+                }
+                continue
+            }
+            for (j = 1; j <= expression_stream_count[left_stream]; j++) {
+                node = expression_stream_node[left_stream, j]
+                matched = expression_truthy(node)
+                if ((kind == "or" && matched) || (kind == "and" && !matched)) {
+                    expression_stream_push(output, expression_boolean(matched))
+                    continue
+                }
+                right_stream = expression_evaluate(expression_right[expression], single)
+                for (collection = 1; collection <= expression_stream_count[right_stream]; collection++) {
+                    child = expression_stream_node[right_stream, collection]
+                    expression_stream_push(output, expression_boolean(expression_truthy(child)))
                 }
             }
         }
@@ -6562,8 +6601,19 @@ BEGIN {
                 continue
             }
             declared_file_index = input_file_index + declared_input_file_count
-            input_file_name[declared_file_index] = ARGV[argument_index]
+            input_physical_name[declared_file_index] = ARGV[argument_index]
+            if (logical_input_list != "") {
+                if ((getline logical_input_name < logical_input_list) <= 0) {
+                    fail("logical input list is missing an entry")
+                }
+                input_file_name[declared_file_index] = logical_input_name
+            } else {
+                input_file_name[declared_file_index] = ARGV[argument_index]
+            }
             declared_input_file_count++
+        }
+        if (logical_input_list != "") {
+            close(logical_input_list)
         }
         declared_last_input_file_index = input_file_index + declared_input_file_count - 1
     }
@@ -6572,7 +6622,7 @@ BEGIN {
 {
     if (combined_files_mode && FNR == 1) {
         next_input_file_index = combined_seen_file ? current_input_file_index + 1 : input_file_index + 0
-        while (next_input_file_index <= declared_last_input_file_index && input_file_name[next_input_file_index] != FILENAME) {
+        while (next_input_file_index <= declared_last_input_file_index && input_physical_name[next_input_file_index] != FILENAME) {
             next_input_file_index++
         }
         if (next_input_file_index > declared_last_input_file_index) {
@@ -6580,7 +6630,7 @@ BEGIN {
         }
         if (!combined_seen_file) {
             current_input_file_index = next_input_file_index
-            current_input_filename = FILENAME
+            current_input_filename = input_file_name[current_input_file_index]
             input_file_start_line[current_input_file_index] = NR
             input_file_has_lines[current_input_file_index] = 1
             combined_seen_file = 1
@@ -6602,7 +6652,7 @@ BEGIN {
             document_ended = 0
             clear_structure()
             current_input_file_index = next_input_file_index
-            current_input_filename = FILENAME
+            current_input_filename = input_file_name[current_input_file_index]
             input_file_start_line[current_input_file_index] = NR
             input_file_has_lines[current_input_file_index] = 1
             file_document_offset = document_index

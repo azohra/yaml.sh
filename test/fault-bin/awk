@@ -1,0 +1,14 @@
+#!/bin/sh
+
+YSH_AWK_BINARY=${YSH_REAL_AWK:-/usr/bin/awk}
+
+if [ ! -x "$YSH_AWK_BINARY" ]; then
+    printf '%s\n' 'fault wrapper could not find the real awk' >&2
+    exit 127
+fi
+
+if [ -n "${YSH_AWK_MUTATE_FILE:-}" ]; then
+    printf '%s\n' "${YSH_AWK_MUTATE_CONTENT:-externally changed}" > "$YSH_AWK_MUTATE_FILE"
+fi
+
+exec "$YSH_AWK_BINARY" "$@"

@@ -2,16 +2,24 @@
 
 : "${YSH_REAL_MV:?YSH_REAL_MV is required}"
 
-if [ -n "${YSH_MV_STATE:-}" ] && [ -n "${YSH_FAIL_MV_AT:-}" ]; then
+if [ -n "${YSH_MV_STATE:-}" ] && { [ -n "${YSH_FAIL_MV_AT:-}" ] || [ -n "${YSH_MUTATE_AFTER_MV_AT:-}" ]; }; then
     YSH_MV_COUNT=0
     if [ -f "$YSH_MV_STATE" ]; then
         IFS= read -r YSH_MV_COUNT < "$YSH_MV_STATE"
     fi
     YSH_MV_COUNT=$((YSH_MV_COUNT + 1))
     printf '%s\n' "$YSH_MV_COUNT" > "$YSH_MV_STATE"
-    if [ "$YSH_MV_COUNT" -eq "$YSH_FAIL_MV_AT" ]; then
+    if [ -n "${YSH_FAIL_MV_AT:-}" ] && [ "$YSH_MV_COUNT" -eq "$YSH_FAIL_MV_AT" ]; then
         exit 1
     fi
 fi
 
-exec "$YSH_REAL_MV" "$@"
+"$YSH_REAL_MV" "$@"
+YSH_MV_RESULT=$?
+
+if [ "$YSH_MV_RESULT" -eq 0 ] && [ -n "${YSH_MUTATE_AFTER_MV_AT:-}" ] &&
+    [ "$YSH_MV_COUNT" -eq "$YSH_MUTATE_AFTER_MV_AT" ] && [ -n "${YSH_MUTATE_FILE:-}" ]; then
+    printf '%s\n' "${YSH_MUTATE_CONTENT:-externally changed}" > "$YSH_MUTATE_FILE"
+fi
+
+exit "$YSH_MV_RESULT"
