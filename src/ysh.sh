@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.14.0
+YSH_VERSION=1.15.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -66,6 +66,9 @@ Evaluation:
       --explain=json      emit one value-free JSON audit record per input
       --security-disable-env-ops
                           disable env(), strenv(), and envsubst
+      --security-disable-file-ops
+                          disable load(), load_str(), load_base64(), and load_props()
+      --shuffle-seed N    make shuffle reproducible with an integer seed
 
 Safety:
       --max-input-bytes N reject larger inputs (default: 16777216)
@@ -78,7 +81,8 @@ Other:
 
 QUERY supports yq-style paths, streams, variables, slices, interpolation,
 portable regexes, maps, reducers, sorting, arithmetic, construction,
-assignment, deletion, and deep merge policies. Collections emit JSON by default.
+assignment, deletion, deep merge, codecs, dynamic eval, and guarded file loads.
+Collections emit JSON by default.
 Common edits preserve comments; other edits emit stable YAML unless --preserve-only is set.
 EOF
 }
@@ -113,6 +117,8 @@ ysh_invoke_awk() {
         -v yaml_indent="$YSH_INDENT" \
         -v unwrap_scalar_mode="$YSH_UNWRAP_SCALAR" \
         -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
+        -v disable_file_ops="$YSH_DISABLE_FILE_OPS" \
+        -v shuffle_seed="$YSH_SHUFFLE_SEED" \
         -v input_filename="$YSH_INPUT_FILENAME" \
         -v input_file_index="$YSH_FILE_INDEX" \
         -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
@@ -666,6 +672,8 @@ ysh_main() {
     YSH_INDENT=2
     YSH_UNWRAP_SCALAR=1
     YSH_DISABLE_ENV_OPS=0
+    YSH_DISABLE_FILE_OPS=0
+    YSH_SHUFFLE_SEED=${YSH_SHUFFLE_SEED:-$$}
     YSH_INPUT_FILENAME=-
     YSH_FILE_INDEX=0
     YSH_INPUT_FILES=
@@ -806,6 +814,34 @@ ysh_main() {
             ;;
         --security-disable-env-ops)
             YSH_DISABLE_ENV_OPS=1
+            shift
+            ;;
+        --security-disable-file-ops)
+            YSH_DISABLE_FILE_OPS=1
+            shift
+            ;;
+        --shuffle-seed)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires a non-negative integer"
+                return 2
+            fi
+            case "$2" in
+            ""|*[!0-9]*)
+                ysh_error "$1 requires a non-negative integer"
+                return 2
+                ;;
+            esac
+            YSH_SHUFFLE_SEED=$2
+            shift 2
+            ;;
+        --shuffle-seed=*)
+            YSH_SHUFFLE_SEED=${1#*=}
+            case "$YSH_SHUFFLE_SEED" in
+            ""|*[!0-9]*)
+                ysh_error "--shuffle-seed requires a non-negative integer"
+                return 2
+                ;;
+            esac
             shift
             ;;
         -d|--document)

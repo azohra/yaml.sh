@@ -4,6 +4,29 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.15.0] - 2026-08-02
+
+Version 1.15 closes the portable utility layer without adding a runtime.
+
+### Added
+
+- JSON, YAML, properties, CSV, TSV, Base64, URI, and shell encode/decode forms, including the yq shorthand aliases.
+- Bounded dynamic `eval`; byte-limited `load`, `load_str`, `load_base64`, and `load_props`; `--security-disable-file-ops`.
+- Portable `shuffle` with reproducible `--shuffle-seed`, plus writable `ref` bindings.
+- Exact block and multiline-flow value/key columns; readable and writable value/key head, line, and foot comments.
+- Strict source plans for inserting, replacing, and removing full-line block comments.
+
+### Changed
+
+- Utility evaluation is isolated from the core traversal/update path and every embedded parser shares the graph and resource ceilings.
+- The operator manifest, query guide, security model, compatibility map, site, README, and story now describe the expanded contract directly.
+- Real-workload profiling retains the 125,000-node, 1,500-document, and exact large-file edit contracts without adding arbitrary gates.
+
+### Boundaries
+
+- XML, date/time, system execution, regex capture objects, and yq's format-heavy CLI remain explicit boundaries.
+- Properties use dotted paths; CSV and TSV decode header-row objects. Full yq format flags are not implied.
+
 ## [1.14.0] - 2026-08-02
 
 Version 1.14 closes the useful portable operator surface and makes its boundary auditable.

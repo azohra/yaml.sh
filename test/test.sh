@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.14.0" "$(./ysh --version)"
+    assertEquals "v1.15.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -275,6 +275,7 @@ testExpressionVariablesAndDynamicIndexes() {
     assertEquals '"web"' "$(./ysh --json '.services[-1].name' test/expressions.yml)"
     assertEquals '"platform"' "$(./ysh -n --json '{key: "owner", data: {owner: "platform"}} | .key as $key | .data[$key]')"
     assertEquals '{"owner":"platform","region":"west"}' "$(./ysh --json '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' test/expressions.yml)"
+    assertEquals '{"a":{"b":"changed","c":"also"}}' "$(printf '%s\n' 'a:' '  b: one' '  c: two' | ./ysh --json '.a ref $target | $target.b = "changed" | $target.c = "also"')"
 }
 
 testExpressionReduceAndDeepMerge() {
@@ -352,6 +353,64 @@ testExpressionCapabilityClosure() {
     assertEquals '{"a":{"c":3,"d":4},"b":2}' "$(printf '%s\n' 'b: 2' 'a:' '  d: 4' '  c: 3' | ./ysh --json 'sort_keys(..)')"
 }
 
+testExpressionPortableUtilities() {
+    load_yaml=test/.tmp-load-yaml-$$.yml
+    load_text=test/.tmp-load-text-$$.txt
+    load_base64=test/.tmp-load-base64-$$.txt
+    load_props=test/.tmp-load-props-$$.properties
+    printf '%s\n' 'service:' '  name: loaded' '  ports: [80, 443]' > "$load_yaml"
+    printf '%s\n' 'plain text' 'with two lines' > "$load_text"
+    printf '%s\n' 'bG9hZGVkIHNlY3JldA==' > "$load_base64"
+    printf '%s\n' 'service.name=props' 'service.ports.0=80' 'service.ports.1=443' > "$load_props"
+
+    input=$(printf '%s\n' 'a:' '  cool: thing' 'text: a special string' "json: '{\"cool\":\"thing\",\"n\":3}'" 'yaml: |' '  foo: bar' '  list: [one, two]' 'pathExp: .a.cool')
+    assertEquals '"{\n  \"cool\": \"thing\"\n}\n"' "$(printf '%s\n' "$input" | ./ysh --json '.a | to_json')"
+    assertEquals '"{\"cool\":\"thing\"}"' "$(printf '%s\n' "$input" | ./ysh --json '.a | @json')"
+    assertEquals '{"cool":"thing"}' "$(./ysh -n --json '"{\"cool\":\"thing\"}" | @jsond')"
+    assertEquals '"cool: thing\n"' "$(printf '%s\n' "$input" | ./ysh --json '.a | to_yaml')"
+    assertEquals '{"cool":"thing"}' "$(./ysh -n --json '"cool: thing" | @yamld')"
+    assertEquals '"YSBzcGVjaWFsIHN0cmluZw=="' "$(printf '%s\n' "$input" | ./ysh --json '.text | @base64')"
+    assertEquals '"a special string"' "$(./ysh -n --json '"YSBzcGVjaWFsIHN0cmluZw==" | @base64d')"
+    assertEquals '"caf%C3%A9+%F0%9F%98%8A"' "$(./ysh -n --json '"café 😊" | @uri')"
+    assertEquals '"café 😊"' "$(./ysh -n --json '"caf%C3%A9+%F0%9F%98%8A" | @urid')"
+    assertEquals "\"with' space'\"" "$(./ysh -n --json '"with space" | @sh')"
+    assertEquals '{"cool":"thing","n":3}' "$(printf '%s\n' "$input" | ./ysh --json '.json | from_json')"
+    assertEquals '{"foo":"bar","list":["one","two"]}' "$(printf '%s\n' "$input" | ./ysh --json '.yaml | from_yaml')"
+    assertEquals '"cool = thing\n"' "$(printf '%s\n' "$input" | ./ysh --json '.a | @props')"
+    assertEquals '{"cats":"great","dogs":"cool as well","items":["one","two"]}' "$(printf '%s\n' 'data: |-' '  cats=great' '  dogs=cool as well' '  items.0=one' '  items.1=two' | ./ysh --json '.data | @propsd')"
+    assertEquals '"name,type\nBobo,dog\nFifi,cat"' "$(printf '%s\n' '- name: Bobo' '  type: dog' '- name: Fifi' '  type: cat' | ./ysh --json '@csv')"
+    assertEquals '[{"name":"alice","age":3,"active":true,"empty":null},{"name":"bob, jr","age":4,"active":false,"empty":null}]' "$(printf '%s\n' 'data: |-' '  name,age,active,empty' '  alice,3,true,' '  "bob, jr",4,false,""' | ./ysh --json '.data | @csvd')"
+    assertEquals '"a\t2\nx\t3"' "$(./ysh -n --json '[["a", 2], ["x", 3]] | @tsv')"
+    assertEquals '[{"name":"alice","age":3}]' "$(printf 'data: |-\n  name\tage\n  alice\t3\n' | ./ysh --json '.data | @tsvd')"
+    assertEquals '"thing"' "$(printf '%s\n' "$input" | ./ysh --json 'eval(.pathExp)')"
+    assertContains "$(printf '%s\n' "$input" | ./ysh --json 'eval(".a.cool") = "changed"')" '"cool":"changed"'
+
+    assertEquals '{"service":{"name":"loaded","ports":[80,443]}}' "$(./ysh -n --json "load(\"$load_yaml\")")"
+    assertEquals '"plain text\nwith two lines\n"' "$(./ysh -n --json "load_str(\"$load_text\")")"
+    assertEquals '"loaded secret"' "$(./ysh -n --json "load_base64(\"$load_base64\")")"
+    assertEquals '{"service":{"name":"props","ports":["80","443"]}}' "$(./ysh -n --json "load_props(\"$load_props\")")"
+    result=$(./ysh -n --security-disable-file-ops "load(\"$load_yaml\")" 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "file operations are disabled"
+
+    for query in \
+        '"%%%" | @base64d' \
+        '"%GG" | @urid' \
+        '"{\"a\":1,}" | from_json' \
+        '"a: [one" | from_yaml' \
+        '"a.b=one\na=two" | from_props' \
+        '"a,b\n\"unterminated" | from_csv' \
+        'eval("mystery")'; do
+        result=$(./ysh -n "$query" 2>&1)
+        assertNotEquals 0 $?
+        assertContains "$result" 'Error:'
+    done
+
+    assertEquals '[3,5,4,1,2]' "$(./ysh -n --json --shuffle-seed 43 '[1,2,3,4,5] | shuffle')"
+    assertEquals '[3,5,4,1,2]' "$(./ysh -n --json --shuffle-seed=43 '[1,2,3,4,5] | shuffle')"
+    rm -f "$load_base64" "$load_props" "$load_text" "$load_yaml"
+}
+
 testExpressionFocusedCollectionOperators() {
     input=$(printf '%s\n' 'a:' '  - cat' '  - dog' '  - cow')
     assertEquals '"dog"' "$(printf '%s\n' "$input" | ./ysh --json '.a | first(. == "dog")')"
@@ -368,6 +427,15 @@ testExpressionNodeMetadata() {
     assertEquals '3' "$(printf '%s\n' "$input" | ./ysh --json '.a[1] | line')"
     assertEquals '1' "$(printf '%s\n' "$input" | ./ysh --json '.a[1] | key')"
     assertEquals '"!!str"' "$(printf '%s\n' "$input" | ./ysh --json '.a[1] | tag')"
+
+    input=$(printf '%s\n' 'root: {' '  alpha: one,' '  beta: [' '    two,' '    {gamma: three}' '  ]' '}')
+    assertEquals '[[2,10],[3,9],[4,5],[5,13],[2,3],[5,6]]' "$(printf '%s\n' "$input" | ./ysh --json '[.root.alpha | [line, column], .root.beta | [line, column], .root.beta[0] | [line, column], .root.beta[1].gamma | [line, column], .root.alpha | key | [line, column], .root.beta[1].gamma | key | [line, column]]')"
+
+    input=$(printf '%s\n' '# document' 'root:' '  # alpha head' '  alpha: one # alpha line' '  beta: two' '  # beta foot' '')
+    assertEquals '["document","","alpha line","alpha head","beta foot"]' "$(printf '%s\n' "$input" | ./ysh --json '[. | head_comment, .root | foot_comment, .root.alpha | line_comment, .root.alpha | key | head_comment, .root.beta | key | foot_comment]')"
+
+    input=$(printf '%s\n' 'root: [' '  one,' '  # two head' '  two,' '  {alpha: one,' '   # beta head' '   beta: two}' ']')
+    assertEquals '["","two head","","beta head"]' "$(printf '%s\n' "$input" | ./ysh --json '[.root[0] | head_comment, .root[1] | head_comment, .root[2].alpha | key | head_comment, .root[2].beta | key | head_comment]')"
 }
 
 testMultipleInputEvaluationAndMetadata() {
@@ -879,6 +947,28 @@ testInplaceEditsPresentationMetadata() {
     ./ysh -i '.service.labels style = "flow"' "$inplace_file"
     assertEquals 0 $?
     assertContains "$(cat "$inplace_file")" '"labels": {"tier": "web"}'
+
+    printf '%s\n' 'before: x' 'a: value' 'items:' '  - one' '  - two' 'after: z' > "$inplace_file"
+    ./ysh --preserve-only -i \
+        '.a head_comment = "value head" | (.a | key) head_comment = "key head" | .a foot_comment = "value foot" | .items[0] head_comment = "item head"' \
+        "$inplace_file"
+    assertEquals 0 $?
+    result=$(cat "$inplace_file")
+    assertContains "$result" '# key head'
+    assertContains "$result" '# value head'
+    assertContains "$result" '# value foot'
+    assertContains "$result" '  # item head'
+
+    printf '%s\n' 'before: x' '# old key' 'a: value' '# old key foot' '' 'items:' '  # old item head' '  - one' '  # old item foot' '' '  - two' > "$inplace_file"
+    ./ysh --preserve-only -i \
+        '(.a | key) head_comment = "changed key" | (.a | key) foot_comment = "" | .items[0] head_comment = "changed item" | .items[0] foot_comment = ""' \
+        "$inplace_file"
+    assertEquals 0 $?
+    result=$(cat "$inplace_file")
+    assertContains "$result" '# changed key'
+    assertContains "$result" '  # changed item'
+    assertNotContains "$result" '# old key'
+    assertNotContains "$result" '# old item'
     rm -f "$inplace_file"
 }
 
@@ -1086,7 +1176,7 @@ testExpressionErrors() {
     assertNotEquals 0 $?
     assertContains "$result" "slice start requires an integer"
 
-    for query in now 'to_json' 'eval(".")' 'load("neighbor.yml")' shuffle; do
+    for query in now 'load_xml("neighbor.xml")' 'from_xml' '@xmld'; do
         result=$(./ysh -n "$query" 2>&1)
         assertNotEquals 0 $?
         assertContains "$result" "unknown expression operator"
@@ -1408,11 +1498,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.14.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.15.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.14.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.14"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.15.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.15"
     assertContains "$(cat _static/_www/story/index.html)" "<strong>v1.8</strong>"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""

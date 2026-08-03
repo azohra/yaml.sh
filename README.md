@@ -66,7 +66,7 @@ Requirements: `/bin/sh` and AWK. That is the whole runtime dependency graph.
 
 Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.
 
-YAML.sh is for that second moment. It keeps the useful paths, streams, filters, construction, updates, environment composition, and multi-file configuration work. It deliberately leaves out codecs, dynamic evaluation, file-loading operators, dates, and other features that would compromise the small portable runtime.
+YAML.sh is for that second moment. It keeps the useful paths, streams, filters, construction, updates, environment composition, multi-file transactions, embedded codecs, and guarded local loads. The portable boundary now excludes XML, dates, system execution, and yq's format-heavy CLI—not useful work merely because it looked ambitious.
 
 The constraint is the fun part.
 
@@ -100,6 +100,16 @@ ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml prod
 ysh eval-all '. as $doc ireduce ({}; . * $doc)' defaults.yml region.yml secrets.yml
 ysh eval-all -i 'select(fileIndex == 0).tag as $tag | select(fileIndex > 0).image.tag = $tag' release.yml services/*.yml
 ```
+
+Decode embedded configuration or load a local default:
+
+```sh
+ysh '.payload | from_json | .services[] | select(.enabled)' config.yml
+ysh -n 'load("defaults.yml") * load("production.yml")'
+ysh '.object | @yaml | @base64' config.yml
+```
+
+JSON, YAML, properties, CSV, TSV, Base64, URI, and shell codecs run inside the same file. `eval(EXPR)` handles data-driven YAML.sh expressions. Disable local reads with `--security-disable-file-ops`; use `--shuffle-seed N` for reproducible shuffle.
 
 Guard an update with a useful failure:
 
@@ -144,7 +154,7 @@ YAML stream → node graph → aliases + merges → expression stream → values
 
 Mappings remain mappings. Empty collections survive. Tags and source lines stay attached. Anchors and aliases retain shared identity. Updates operate on selected nodes rather than reconstructed strings.
 
-After evaluation, YAML.sh compiles a non-overlapping edit plan against the original source. Scalar replacements, flow collections, block scalars, block inserts/appends, record deletions, and mapping or sequence reorders keep untouched bytes intact. Attached comments move with their records; edits through aliases or merges update the owned anchor source. Changed flow spans use stable flow formatting. Unsupported structural edits fall back to deterministic semantic YAML unless `--preserve-only` is set.
+After evaluation, YAML.sh compiles a non-overlapping edit plan against the original source. Scalar replacements, flow collections, block scalars, block inserts/appends, comment edits, record deletions, and mapping or sequence reorders keep untouched bytes intact. Attached comments move with their records; edits through aliases or merges update the owned anchor source. Changed flow spans use stable flow formatting. Unsupported structural edits fall back to deterministic semantic YAML unless `--preserve-only` is set.
 
 Multi-file `-i` evaluates preserved source snapshots, then verifies the live inputs still match before replacing anything. Each changed file is checked again immediately before its atomic sibling rename. Drift aborts the transaction; a commit failure or interrupt restores the evaluated snapshots. Writable `eval-all` can read one file and update another under the same guarded transaction.
 
@@ -162,9 +172,9 @@ Every public claim has an owner:
 
 The [operator manifest](https://yaml.azohra.com/docs/operators/) says supported, focused, or excluded for every YAML-oriented yq area. [YAML support](https://yaml.azohra.com/docs/supported_yml/) does the same for syntax. Nearby unsupported input gets an explicit error instead of a confident misparse.
 
-## A deliberately small security model
+## A controllable security model
 
-YAML.sh does not run YAML as shell code, construct application objects from tags, load neighboring files, execute commands, or provide dynamic evaluation. Input bytes, graph nodes, and collection depth have configurable ceilings. Environment operators can be disabled entirely.
+YAML.sh does not run YAML as shell code, execute commands, access the network, or construct application objects from tags. Explicit environment and file operators have separate disable switches. Input, loaded bytes, embedded parses, dynamic expressions, graph nodes, and collection depth share configurable ceilings.
 
 ```sh
 ysh \
@@ -172,6 +182,7 @@ ysh \
   --max-nodes 20000 \
   --max-depth 80 \
   --security-disable-env-ops \
+  --security-disable-file-ops \
   '.metadata.name' untrusted.yml
 ```
 
@@ -199,6 +210,8 @@ ysh eval-all QUERY FILE...
 | `--type`, `--tag`, `--line` | Inspect selected node metadata |
 | `--ast`, `--events` | Inspect parser structure |
 | `--explain`, `--explain=json` | Report value-free mutations and presentation behavior |
+| `--security-disable-env-ops`, `--security-disable-file-ops` | Disable explicit environment or local-file reads |
+| `--shuffle-seed N` | Make portable shuffle reproducible |
 | `--max-input-bytes`, `--max-nodes`, `--max-depth` | Bound hostile input |
 
 Run `ysh --help` for the complete interface.

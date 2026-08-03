@@ -48,7 +48,7 @@ Multiple results are separated with `---`, producing a valid YAML stream. Anchor
 
 Set YAML indentation from one through nine spaces with `-I N` or `--indent=N`. Use `--unwrap-scalar=false` when default value output should retain a scalar's YAML quoting, tag, and line comment.
 
-The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/collection styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.
+The emitter is semantic. It uses a stable layout while retaining recorded head, line, and foot comments plus supported scalar/collection styles. Blank lines, spacing, directive spelling, and exact scalar formatting are not reconstructed unless a source edit owns that presentation.
 
 For edits, evaluation finishes before YAML.sh compiles a source plan. The plan must contain non-overlapping owned spans; only then is a candidate emitted.
 
@@ -57,6 +57,7 @@ For edits, evaluation finishes before YAML.sh compiles a source plan. The plan m
 | Scalar replacement | Keeps surrounding spacing, quote style, properties, and line comment |
 | Flow mapping or sequence | Rewrites the changed collection span; keeps bytes and closing comments outside it |
 | Literal/folded scalar | Keeps block style, indentation, and header comment while replacing content |
+| Head or foot comment | Inserts, replaces, or removes the owned full-line block comment span |
 | Block insert, append, delete, or reorder | Moves or removes the complete record span with its attached comments |
 | Alias or merged value | Updates the owned anchor source; alias and merge occurrences stay intact |
 

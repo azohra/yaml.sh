@@ -142,6 +142,15 @@ Use `-` explicitly when it helps a generated command read clearly:
 generate-config | ysh '.release.version' -
 ```
 
+## Embedded formats and local files
+
+```sh
+ysh '.payload | from_json | .name' config.yml
+ysh -n 'load("defaults.yml") * load("production.yml")'
+```
+
+The expression language can encode and decode JSON, YAML, properties, CSV, TSV, Base64, URI, and shell text. Add `--security-disable-file-ops` when a query must not read paths of its own.
+
 ## Compose configuration
 
 Environment values can stay strings or be parsed as YAML:

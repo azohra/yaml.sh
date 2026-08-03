@@ -60,11 +60,13 @@ Merge entries remain marked edges in the graph. Lookup checks explicit entries f
 
 ## Expression streams
 
-The expression parser builds an operator tree with explicit precedence for streams, lexical binding, pipes, assignment, alternatives, booleans, comparisons, arithmetic, and traversal. Evaluation passes numbered streams of node references between operators. Variables hold node identity; dynamic indexes evaluate computed keys; reducers repeatedly bind an item while feeding an accumulator through the update expression.
+The expression parser builds an operator tree with explicit precedence for streams, lexical binding and `ref`, pipes, assignment, alternatives, booleans, comparisons, arithmetic, and traversal. Evaluation passes numbered streams of node references between operators. Variables hold node identity; dynamic indexes evaluate computed keys; reducers repeatedly bind an item while feeding an accumulator through the update expression. Utility dispatch isolates codecs, guarded loads, dynamic evaluation, and shuffle from the core traversal/update path.
 
 Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Assignments replace the selected graph nodes; missing mapping paths use attachable placeholders. Computed booleans, strings, numbers, constructed collections, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
 
-The semantic emitter walks the graph and produces stable block YAML. The source layer separately records node ownership and spans. After the query finishes, it compiles replacements, insertions, deletions, and moves into a non-overlapping plan. This covers scalar tokens, single- and multiline flow collections, block scalars, block records, and mapping or sequence reorders while retaining properties and attached comments. Other mutations use the semantic emitter, or fail before candidate output when `--preserve-only` is active.
+The JSON and YAML string decoders create nodes through the same graph limits as file input; properties and delimited codecs have strict, bounded parsers of their own. `eval` compiles a string with the normal expression-node ceiling and a depth guard. `load*` routes every local read through one byte-limited, policy-controlled function.
+
+The semantic emitter walks the graph and produces stable block YAML. The source layer separately records node ownership and spans. After the query finishes, it compiles replacements, insertions, deletions, and moves into a non-overlapping plan. This covers scalar tokens, single- and multiline flow collections, block scalars, block records, full-line comments, and mapping or sequence reorders while retaining properties and attached comments. Other mutations use the semantic emitter, or fail before candidate output when `--preserve-only` is active.
 
 The compiler is intentionally late. A query can touch the same node several times; only the final graph and the final source plan determine candidate bytes. `--diff`, `--check`, and `-i` then consume that same candidate.
 

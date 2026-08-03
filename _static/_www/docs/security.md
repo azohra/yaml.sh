@@ -1,16 +1,18 @@
 # Security & limits
 
-YAML.sh parses data. It does not evaluate YAML as shell, load neighboring files, run commands, or execute application-specific tag constructors.
+YAML.sh parses data and runs an explicit query program. It never evaluates YAML as shell, runs commands, opens network connections, or executes application-specific tag constructors.
 
 ## The small security model
 
-- No `load`, dynamic `eval`, system execution, network, or plugin operators.
+- No system execution, network, or plugin operators.
 - No application-specific object construction from YAML tags.
 - Environment access is limited to explicit `env`, `strenv`, and `envsubst` operators.
+- File access is limited to explicit `load`, `load_str`, `load_base64`, and `load_props`; every read shares the input-byte ceiling.
+- Dynamic `eval` compiles only YAML.sh expressions and has expression-node and nesting ceilings.
 - Check, diff, and in-place writes reject symlinks and duplicate inputs, evaluate source snapshots, then refuse detected live-file drift.
 - Input bytes, graph nodes, and nesting depth have hard configurable ceilings.
 
-This is a narrower attack surface than a general automation language. It is not a sandbox for arbitrary expressions: a query can still consume CPU and memory up to the configured limits.
+This is a narrower attack surface than a general automation language. It is not a sandbox: a query can still read allowed files and consume CPU and memory up to the configured limits.
 
 ## Bound input
 
@@ -25,7 +27,7 @@ ysh \
 | Limit | Protects against |
 | --- | --- |
 | `--max-input-bytes` | Oversized files and streams |
-| `--max-nodes` | Documents or expressions that create too many graph nodes |
+| `--max-nodes` | Documents, embedded codecs, or expressions that create too many graph nodes |
 | `--max-depth` | Excessively nested collections and recursive traversal |
 
 Scale tests parse 125,000 payload nodes and 1,500 documents under a 224 MiB RSS ceiling. Set lower limits for smaller workloads or tighter environments.
@@ -53,6 +55,18 @@ USER_NAME="$UNTRUSTED_NAME" ysh '.users[strenv(USER_NAME)]' config.yml
 ```
 
 Use `--security-disable-env-ops` when even that environment read is inappropriate.
+
+## Disable file access
+
+Loads are useful for bootstrapping configuration, but they follow paths supplied by the query. Disable the entire class when a query crosses a trust boundary:
+
+```sh
+ysh --security-disable-file-ops "$UNTRUSTED_QUERY" config.yml
+```
+
+The flag makes every `load*` operator fail. It does not affect the input files named on the command line. `load` parses YAML, `load_props` parses properties, `load_str` returns text, and `load_base64` decodes RFC 4648 text. Loaded content is subject to `--max-input-bytes`.
+
+`eval(EXPR)` treats its string as code in YAML.sh's expression language. Do not pass untrusted expression text to it merely because shell execution is absent.
 
 ## In-place writes
 

@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.14.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.15.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -101,7 +101,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.14.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.15.0</span></div>
       <article>
           <h1 id="yaml-without-the-luggage">YAML without the luggage</h1>
           <p>YAML.sh is a focused, yq-like tool delivered as one readable shell file. It runs anywhere with <code>/bin/sh</code> and AWK: bootstrap scripts, minimal containers, old machines, and recovery environments where installing the better-known tool is the problem.</p>
@@ -129,6 +129,7 @@ ysh --preserve-only --diff '.release.channel = &quot;stable&quot;' services/*.ym
             <li>a portable POSIX shell launcher and AWK engine;</li>
             <li>real mappings, sequences, tags, anchors, aliases, and merge behavior;</li>
             <li>a writable expression stream rather than chained query flags;</li>
+            <li>embedded JSON, YAML, properties, CSV, TSV, Base64, URI, and shell codecs;</li>
             <li>one shared check, diff, and commit plan for repository work;</li>
             <li>no package manager, runtime, plugin system, or hidden binary.</li>
           </ul>
@@ -148,7 +149,7 @@ value / JSON / YAML / metadata
           </div>
           <p>The graph is why empty collections survive, punctuated keys behave, aliases retain identity, and in-place changes can preserve source presentation.</p>
           <h2 id="where-it-fits"><a href="#where-it-fits">Where it fits<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The useful overlap with yq is large, but deliberate. YAML.sh does not implement non-YAML codecs, dates, file-loading operators, dynamic evaluation, system execution, or yq's complete operator and flag surface.</p>
+          <p>The useful overlap with yq is large, but deliberate. YAML.sh includes bounded dynamic evaluation, guarded local loads, reproducible shuffle, and the portable codecs that fit its runtime. XML, dates, system execution, regex capture objects, and yq's complete format/flag surface remain outside the contract.</p>
           <p>Three references make that boundary easy to inspect:</p>
           <ul>
             <li><a href="/docs/supported_yml/">YAML support</a> lists parser behavior, limits, and test coverage.</li>

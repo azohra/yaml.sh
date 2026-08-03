@@ -366,3 +366,21 @@ test.yml	.top_values.lower3 | join("-")
 test.yml	.simple_list.list | length
 test.yml	.object_list.list | length
 test.yml	.object_list.list | any_c(.value == 2)
+# Portable utility closure
+expressions.yml	{"a": {"cool": "thing"}} | .a | @json
+expressions.yml	"{\"cool\":\"thing\",\"n\":3}" | @jsond
+expressions.yml	{"a": {"cool": "thing"}} | .a | @yaml
+expressions.yml	"cool: thing" | @yamld
+expressions.yml	"a special string" | @base64
+expressions.yml	"YSBzcGVjaWFsIHN0cmluZw==" | @base64d
+expressions.yml	"café 😊" | @uri
+expressions.yml	"caf%C3%A9+%F0%9F%98%8A" | @urid
+expressions.yml	"with space" | @sh
+expressions.yml	{"cool": "thing", "items": ["one", "two"]} | @props
+expressions.yml	"cats=great\ndogs=cool as well" | @propsd
+expressions.yml	[["name", "age"], ["alice", 3]] | @csv
+expressions.yml	"name,age\nalice,3" | @csvd
+expressions.yml	[["name", "age"], ["alice", 3]] | @tsv
+expressions.yml	"name\tage\nalice\t3" | @tsvd
+expressions.yml	{"path": ".metadata.owner", "metadata": {"owner": "platform"}} | eval(.path)
+expressions.yml	{"a": {"b": "one", "c": "two"}} | .a ref $target | $target.b = "changed" | $target.c = "also"

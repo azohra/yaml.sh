@@ -10,12 +10,13 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 | Select and logic | Strong | `select`, `filter`, comparisons, short-circuiting `and`/`or`, `not`, `//`, `any`, `all`, `error` guards |
 | Build and mutate | Strong | arrays, computed keys, reducers, `=`, `|=`, compound updates, `setpath`, `delpaths`, `del`, `with`, deep merge and `*+`/`*d`/`*?`/`*n` policies |
 | Collections | Strong | `map`, `map_values`, entries, sort/group/unique/min/max families, recursive key sorting, flatten, reverse, `array_to_map`, add, first, pick, omit, pivot |
-| Context | Strong | `path`, `parent`, `key`, `line`, focused `column`, `tag`, `filename`, `fileIndex`, `documentIndex` |
+| Context | Strong | `path`, `parent`, `key`, exact block/flow `line` and `column`, `tag`, `filename`, `fileIndex`, `documentIndex` |
 | Environment | Strong | `env`, `strenv`, `envsubst`, defaults, `nu`/`ne`/`ff`, security disable switch |
 | Files and documents | Strong | one-process multi-file evaluation; all-document mode; whole-stream reduction; `split_doc`; writable cross-file `eval-all`; exact no-write diffs; snapshot-guarded transactions |
+| Portable utilities | Focused | JSON, YAML, properties, CSV, TSV, Base64, URI, and shell codecs; dynamic `eval`; guarded loads; reproducible shuffle |
 | Strings | Focused | interpolation, trim, string conversion, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
 | YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
-| YAML presentation | Focused | compiled scalar, flow, block-scalar, record, and reorder spans; writable line comments and styles |
+| YAML presentation | Strong | exact source coordinates; writable value/key head, line, and foot comments; compiled scalar, flow, block, record, comment, and reorder spans |
 
 “Strong” means the common forms documented and tested here. It does not mean every polymorphic combination accepted by yq.
 
@@ -25,7 +26,7 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 
 - The executable is readable source: one POSIX shell file with its portable AWK engine embedded.
 - It runs where `/bin/sh` and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.
-- Input bytes, graph nodes, and collection depth are bounded; file-loading and dynamic-code operators do not exist, and environment access can be disabled.
+- Input bytes, graph nodes, collection depth, embedded parses, and dynamic evaluation are bounded. Environment and file operators have separate disable switches.
 - `--ast` and `--events` expose the parser directly when a strange document needs explaining.
 - `--check`, `--diff`, and `-i` share one prepared edit plan. Previewed bytes are committed bytes; net-zero updates are no-ops.
 - `--preserve-only` turns source fidelity into an enforceable precondition instead of a best-effort promise.
@@ -34,21 +35,19 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 - `--explain=json` produces one value-free audit record per input for CI.
 - Parser outcomes, invalid input, yq comparisons, presentation edits, and useful scale are covered by repeatable tests.
 
-yq remains the better choice for its complete operator surface, many codecs, polished platform packaging, and broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, and a deliberately narrow security model matter more than total surface area.
+yq remains the better choice for complete XML/date/format support, polished platform packaging, and its broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, exact source-aware repository edits, and a small controllable security model matter most.
 
 ## Deliberate boundary
 
-| Not implemented | Why |
+| Boundary | Contract |
 |---|---|
-| XML, CSV, TSV, TOML, INI, properties, Base64, URI codecs | YAML.sh is a YAML tool; codecs would add a second product and substantial code. |
-| `load*`, dynamic `eval`, system execution | File and code execution widen the security model and audit surface. |
-| Date/time and timezone operators | Portable AWK has no reliable cross-platform date library. |
-| Head/foot comments and key-node presentation | The graph stores mapping keys as edges rather than full nodes; pretending to support their metadata would be misleading. |
-| `match` captures, named captures, regex flags | AWK regex is intentionally the portable POSIX intersection. |
-| `shuffle` | Portable deterministic behavior would not match yq's randomized output. |
-| Complete yq CLI flag parity | Format conversion, colors, XML flags, splitting, shell completion, and similar surfaces are out of scope. |
+| XML, TOML, and INI codecs | No partial parser is advertised. These formats remain explicit errors. |
+| Date/time and timezone operators | Portable AWK has no cross-platform timezone database or reliable host date API. |
+| System execution | Expressions never launch commands. |
+| Regex captures and flags | `test` and global `sub` use the platform's POSIX ERE engine. |
+| Complete yq CLI flag parity | YAML.sh does not reproduce format-selection flags, colors, XML flags, shell completion, or plugin surfaces. |
 
-Some areas remain partial: column data is focused on block nodes, collection string conversion emits stable YAML rather than preserving every source spelling, and anchor renames deliberately keep existing aliases valid even where yq leaves their displayed alias name unchanged.
+Properties use dotted paths and CSV/TSV use header-row object decoding. XML-specific forms are rejected. Dynamic expressions speak YAML.sh's documented language, and file reads can be disabled with `--security-disable-file-ops`. Anchor renames keep existing aliases valid even where yq leaves their displayed alias name unchanged.
 
 ## Compared with yq
 

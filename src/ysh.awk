@@ -62,6 +62,663 @@ function json_quote(value) {
     return "\"" json_escape(value) "\""
 }
 
+function codec_initialize(    i, char) {
+    codec_hex = "0123456789ABCDEF"
+    codec_base64_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    for (i = 1; i <= 255; i++) {
+        char = sprintf("%c", i)
+        codec_byte_value[char] = i
+    }
+    for (i = 1; i <= length(codec_base64_alphabet); i++) {
+        codec_base64_value[substr(codec_base64_alphabet, i, 1)] = i - 1
+    }
+    codec_random_state = (shuffle_seed + 0) % 2147483647
+    if (codec_random_state <= 0) codec_random_state = 1
+}
+
+function codec_byte(char) {
+    return codec_byte_value[char] + 0
+}
+
+function codec_base64_encode(value,    result, i, first, second, third, remaining) {
+    result = ""
+    for (i = 1; i <= length(value); i += 3) {
+        remaining = length(value) - i + 1
+        first = codec_byte(substr(value, i, 1))
+        second = remaining > 1 ? codec_byte(substr(value, i + 1, 1)) : 0
+        third = remaining > 2 ? codec_byte(substr(value, i + 2, 1)) : 0
+        result = result substr(codec_base64_alphabet, int(first / 4) + 1, 1)
+        result = result substr(codec_base64_alphabet, ((first % 4) * 16 + int(second / 16)) + 1, 1)
+        result = result (remaining > 1 ? substr(codec_base64_alphabet, ((second % 16) * 4 + int(third / 64)) + 1, 1) : "=")
+        result = result (remaining > 2 ? substr(codec_base64_alphabet, (third % 64) + 1, 1) : "=")
+    }
+    return result
+}
+
+function codec_base64_decode(value,    result, clean, i, first, second, third, fourth, char, padding, byte) {
+    clean = value
+    gsub(/[[:space:]]/, "", clean)
+    if (length(clean) % 4 != 0) fail("invalid base64 length")
+    result = ""
+    for (i = 1; i <= length(clean); i += 4) {
+        padding = 0
+        char = substr(clean, i, 1)
+        if (!(char in codec_base64_value)) fail("invalid base64 character")
+        first = codec_base64_value[char]
+        char = substr(clean, i + 1, 1)
+        if (!(char in codec_base64_value)) fail("invalid base64 character")
+        second = codec_base64_value[char]
+        char = substr(clean, i + 2, 1)
+        if (char == "=") {
+            third = 0
+            padding = 2
+        } else {
+            if (!(char in codec_base64_value)) fail("invalid base64 character")
+            third = codec_base64_value[char]
+        }
+        char = substr(clean, i + 3, 1)
+        if (char == "=") {
+            fourth = 0
+            if (!padding) padding = 1
+        } else {
+            if (padding || !(char in codec_base64_value)) fail("invalid base64 padding")
+            fourth = codec_base64_value[char]
+        }
+        if (padding && i + 3 != length(clean)) fail("base64 padding must end the input")
+        if (padding == 2 && second % 16) fail("invalid base64 padding bits")
+        if (padding == 1 && third % 4) fail("invalid base64 padding bits")
+        byte = first * 4 + int(second / 16)
+        if (!byte) fail("decoded base64 contains a NUL byte")
+        result = result sprintf("%c", byte)
+        if (padding < 2) {
+            byte = (second % 16) * 16 + int(third / 4)
+            if (!byte) fail("decoded base64 contains a NUL byte")
+            result = result sprintf("%c", byte)
+        }
+        if (!padding) {
+            byte = (third % 4) * 64 + fourth
+            if (!byte) fail("decoded base64 contains a NUL byte")
+            result = result sprintf("%c", byte)
+        }
+    }
+    return result
+}
+
+function codec_uri_encode(value,    result, i, char, byte) {
+    result = ""
+    for (i = 1; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        if (char ~ /^[A-Za-z0-9_.~-]$/) {
+            result = result char
+        } else if (char == " ") {
+            result = result "+"
+        } else {
+            byte = codec_byte(char)
+            result = result "%" substr(codec_hex, int(byte / 16) + 1, 1) substr(codec_hex, (byte % 16) + 1, 1)
+        }
+    }
+    return result
+}
+
+function codec_uri_decode(value,    result, i, char, digits, byte) {
+    result = ""
+    for (i = 1; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        if (char == "+") {
+            result = result " "
+        } else if (char == "%") {
+            digits = substr(value, i + 1, 2)
+            if (length(digits) != 2 || digits !~ /^[0-9A-Fa-f][0-9A-Fa-f]$/) fail("invalid URI escape")
+            byte = base_integer(digits, 16) + 0
+            if (!byte) fail("decoded URI contains a NUL byte")
+            result = result sprintf("%c", byte)
+            i += 2
+        } else {
+            result = result char
+        }
+    }
+    return result
+}
+
+function codec_shell_encode(value,    quote, result, quoted, i, char) {
+    quote = sprintf("%c", 39)
+    result = ""
+    for (i = 1; i <= length(value); i++) {
+        char = substr(value, i, 1)
+        if (char == quote) {
+            if (quoted) {
+                result = result quote
+                quoted = 0
+            }
+            result = result "\\" quote
+        } else if (quoted) {
+            result = result char
+        } else if (char ~ /^[A-Za-z0-9_.,:+=\/@%-]$/) {
+            result = result char
+        } else {
+            result = result quote char
+            quoted = 1
+        }
+    }
+    if (quoted) result = result quote
+    return result
+}
+
+function codec_props_scalar(value,    escaped) {
+    escaped = value
+    gsub(/\\/, "\\\\", escaped)
+    gsub(/\n/, "\\n", escaped)
+    gsub(/\r/, "\\r", escaped)
+    gsub(/\t/, "\\t", escaped)
+    if (escaped ~ /^[[:space:]]/ || escaped ~ /[[:space:]]$/) escaped = json_quote(value)
+    return escaped
+}
+
+function codec_props_walk(node, path,    resolved, result, i, child, next_path, key) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar") {
+        if (path == "") fail("properties encoding requires a mapping or sequence root")
+        return path " = " codec_props_scalar(node_type[resolved] == "null" ? "null" : node_value[resolved]) "\n"
+    }
+    result = ""
+    if (node_kind[resolved] == "sequence") {
+        for (i = 1; i <= sequence_count[resolved]; i++) {
+            next_path = path == "" ? (i - 1) : path "." (i - 1)
+            result = result codec_props_walk(sequence_child[resolved, i], next_path)
+        }
+        return result
+    }
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        if (mapping_merge[resolved, i]) continue
+        key = mapping_key[resolved, i]
+        if (index(key, "\n") || index(key, "\r") || index(key, "=")) fail("property keys cannot contain newlines or equals signs")
+        next_path = path == "" ? key : path "." key
+        child = mapping_child[resolved, i]
+        result = result codec_props_walk(child, next_path)
+    }
+    return result
+}
+
+function codec_props_assign(root, path, value,    count, parts, current, i, index_value, child, wanted_kind) {
+    count = split(path, parts, /\./)
+    if (!count || parts[1] == "") fail("property key cannot be empty")
+    current = root
+    for (i = 1; i <= count; i++) {
+        if (node_kind[current] == "mapping") {
+            child = mapping_lookup(current, parts[i])
+            if (i == count) {
+                if (child) fail("duplicate property key: " path)
+                add_mapping(current, parts[i], expression_scalar(value, "string"), 0, 0)
+                break
+            }
+            wanted_kind = parts[i + 1] ~ /^(0|[1-9][0-9]*)$/ ? "sequence" : "mapping"
+            if (!child) {
+                child = new_node(wanted_kind, 0, "", "", "")
+                add_mapping(current, parts[i], child, 0, 0)
+            } else if (node_kind[child] != wanted_kind) fail("conflicting property path: " path)
+            current = child
+        } else if (node_kind[current] == "sequence") {
+            if (parts[i] !~ /^(0|[1-9][0-9]*)$/) fail("property array segment must be a non-negative integer: " path)
+            index_value = parts[i] + 1
+            while (sequence_count[current] < index_value) add_sequence(current, expression_null(), 0)
+            child = sequence_child[current, index_value]
+            if (i == count) {
+                if (node_type[child] != "null" || node_kind[child] != "scalar") fail("duplicate property key: " path)
+                child = expression_scalar(value, "string")
+                sequence_child[current, index_value] = child
+                node_parent[child] = current
+                node_parent_edge[child] = "index " (index_value - 1)
+                break
+            }
+            wanted_kind = parts[i + 1] ~ /^(0|[1-9][0-9]*)$/ ? "sequence" : "mapping"
+            if (node_kind[child] == "scalar" && node_type[child] == "null") {
+                child = new_node(wanted_kind, 0, "", "", "")
+                sequence_child[current, index_value] = child
+                node_parent[child] = current
+                node_parent_edge[child] = "index " (index_value - 1)
+            } else if (node_kind[child] != wanted_kind) fail("conflicting property path: " path)
+            current = child
+        } else fail("conflicting property path: " path)
+    }
+    for (i = 1; i <= count; i++) delete parts[i]
+}
+
+function codec_props_decode(value,    root, remaining, newline, line, separator, key, item) {
+    root = new_node("mapping", 0, "", "", "")
+    remaining = value
+    while (remaining != "") {
+        newline = index(remaining, "\n")
+        if (newline) {
+            line = substr(remaining, 1, newline - 1)
+            remaining = substr(remaining, newline + 1)
+        } else {
+            line = remaining
+            remaining = ""
+        }
+        sub(/\r$/, "", line)
+        if (line ~ /^[[:space:]]*$/ || line ~ /^[[:space:]]*[#!]/) continue
+        separator = index(line, "=")
+        if (!separator) separator = index(line, ":")
+        if (!separator) {
+            if (!match(line, /[[:space:]]/)) fail("property entry requires a separator")
+            separator = RSTART
+        }
+        key = trim(substr(line, 1, separator - 1))
+        item = trim(substr(line, separator + 1))
+        codec_props_assign(root, key, item)
+    }
+    return root
+}
+
+function codec_delimited_cell(node, separator,    resolved, value, quote, escaped) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "scalar") fail("CSV and TSV encoding requires scalar cells")
+    value = node_type[resolved] == "null" ? "null" : node_value[resolved]
+    quote = sprintf("%c", 34)
+    if (index(value, separator) || index(value, quote) || index(value, "\n") || index(value, "\r") ||
+        value ~ /^[[:space:]]/ || value ~ /[[:space:]]$/) {
+        escaped = value
+        gsub(quote, quote quote, escaped)
+        return quote escaped quote
+    }
+    return value
+}
+
+function codec_delimited_row(node, separator,    resolved, result, i) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "sequence") fail("CSV and TSV rows must be arrays")
+    result = ""
+    for (i = 1; i <= sequence_count[resolved]; i++) {
+        if (i > 1) result = result separator
+        result = result codec_delimited_cell(sequence_child[resolved, i], separator)
+    }
+    return result
+}
+
+function codec_delimited_encode(node, separator,    resolved, first, result, i, j, row, child, key) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "sequence") fail("CSV and TSV encoding requires an array")
+    if (!sequence_count[resolved]) return ""
+    first = resolve_alias(sequence_child[resolved, 1])
+    if (node_kind[first] == "scalar") return codec_delimited_row(resolved, separator)
+    result = ""
+    if (node_kind[first] == "mapping") {
+        for (j = 1; j <= mapping_count[first]; j++) {
+            if (mapping_merge[first, j]) continue
+            if (result != "") result = result separator
+            result = result codec_delimited_cell(expression_scalar(mapping_key[first, j], "string"), separator)
+        }
+        for (i = 1; i <= sequence_count[resolved]; i++) {
+            row = resolve_alias(sequence_child[resolved, i])
+            if (node_kind[row] != "mapping") fail("CSV and TSV object rows must be homogeneous")
+            result = result "\n"
+            child = 0
+            for (j = 1; j <= mapping_count[first]; j++) {
+                if (mapping_merge[first, j]) continue
+                if (child++) result = result separator
+                key = mapping_key[first, j]
+                row = resolve_alias(sequence_child[resolved, i])
+                result = result codec_delimited_cell(mapping_lookup(row, key) ? mapping_lookup(row, key) : expression_scalar("", "string"), separator)
+            }
+        }
+        return result
+    }
+    for (i = 1; i <= sequence_count[resolved]; i++) {
+        if (i > 1) result = result "\n"
+        result = result codec_delimited_row(sequence_child[resolved, i], separator)
+    }
+    return result
+}
+
+function codec_delimited_finish_field(row, column, value) {
+    codec_delimited_field[row, column] = value
+}
+
+function codec_delimited_decode(value, separator,    row, column, field, quoted, after_quote, i, char, next_char, rows, columns, root, item, header, type, j, child) {
+    row = 1
+    column = 1
+    field = ""
+    for (i = 1; i <= length(value) + 1; i++) {
+        char = i <= length(value) ? substr(value, i, 1) : "\n"
+        next_char = i < length(value) ? substr(value, i + 1, 1) : ""
+        if (quoted) {
+            if (char == "\"" && next_char == "\"") {
+                field = field "\""
+                i++
+            } else if (char == "\"") {
+                quoted = 0
+                after_quote = 1
+            } else field = field char
+            continue
+        }
+        if (!after_quote && field == "" && char == "\"") {
+            quoted = 1
+            continue
+        }
+        if (after_quote && char != separator && char != "\n" && char != "\r") fail("unexpected character after quoted CSV field")
+        if (char == separator) {
+            codec_delimited_finish_field(row, column++, field)
+            field = ""
+            after_quote = 0
+        } else if (char == "\n" || char == "\r") {
+            if (char == "\r" && next_char == "\n") i++
+            codec_delimited_finish_field(row, column, field)
+            codec_delimited_columns[row] = column
+            rows = row++
+            column = 1
+            field = ""
+            after_quote = 0
+        } else {
+            if (char == "\"") fail("quote inside unquoted CSV field")
+            field = field char
+        }
+    }
+    if (quoted) fail("unterminated quoted CSV field")
+    if (rows > 1 && codec_delimited_columns[rows] == 1 && codec_delimited_field[rows, 1] == "" && substr(value, length(value), 1) ~ /[\r\n]/) rows--
+    root = new_node("sequence", 0, "", "", "")
+    if (!rows) return root
+    columns = codec_delimited_columns[1]
+    for (j = 1; j <= columns; j++) {
+        header = codec_delimited_field[1, j]
+        if (header == "") fail("CSV and TSV headers cannot be empty")
+        codec_delimited_header[j] = header
+    }
+    for (i = 2; i <= rows; i++) {
+        if (codec_delimited_columns[i] > columns) fail("CSV and TSV rows cannot have more fields than the header")
+        item = new_node("mapping", 0, "", "", "")
+        for (j = 1; j <= columns; j++) {
+            field = j <= codec_delimited_columns[i] ? codec_delimited_field[i, j] : ""
+            type = scalar_type(field, "", field)
+            child = expression_scalar(field, type)
+            add_mapping(item, codec_delimited_header[j], child, 0, 0)
+        }
+        add_sequence(root, item, 0)
+    }
+    for (i = 1; i <= rows; i++) {
+        for (j = 1; j <= codec_delimited_columns[i]; j++) delete codec_delimited_field[i, j]
+        delete codec_delimited_columns[i]
+    }
+    for (j = 1; j <= columns; j++) delete codec_delimited_header[j]
+    return root
+}
+
+function codec_random_next(    high, low, test) {
+    high = int(codec_random_state / 127773)
+    low = codec_random_state % 127773
+    test = 16807 * low - 2836 * high
+    codec_random_state = test > 0 ? test : test + 2147483647
+    return codec_random_state
+}
+
+function codec_json_skip_space(    char) {
+    while (codec_json_position <= length(codec_json_source)) {
+        char = substr(codec_json_source, codec_json_position, 1)
+        if (char != " " && char != "\t" && char != "\r" && char != "\n") break
+        codec_json_position++
+    }
+}
+
+function codec_json_string(    result, char, escaped, digits, codepoint, high, low) {
+    if (substr(codec_json_source, codec_json_position, 1) != "\"") fail("JSON string must begin with a quote")
+    codec_json_position++
+    result = ""
+    while (codec_json_position <= length(codec_json_source)) {
+        char = substr(codec_json_source, codec_json_position++, 1)
+        if (char == "\"") return result
+        if (codec_byte(char) < 32) fail("unescaped control character in JSON string")
+        if (char != "\\") {
+            result = result char
+            continue
+        }
+        if (codec_json_position > length(codec_json_source)) fail("unterminated JSON escape")
+        escaped = substr(codec_json_source, codec_json_position++, 1)
+        if (escaped == "\"" || escaped == "\\" || escaped == "/") result = result escaped
+        else if (escaped == "b") result = result sprintf("%c", 8)
+        else if (escaped == "f") result = result sprintf("%c", 12)
+        else if (escaped == "n") result = result "\n"
+        else if (escaped == "r") result = result "\r"
+        else if (escaped == "t") result = result "\t"
+        else if (escaped == "u") {
+            digits = substr(codec_json_source, codec_json_position, 4)
+            if (length(digits) != 4 || digits !~ /^[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$/) fail("invalid Unicode escape in JSON string")
+            codec_json_position += 4
+            codepoint = base_integer(digits, 16) + 0
+            if (codepoint >= 55296 && codepoint <= 56319) {
+                if (substr(codec_json_source, codec_json_position, 2) != "\\u") fail("unpaired high surrogate in JSON string")
+                codec_json_position += 2
+                digits = substr(codec_json_source, codec_json_position, 4)
+                if (length(digits) != 4 || digits !~ /^[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$/) fail("invalid low surrogate in JSON string")
+                codec_json_position += 4
+                low = base_integer(digits, 16) + 0
+                if (low < 56320 || low > 57343) fail("invalid low surrogate in JSON string")
+                high = codepoint
+                codepoint = 65536 + (high - 55296) * 1024 + (low - 56320)
+            } else if (codepoint >= 56320 && codepoint <= 57343) {
+                fail("unpaired low surrogate in JSON string")
+            }
+            if (!codepoint) fail("JSON strings cannot contain NUL")
+            result = result unicode_utf8(codepoint)
+        } else fail("invalid JSON escape")
+    }
+    fail("unterminated JSON string")
+}
+
+function codec_json_value(    char, node, key, value, start, number) {
+    codec_json_skip_space()
+    char = substr(codec_json_source, codec_json_position, 1)
+    if (char == "\"") return expression_scalar(codec_json_string(), "string")
+    if (char == "{") {
+        codec_json_position++
+        node = new_node("mapping", 0, "", "", "")
+        codec_json_skip_space()
+        if (substr(codec_json_source, codec_json_position, 1) == "}") {
+            codec_json_position++
+            return node
+        }
+        while (1) {
+            codec_json_skip_space()
+            if (substr(codec_json_source, codec_json_position, 1) != "\"") fail("JSON object keys must be strings")
+            key = codec_json_string()
+            codec_json_skip_space()
+            if (substr(codec_json_source, codec_json_position, 1) != ":") fail("expected colon after JSON object key")
+            codec_json_position++
+            value = codec_json_value()
+            add_mapping(node, key, value, 0, 0)
+            codec_json_skip_space()
+            char = substr(codec_json_source, codec_json_position++, 1)
+            if (char == "}") return node
+            if (char != ",") fail("expected comma or closing brace in JSON object")
+        }
+    }
+    if (char == "[") {
+        codec_json_position++
+        node = new_node("sequence", 0, "", "", "")
+        codec_json_skip_space()
+        if (substr(codec_json_source, codec_json_position, 1) == "]") {
+            codec_json_position++
+            return node
+        }
+        while (1) {
+            add_sequence(node, codec_json_value(), 0)
+            codec_json_skip_space()
+            char = substr(codec_json_source, codec_json_position++, 1)
+            if (char == "]") return node
+            if (char != ",") fail("expected comma or closing bracket in JSON array")
+        }
+    }
+    if (substr(codec_json_source, codec_json_position, 4) == "true") {
+        codec_json_position += 4
+        return expression_scalar("true", "bool")
+    }
+    if (substr(codec_json_source, codec_json_position, 5) == "false") {
+        codec_json_position += 5
+        return expression_scalar("false", "bool")
+    }
+    if (substr(codec_json_source, codec_json_position, 4) == "null") {
+        codec_json_position += 4
+        return expression_null()
+    }
+    start = codec_json_position
+    while (codec_json_position <= length(codec_json_source) && substr(codec_json_source, codec_json_position, 1) ~ /^[0-9eE+.-]$/) codec_json_position++
+    number = substr(codec_json_source, start, codec_json_position - start)
+    if (number == "" || number !~ /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) fail("invalid JSON value")
+    return expression_scalar(number, (number ~ /[.eE]/ ? "float" : "int"))
+}
+
+function expression_parse_json_text(value,    node) {
+    if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded JSON size limit exceeded (max " max_input_bytes " bytes)")
+    codec_json_source = value
+    codec_json_position = 1
+    node = codec_json_value()
+    codec_json_skip_space()
+    if (codec_json_position <= length(codec_json_source)) fail("trailing content after JSON value")
+    return node
+}
+
+function codec_yaml_process_line(raw, source_line,    clean) {
+    if (multiline_scalar_active) {
+        multiline_scalar_text = multiline_scalar_text "\n" raw
+        if (!multiline_quote_is_open(multiline_scalar_text, multiline_scalar_delimiter)) {
+            process_line(multiline_scalar_text, multiline_scalar_line)
+            multiline_scalar_active = 0
+            multiline_scalar_text = ""
+        }
+        return
+    }
+    if (multiline_flow_active) {
+        if (raw ~ /^[[:space:]]*#/) {
+            multiline_flow_comment_break = 1
+            flow_pending_comment_add(raw, source_line)
+            return
+        }
+        if (multiline_flow_comment_break) {
+            clean = trim(multiline_flow_text)
+            clean = substr(clean, length(clean), 1)
+            if (clean != "," && trim(raw) !~ /^[,}\]]/) fail("flow entries separated by a comment require a comma")
+            multiline_flow_comment_break = 0
+        }
+        clean = strip_flow_line_comment(raw)
+        if (trim(clean) == "") return
+        flow_position_bind_pending(length(multiline_flow_text) + 2)
+        flow_position_append(raw, clean, source_line)
+        multiline_flow_text = multiline_flow_text " " clean
+        multiline_flow_depth = flow_balance(multiline_flow_text)
+        if (multiline_flow_depth <= 0) {
+            process_line(multiline_flow_text, multiline_flow_line)
+            flow_position_clear()
+            multiline_flow_active = 0
+            multiline_flow_text = ""
+        }
+        return
+    }
+    process_line(raw, source_line)
+}
+
+function expression_parse_yaml_text(value,    saved_document_index, saved_file_offset, saved_file_index, saved_filename, saved_combined, saved_inplace, embedded_document, source_base, line, next_newline, source_line, root, node, start_node, last_document, anchor_index, key) {
+    if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded YAML size limit exceeded (max " max_input_bytes " bytes)")
+    saved_document_index = document_index
+    saved_file_offset = file_document_offset
+    saved_file_index = current_input_file_index
+    saved_filename = current_input_filename
+    saved_combined = combined_files_mode
+    saved_inplace = inplace_mode
+    start_node = node_count + 1
+
+    embedded_document = 1000000 + (++codec_yaml_serial * 1000)
+    source_base = embedded_document
+    document_index = embedded_document
+    file_document_offset = embedded_document
+    current_input_file_index = 0
+    current_input_filename = "<embedded>"
+    combined_files_mode = 0
+    inplace_mode = 0
+    clear_structure()
+    block_active = 0
+    multiline_scalar_active = 0
+    multiline_flow_active = 0
+    document_ended = 0
+
+    source_line = source_base
+    while (1) {
+        next_newline = index(value, "\n")
+        if (next_newline) {
+            line = substr(value, 1, next_newline - 1)
+            value = substr(value, next_newline + 1)
+        } else {
+            line = value
+            value = ""
+        }
+        codec_yaml_process_line(line, ++source_line)
+        if (!next_newline) break
+    }
+    if (multiline_scalar_active) fail("unclosed quoted scalar in embedded YAML")
+    if (multiline_flow_active) fail("unclosed flow collection in embedded YAML")
+    flush_block()
+    fail_pending_explicit_keys(source_line + 1)
+    if (!(embedded_document in document_root)) create_empty_document(source_line + 1)
+    finalize_nodes()
+    validate_aliases()
+    validate_merges()
+    root = document_root[embedded_document]
+
+    last_document = document_index
+    for (node = start_node; node <= node_count; node++) {
+        node_line[node] = 0
+        node_column[node] = 0
+        delete node_document[node]
+        delete node_file_index[node]
+        delete node_filename[node]
+    }
+    for (document_index = embedded_document; document_index <= last_document; document_index++) {
+        for (anchor_index = 1; anchor_index <= document_anchor_count[document_index]; anchor_index++) {
+            key = document_index SUBSEP document_anchor_name[document_index, anchor_index]
+            delete anchor_target[key]
+            delete document_anchor_name[document_index, anchor_index]
+            delete document_anchor_node[document_index, anchor_index]
+        }
+        delete document_anchor_count[document_index]
+        delete document_root[document_index]
+        delete document_file_index[document_index]
+        delete document_filename[document_index]
+        delete document_has_content[document_index]
+        delete document_explicit[document_index]
+        delete document_ended_line[document_index]
+        delete document_directive_pending[document_index]
+    }
+    clear_structure()
+    block_active = 0
+    multiline_scalar_active = 0
+    multiline_flow_active = 0
+    document_ended = 0
+    document_index = saved_document_index
+    file_document_offset = saved_file_offset
+    current_input_file_index = saved_file_index
+    current_input_filename = saved_filename
+    combined_files_mode = saved_combined
+    inplace_mode = saved_inplace
+    return root
+}
+
+function expression_read_file(path,    line, result, status, bytes, separator) {
+    if (disable_file_ops) fail("file operations are disabled")
+    if (path == "" || index(path, "\n") || index(path, "\r")) fail("load path must be a non-empty single line")
+    result = ""
+    separator = ""
+    while ((status = (getline line < path)) > 0) {
+        bytes += length(line) + 1
+        if (max_input_bytes > 0 && bytes > max_input_bytes) {
+            close(path)
+            fail("loaded file size limit exceeded (max " max_input_bytes " bytes)")
+        }
+        result = result separator line
+        separator = "\n"
+    }
+    close(path)
+    if (status < 0) fail("could not load file: " path)
+    if (separator != "") result = result "\n"
+    return result
+}
+
 function unicode_utf8(codepoint,    first, second, third, fourth) {
     if (codepoint <= 127) {
         return sprintf("%c", codepoint)
@@ -342,10 +999,135 @@ function strip_flow_line_comment(value,    i, char, previous, quote, escaped) {
     return trim(value)
 }
 
+function parser_pending_comment_add(raw, source_line,    text) {
+    text = raw
+    sub(/^[[:space:]]*#[ ]?/, "", text)
+    if (parser_pending_comment != "") parser_pending_comment = parser_pending_comment "\n"
+    parser_pending_comment = parser_pending_comment text
+    if (!parser_pending_comment_start) parser_pending_comment_start = source_line
+    parser_pending_comment_end = source_line
+}
+
+function parser_record_content(node, as_key) {
+    if (parser_pending_comment != "") {
+        if (as_key) {
+            node_key_head_comment[node] = parser_pending_comment
+            node_key_head_comment_start[node] = parser_pending_comment_start
+            node_key_head_comment_end[node] = parser_pending_comment_end
+        } else {
+            node_head_comment[node] = parser_pending_comment
+            node_head_comment_start[node] = parser_pending_comment_start
+            node_head_comment_end[node] = parser_pending_comment_end
+        }
+        parser_pending_comment = ""
+        parser_pending_comment_start = 0
+        parser_pending_comment_end = 0
+    }
+    parser_last_content_node = node
+    parser_last_content_is_key = as_key
+}
+
+function parser_flush_pending_foot() {
+    if (parser_pending_comment == "" || !parser_last_content_node) return
+    if (parser_last_content_is_key) {
+        node_key_foot_comment[parser_last_content_node] = parser_pending_comment
+        node_key_foot_comment_start[parser_last_content_node] = parser_pending_comment_start
+        node_key_foot_comment_end[parser_last_content_node] = parser_pending_comment_end
+    } else {
+        node_foot_comment[parser_last_content_node] = parser_pending_comment
+        node_foot_comment_start[parser_last_content_node] = parser_pending_comment_start
+        node_foot_comment_end[parser_last_content_node] = parser_pending_comment_end
+    }
+    parser_pending_comment = ""
+    parser_pending_comment_start = 0
+    parser_pending_comment_end = 0
+}
+
 function start_flow_line(value,    prefix) {
     prefix = value
     sub(/[^ ].*$/, "", prefix)
     return prefix strip_flow_line_comment(value)
+}
+
+function flow_position_start(value, source_line,    i) {
+    active_flow_position_map = ++flow_position_serial
+    for (i = 1; i <= length(value); i++) {
+        flow_position_line[active_flow_position_map, i] = source_line
+        flow_position_column[active_flow_position_map, i] = i
+    }
+}
+
+function flow_position_append(raw, value, source_line,    position, offset, i) {
+    if (!active_flow_position_map) return
+    position = length(multiline_flow_text) + 1
+    offset = index(raw, value)
+    if (!offset) offset = 1
+    flow_position_line[active_flow_position_map, position] = source_line
+    flow_position_column[active_flow_position_map, position] = offset
+    for (i = 1; i <= length(value); i++) {
+        flow_position_line[active_flow_position_map, position + i] = source_line
+        flow_position_column[active_flow_position_map, position + i] = offset + i - 1
+    }
+}
+
+function flow_pending_comment_add(raw, source_line,    text) {
+    text = raw
+    sub(/^[[:space:]]*#[ ]?/, "", text)
+    if (multiline_flow_pending_comment != "") multiline_flow_pending_comment = multiline_flow_pending_comment "\n"
+    multiline_flow_pending_comment = multiline_flow_pending_comment text
+    if (!multiline_flow_pending_start) multiline_flow_pending_start = source_line
+    multiline_flow_pending_end = source_line
+}
+
+function flow_position_bind_pending(position) {
+    if (!active_flow_position_map || multiline_flow_pending_comment == "") return
+    flow_position_comment[active_flow_position_map, position] = multiline_flow_pending_comment
+    flow_position_comment_start[active_flow_position_map, position] = multiline_flow_pending_start
+    flow_position_comment_end[active_flow_position_map, position] = multiline_flow_pending_end
+    multiline_flow_pending_comment = ""
+    multiline_flow_pending_start = 0
+    multiline_flow_pending_end = 0
+}
+
+function flow_position_take_comment(position, node, as_key,    key) {
+    key = active_flow_position_map SUBSEP position
+    if (!active_flow_position_map || !(key in flow_position_comment)) return
+    if (as_key) {
+        node_key_head_comment[node] = flow_position_comment[key]
+        node_key_head_comment_start[node] = flow_position_comment_start[key]
+        node_key_head_comment_end[node] = flow_position_comment_end[key]
+    } else {
+        node_head_comment[node] = flow_position_comment[key]
+        node_head_comment_start[node] = flow_position_comment_start[key]
+        node_head_comment_end[node] = flow_position_comment_end[key]
+    }
+    delete flow_position_comment[key]
+    delete flow_position_comment_start[key]
+    delete flow_position_comment_end[key]
+}
+
+function flow_position_source_line(position, fallback) {
+    return active_flow_position_map && ((active_flow_position_map SUBSEP position) in flow_position_line) ? flow_position_line[active_flow_position_map, position] : fallback
+}
+
+function flow_position_source_column(position, fallback) {
+    return active_flow_position_map && ((active_flow_position_map SUBSEP position) in flow_position_column) ? flow_position_column[active_flow_position_map, position] : fallback
+}
+
+function flow_position_clear(    i, count) {
+    if (!active_flow_position_map) return
+    count = length(multiline_flow_text)
+    for (i = 1; i <= count; i++) {
+        delete flow_position_line[active_flow_position_map, i]
+        delete flow_position_column[active_flow_position_map, i]
+        delete flow_position_comment[active_flow_position_map, i]
+        delete flow_position_comment_start[active_flow_position_map, i]
+        delete flow_position_comment_end[active_flow_position_map, i]
+    }
+    active_flow_position_map = 0
+    multiline_flow_pending_comment = ""
+    multiline_flow_pending_start = 0
+    multiline_flow_pending_end = 0
 }
 
 function flow_continuation_indent(value,    prefix, indent, clean, separator) {
@@ -441,7 +1223,7 @@ function find_mapping_separator(value, require_space,    offset, remainder, spac
     return separator ? offset + separator - 1 : 0
 }
 
-function split_flow(value, output,    count, start, i, char, quote, escaped, braces, brackets) {
+function split_flow(value, output,    count, start, i, char, quote, escaped, braces, brackets, raw, leading) {
     count = 0
     start = 1
     quote = ""
@@ -480,11 +1262,17 @@ function split_flow(value, output,    count, start, i, char, quote, escaped, bra
         } else if (char == "]") {
             brackets--
         } else if (char == "," && braces == 0 && brackets == 0) {
-            output[++count] = trim(substr(value, start, i - start))
+            raw = substr(value, start, i - start)
+            leading = leading_horizontal_width(raw)
+            output[++count] = trim(raw)
+            flow_piece_offset[count] = start + leading
             start = i + 1
         }
     }
-    output[++count] = trim(substr(value, start))
+    raw = substr(value, start)
+    leading = leading_horizontal_width(raw)
+    output[++count] = trim(raw)
+    flow_piece_offset[count] = start + leading
     return count
 }
 
@@ -616,6 +1404,10 @@ function ensure_container(node, kind, source_line) {
     if (node_kind[node] == "pending") {
         node_kind[node] = kind
         node_type[node] = ""
+        if (substr(node_parent_edge[node], 1, 4) == "key " && (node in node_line_comment)) {
+            node_key_line_comment[node] = node_line_comment[node]
+            delete node_line_comment[node]
+        }
         return node
     }
     if (node_kind[node] != kind) {
@@ -631,6 +1423,7 @@ function ensure_root(kind, source_line,    root) {
         document_file_index[document_index] = current_input_file_index
         document_filename[document_index] = current_input_filename
         document_has_content[document_index] = 1
+        parser_record_content(root, 0)
         return root
     }
     root = (document_index in document_root) ? document_root[document_index] : 0
@@ -646,6 +1439,7 @@ function create_empty_document(source_line,    root) {
     document_file_index[document_index] = current_input_file_index
     document_filename[document_index] = current_input_filename
     document_has_content[document_index] = 1
+    parser_record_content(root, 0)
     return root
 }
 
@@ -709,7 +1503,7 @@ function parse_scalar_key(value, source_line,    remainder, tag, anchor, node, r
     return node_value[resolved]
 }
 
-function parse_core(value, source_line, tag, anchor,    node, inner, count, i, separator, raw_key, key, child, alias_name, flow_serial, piece, is_merge) {
+function parse_core(value, source_line, tag, anchor, column_base,    node, inner, count, i, separator, raw_key, raw_value, leading, key, child, alias_name, flow_serial, piece, piece_offset, is_merge) {
     if (substr(value, 1, 1) == "*" && valid_anchor_name(substr(value, 2))) {
         if (tag != "" || anchor != "") {
             fail("aliases cannot carry a tag or anchor on line " source_line)
@@ -729,13 +1523,17 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
         count = split_flow(inner, flow_piece)
         for (i = 1; i <= count; i++) {
             flow_piece_saved[flow_piece_serial + 1, i] = flow_piece[i]
+            flow_piece_saved_offset[flow_piece_serial + 1, i] = flow_piece_offset[i]
             delete flow_piece[i]
+            delete flow_piece_offset[i]
         }
         flow_serial = ++flow_piece_serial
         for (i = 1; i <= count; i++) {
             piece = flow_piece_saved[flow_serial, i]
+            piece_offset = flow_piece_saved_offset[flow_serial, i]
             if (i == count && piece == "") {
                 delete flow_piece_saved[flow_serial, i]
+                delete flow_piece_saved_offset[flow_serial, i]
                 continue
             }
             if (piece == "") {
@@ -750,15 +1548,23 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
                 if (raw_key ~ /^\?[[:space:]]/) {
                     raw_key = trim(substr(raw_key, 2))
                 }
-                child = new_node("mapping", source_line, "", "", "")
+                child = new_node("mapping", flow_position_source_line(column_base + piece_offset, source_line), "", "", "")
+                node_column[child] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
                 key = parse_scalar_key(raw_key, source_line)
                 is_merge = parsed_key_is_merge
-                add_mapping(child, key, parse_value(substr(piece, separator + 1), source_line, -1, 0), source_line, is_merge)
+                raw_value = substr(piece, separator + 1)
+                leading = leading_horizontal_width(raw_value)
+                raw_value = trim(raw_value)
+                add_mapping(child, key, parse_value(raw_value, source_line, -1, 0, column_base ? column_base + piece_offset + separator + leading : 0), source_line, is_merge)
+                node_key_column[mapping_child[child, 1]] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
+                node_key_line[mapping_child[child, 1]] = column_base ? flow_position_source_line(column_base + piece_offset, source_line) : source_line
             } else {
-                child = parse_value(piece, source_line, -1, 0)
+                child = parse_value(piece, source_line, -1, 0, column_base ? column_base + piece_offset : 0)
             }
+            if (column_base) flow_position_take_comment(column_base + piece_offset, child, 0)
             add_sequence(node, child, source_line)
             delete flow_piece_saved[flow_serial, i]
+            delete flow_piece_saved_offset[flow_serial, i]
         }
         return node
     }
@@ -770,13 +1576,17 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
         count = split_flow(inner, flow_piece)
         for (i = 1; i <= count; i++) {
             flow_piece_saved[flow_piece_serial + 1, i] = flow_piece[i]
+            flow_piece_saved_offset[flow_piece_serial + 1, i] = flow_piece_offset[i]
             delete flow_piece[i]
+            delete flow_piece_offset[i]
         }
         flow_serial = ++flow_piece_serial
         for (i = 1; i <= count; i++) {
             piece = flow_piece_saved[flow_serial, i]
+            piece_offset = flow_piece_saved_offset[flow_serial, i]
             if (i == count && piece == "") {
                 delete flow_piece_saved[flow_serial, i]
+                delete flow_piece_saved_offset[flow_serial, i]
                 continue
             }
             if (piece == "") {
@@ -790,15 +1600,26 @@ function parse_core(value, source_line, tag, anchor,    node, inner, count, i, s
                 }
                 key = parse_scalar_key(raw_key, source_line)
                 is_merge = parsed_key_is_merge
-                child = parse_value(substr(piece, separator + 1), source_line, -1, 0)
+                raw_value = substr(piece, separator + 1)
+                leading = leading_horizontal_width(raw_value)
+                raw_value = trim(raw_value)
+                child = parse_value(raw_value, source_line, -1, 0, column_base ? column_base + piece_offset + separator + leading : 0)
+                node_key_column[child] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
+                node_key_line[child] = column_base ? flow_position_source_line(column_base + piece_offset, source_line) : source_line
                 add_mapping(node, key, child, source_line, is_merge)
+                if (column_base) flow_position_take_comment(column_base + piece_offset, child, 1)
             } else {
                 key = parse_scalar_key(piece, source_line)
                 is_merge = parsed_key_is_merge
-                child = new_node("scalar", source_line, "", "null", "")
+                child = new_node("scalar", flow_position_source_line(column_base + piece_offset, source_line), "", "null", "")
+                node_column[child] = column_base ? flow_position_source_column(column_base + piece_offset + length(piece), column_base + piece_offset + length(piece)) : 0
+                node_key_column[child] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
+                node_key_line[child] = column_base ? flow_position_source_line(column_base + piece_offset, source_line) : source_line
                 add_mapping(node, key, child, source_line, is_merge)
+                if (column_base) flow_position_take_comment(column_base + piece_offset, child, 1)
             }
             delete flow_piece_saved[flow_serial, i]
+            delete flow_piece_saved_offset[flow_serial, i]
         }
         return node
     }
@@ -838,7 +1659,7 @@ function record_node_presentation(node, syntax, original,    first, comment_at) 
     return node
 }
 
-function parse_value(value, source_line, indent, allow_block,    cleaned, remainder, tag, anchor, node) {
+function parse_value(value, source_line, indent, allow_block, column_base,    cleaned, remainder, tag, anchor, node) {
     cleaned = strip_inline_comment(trim(value))
     remainder = parse_properties(cleaned, source_line)
     tag = parsed_tag
@@ -871,7 +1692,11 @@ function parse_value(value, source_line, indent, allow_block,    cleaned, remain
         find_top_level_colon(remainder, 1)) {
         fail("mapping indicator inside plain scalar on line " source_line)
     }
-    node = parse_core(remainder, source_line, tag, anchor)
+    node = parse_core(remainder, source_line, tag, anchor, column_base)
+    if (column_base) {
+        node_line[node] = flow_position_source_line(column_base, source_line)
+        node_column[node] = flow_position_source_column(column_base, column_base)
+    }
     return record_node_presentation(node, remainder, value)
 }
 
@@ -1042,7 +1867,7 @@ function flush_block(    value, i, line, previous, more, previous_more, seen_non
     block_count = 0
 }
 
-function parse_mapping_into(value, parent, indent, source_line,    separator, raw_key, key, child, raw_value, raw_suffix, is_merge) {
+function parse_mapping_into(value, parent, indent, source_line,    separator, raw_key, key, child, raw_value, raw_suffix, column, is_merge) {
     if (indent > max_indent) {
         max_indent = indent
     }
@@ -1057,15 +1882,24 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     is_merge = parsed_key_is_merge
     raw_suffix = substr(value, separator + 1)
     raw_value = trim(raw_suffix)
+    column = raw_value == "" ? indent + separator + 1 : indent + separator + leading_horizontal_width(raw_suffix) + 1
     if (raw_key != "" && raw_value ~ /^-[[:space:]]/) {
         fail("block sequence entries must begin on their own line " source_line)
     }
-    child = parse_value(raw_value, source_line, indent, 1)
+    child = parse_value(raw_value, source_line, indent, 1, column)
     node_indent[child] = indent
-    node_column[child] = raw_value == "" ? indent + separator + 1 : indent + separator + leading_horizontal_width(raw_suffix) + 1
+    node_column[child] = column
+    node_key_column[child] = indent + 1
+    node_key_line[child] = source_line
     add_mapping(parent, key, child, source_line, is_merge)
+    parser_record_content(child, 1)
     if (source_line in source_line_comment) {
-        node_line_comment[child] = source_line_comment[source_line]
+        if (node_kind[child] == "scalar" || node_kind[child] == "alias" || node_style[child] == "flow") {
+            node_line_comment[child] = source_line_comment[source_line]
+        } else {
+            node_key_line_comment[child] = source_line_comment[source_line]
+            delete node_line_comment[child]
+        }
     }
 
     delete list_node[indent]
@@ -1133,6 +1967,7 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
     } else if (original == "-" || original ~ /^-[[:space:]]/) {
         item = new_node("sequence", source_line, "", "", "")
         add_sequence(sequence, item, source_line)
+        parser_record_content(item, 0)
         context_node[indent] = item
         context_valid[indent] = 1
         parse_sequence_line(original, nested_indent, source_line)
@@ -1148,15 +1983,17 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
             node_column[item] = nested_indent + 1
             bind_anchor(anchor, item, source_line)
             add_sequence(sequence, item, source_line)
+            parser_record_content(item, 0)
             context_node[indent] = item
             context_valid[indent] = 1
             parse_mapping_into(remainder, item, indent + 2, source_line)
             return
         }
-        item = parse_value(original, source_line, indent, 1)
+        item = parse_value(original, source_line, indent, 1, original == "" ? indent + 2 : nested_indent + 1)
     }
 
     add_sequence(sequence, item, source_line)
+    parser_record_content(item, 0)
     if (source_line in source_line_comment) {
         node_line_comment[item] = source_line_comment[source_line]
     }
@@ -1242,14 +2079,18 @@ function add_explicit_value(indent, text, source_line,    parent, child, raw_val
     if (raw_value ~ /^-[[:space:]]/) {
         child = new_node("sequence", source_line, "", "", "")
         add_mapping(parent, explicit_key[indent], child, source_line, 0)
+        parser_record_content(child, 1)
         list_node[indent + 2] = child
         list_valid[indent + 2] = 1
         parse_sequence_line(raw_value, indent + 2, source_line)
     } else {
-        child = parse_value(raw_value, source_line, indent, 1)
+        child = parse_value(raw_value, source_line, indent, 1, raw_value == "" ? indent + 2 : indent + 2 + leading_horizontal_width(substr(text, 2)))
         add_mapping(parent, explicit_key[indent], child, source_line, 0)
+        parser_record_content(child, 1)
     }
     node_indent[child] = indent
+    node_key_column[child] = indent + 1
+    node_key_line[child] = source_line
     node_column[child] = raw_value == "" ? indent + 2 : indent + 2 + leading_horizontal_width(substr(text, 2))
     delete explicit_key[indent]
     delete explicit_key_valid[indent]
@@ -1276,6 +2117,9 @@ function add_explicit_null(indent, source_line,    parent, child) {
     }
     child = new_node("scalar", source_line, "", "null", "")
     add_mapping(parent, explicit_key[indent], child, source_line, 0)
+    node_key_column[child] = indent + 1
+    node_key_line[child] = source_line
+    parser_record_content(child, 1)
     delete explicit_key[indent]
     delete explicit_key_valid[indent]
     delete explicit_key_last_line[indent]
@@ -1431,10 +2275,13 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         }
     }
 
-    if (raw ~ /^[[:space:]]*$/ || raw ~ /^[[:space:]]*#/) {
-        if (raw ~ /^[[:space:]]*#/) {
-            close_plain_contexts()
-        }
+    if (raw ~ /^[[:space:]]*#/) {
+        close_plain_contexts()
+        parser_pending_comment_add(raw, source_line)
+        return
+    }
+    if (raw ~ /^[[:space:]]*$/) {
+        parser_flush_pending_foot()
         return
     }
 
@@ -1454,6 +2301,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         multiline_flow_active = 1
         multiline_flow_line = source_line
         multiline_flow_text = start_flow_line(raw)
+        flow_position_start(multiline_flow_text, source_line)
         multiline_flow_depth = flow_balance(multiline_flow_text)
         multiline_flow_min_indent = flow_continuation_indent(raw)
         multiline_flow_root = flow_opening(raw)
@@ -1498,6 +2346,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         source_line_comment[source_line] = trim(substr(text, comment_at + 1))
     }
     clean = strip_inline_comment(text)
+    if (indent == 0 && (clean == "---" || clean == "...")) parser_flush_pending_foot()
 
     root = (document_index in document_root) ? document_root[document_index] : 0
     if (root && indent == 0 && node_kind[root] == "pending") {
@@ -1568,6 +2417,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         }
         document_ended = 0
         clear_structure()
+        parser_last_content_node = 0
     }
 
     clear_deeper(indent)
@@ -1649,12 +2499,13 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         (document_index in document_root)) {
         fail("unknown syntax on line " source_line)
     }
-    root = parse_value(text, source_line, indent, 1)
+    root = parse_value(text, source_line, indent, 1, indent + 1)
     node_column[root] = indent + 1
     document_root[document_index] = root
     document_file_index[document_index] = current_input_file_index
     document_filename[document_index] = current_input_filename
     document_has_content[document_index] = 1
+    parser_record_content(root, 0)
     if (block_active && block_node == root && indent == 0) {
         block_base_indent = -1
     }
@@ -2063,6 +2914,19 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         expression_token_value = substr(expression_source, start, expression_position - start)
         return
     }
+    if (char == "@") {
+        start = expression_position
+        expression_position++
+        while (expression_position <= length(expression_source) && expression_is_word_char(substr(expression_source, expression_position, 1))) {
+            expression_position++
+        }
+        if (expression_position == start + 1) {
+            fail("codec names require characters after @")
+        }
+        expression_token_type = "identifier"
+        expression_token_value = substr(expression_source, start, expression_position - start)
+        return
+    }
     if (char == "*") {
         start = expression_position
         expression_position++
@@ -2141,7 +3005,7 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         }
         word = substr(expression_source, start, expression_position - start)
         lowered = tolower(word)
-        if (lowered == "and" || lowered == "or" || lowered == "not" || lowered == "as") {
+        if (lowered == "and" || lowered == "or" || lowered == "not" || lowered == "as" || lowered == "ref") {
             expression_token_type = lowered
         } else if (lowered == "true" || lowered == "false" || lowered == "null") {
             expression_token_type = "literal_" lowered
@@ -2156,6 +3020,7 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
 
 function expression_new(kind, left, right, value,    expression) {
     expression = ++expression_count
+    if (max_nodes > 0 && expression > max_nodes) fail("expression node limit exceeded (max " max_nodes ")")
     expression_kind[expression] = kind
     expression_left[expression] = left
     expression_right[expression] = right
@@ -2418,11 +3283,43 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             argument = expression_parse_stream()
             expression_expect("right_parenthesis")
             expression = expression_new("explode", argument, 0, "")
-        } else if (name == "error") {
+        } else if (name == "error" || name == "eval" || name == "load" || name == "load_str" || name == "load_base64" || name == "load_props") {
             expression_expect("left_parenthesis")
             argument = expression_parse_stream()
             expression_expect("right_parenthesis")
-            expression = expression_new("error", argument, 0, "")
+            expression = expression_new(name, argument, 0, "")
+        } else if (name == "to_json" || name == "to_yaml") {
+            argument = 0
+            if (expression_token_type == "left_parenthesis") {
+                expression_lex_next()
+                if (expression_token_type != "right_parenthesis") {
+                    argument = expression_parse_stream()
+                }
+                expression_expect("right_parenthesis")
+            }
+            expression = expression_new(name, argument, 0, "")
+        } else if (name == "from_json" || name == "from_yaml" || name == "from_props" || name == "from_csv" || name == "from_tsv" ||
+            name == "to_props" || name == "to_csv" || name == "to_tsv") {
+            if (expression_token_type == "left_parenthesis") {
+                expression_lex_next()
+                expression_expect("right_parenthesis")
+            }
+            expression = expression_new(name, 0, 0, "")
+        } else if (name == "@json" || name == "@jsond" || name == "@yaml" || name == "@yamld" ||
+            name == "@props" || name == "@propsd" || name == "@csv" || name == "@csvd" || name == "@tsv" || name == "@tsvd" ||
+            name == "@base64" || name == "@base64d" ||
+            name == "@uri" || name == "@urid" || name == "@sh") {
+            if (name == "@json") expression = expression_new("to_json", 0, 0, "compact")
+            else if (name == "@jsond") expression = expression_new("from_json", 0, 0, "")
+            else if (name == "@yaml") expression = expression_new("to_yaml", 0, 0, "")
+            else if (name == "@yamld") expression = expression_new("from_yaml", 0, 0, "")
+            else if (name == "@props") expression = expression_new("to_props", 0, 0, "")
+            else if (name == "@propsd") expression = expression_new("from_props", 0, 0, "")
+            else if (name == "@csv") expression = expression_new("to_csv", 0, 0, "")
+            else if (name == "@csvd") expression = expression_new("from_csv", 0, 0, "")
+            else if (name == "@tsv") expression = expression_new("to_tsv", 0, 0, "")
+            else if (name == "@tsvd") expression = expression_new("from_tsv", 0, 0, "")
+            else expression = expression_new("codec_" substr(name, 2), 0, 0, "")
         } else if (name == "select" || name == "has" || name == "del" || name == "map" || name == "map_values" || name == "with_entries" ||
             name == "contains" || name == "startswith" || name == "endswith" || name == "split" || name == "join" ||
             name == "sort_by" || name == "group_by" || name == "unique_by" || name == "min_by" || name == "max_by" ||
@@ -2441,11 +3338,12 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             expression = expression_new("regex_sub", argument, child, "")
         } else if (name == "length" || name == "keys" || name == "kind" || name == "type" || name == "to_entries" || name == "from_entries" ||
             name == "sort" || name == "unique" || name == "flatten" || name == "reverse" || name == "upcase" || name == "downcase" ||
-            name == "trim" || name == "to_string" || name == "array_to_map" || name == "split_doc" ||
+            name == "trim" || name == "to_string" || name == "array_to_map" || name == "split_doc" || name == "shuffle" ||
             name == "min" || name == "max" || name == "any" || name == "all" || name == "add" || name == "path" ||
             name == "parent" || name == "to_number" || name == "documentindex" ||
             name == "fileindex" || name == "filename" || name == "empty" || name == "line" || name == "key" ||
-            name == "column" || name == "tag" || name == "anchor" || name == "alias" || name == "style" || name == "line_comment" || name == "pivot") {
+            name == "column" || name == "tag" || name == "anchor" || name == "alias" || name == "style" || name == "line_comment" ||
+            name == "head_comment" || name == "foot_comment" || name == "pivot") {
             if (expression_token_type == "left_parenthesis") {
                 expression_lex_next()
                 expression_expect("right_parenthesis")
@@ -2458,6 +3356,8 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             else if (name == "alias") name = "node_alias"
             else if (name == "style") name = "node_style"
             else if (name == "line_comment") name = "node_line_comment"
+            else if (name == "head_comment") name = "node_head_comment"
+            else if (name == "foot_comment") name = "node_foot_comment"
             expression = expression_new(name, 0, 0, "")
         } else {
             fail("unknown expression operator: " name)
@@ -2559,6 +3459,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             }
         } else if (expression_token_type == "identifier" &&
             (tolower(expression_token_value) == "style" || tolower(expression_token_value) == "line_comment" ||
+            tolower(expression_token_value) == "head_comment" || tolower(expression_token_value) == "foot_comment" ||
             tolower(expression_token_value) == "tag" || tolower(expression_token_value) == "anchor" ||
             tolower(expression_token_value) == "alias")) {
             value = tolower(expression_token_value)
@@ -3033,6 +3934,15 @@ function expression_parse_assignment(    left, right, kind, operator, identity, 
 
 function expression_parse_pipe(    left, right, variable, initial, update, reduction) {
     left = expression_parse_assignment()
+    if (expression_token_type == "ref") {
+        expression_lex_next()
+        if (expression_token_type != "variable") fail("ref requires a variable")
+        variable = expression_token_value
+        expression_lex_next()
+        expression_expect("pipe")
+        right = expression_parse_pipe()
+        return expression_new("bind", left, right, variable)
+    }
     if (expression_token_type == "as") {
         expression_lex_next()
         if (expression_token_type != "variable") {
@@ -3294,9 +4204,19 @@ function expression_clone_node(source,    resolved, clone, i, collection, key, c
     if (resolved in node_line_comment) {
         node_line_comment[clone] = node_line_comment[resolved]
     }
+    if (resolved in node_head_comment) node_head_comment[clone] = node_head_comment[resolved]
+    if (resolved in node_foot_comment) node_foot_comment[clone] = node_foot_comment[resolved]
+    if (resolved in node_key_head_comment) node_key_head_comment[clone] = node_key_head_comment[resolved]
+    if (resolved in node_key_foot_comment) node_key_foot_comment[clone] = node_key_foot_comment[resolved]
+    if (resolved in node_key_line_comment) node_key_line_comment[clone] = node_key_line_comment[resolved]
     if (node_line_comment_modified[resolved]) {
         node_line_comment_modified[clone] = 1
     }
+    if (node_head_comment_modified[resolved]) node_head_comment_modified[clone] = 1
+    if (node_foot_comment_modified[resolved]) node_foot_comment_modified[clone] = 1
+    if (node_key_head_comment_modified[resolved]) node_key_head_comment_modified[clone] = 1
+    if (node_key_foot_comment_modified[resolved]) node_key_foot_comment_modified[clone] = 1
+    if (node_key_line_comment_modified[resolved]) node_key_line_comment_modified[clone] = 1
     delete node_document[clone]
     delete node_file_index[clone]
     delete node_filename[clone]
@@ -3576,6 +4496,8 @@ function expression_node_property_value(node, property,    value) {
     if (property == "line_comment") {
         return node_line_comment[node]
     }
+    if (property == "head_comment") return node_head_comment[node]
+    if (property == "foot_comment") return node_foot_comment[node]
     if (property == "tag") {
         return expression_type_name(node)
     }
@@ -3711,6 +4633,24 @@ function expression_set_node_property(node, property, value_node,    resolved, v
         fail(property " must be set to a string")
     }
     value = node_value[resolved]
+    if (node_key_reference[node] && (property == "line_comment" || property == "head_comment" || property == "foot_comment")) {
+        node = node_origin[node]
+        old_value = property == "line_comment" ? node_key_line_comment[node] : (property == "head_comment" ? node_key_head_comment[node] : node_key_foot_comment[node])
+        if (value == old_value) return
+        if (property == "line_comment") {
+            node_key_line_comment[node] = value
+            node_key_line_comment_modified[node] = 1
+        } else if (property == "head_comment") {
+            node_key_head_comment[node] = value
+            node_key_head_comment_modified[node] = 1
+        } else {
+            node_key_foot_comment[node] = value
+            node_key_foot_comment_modified[node] = 1
+        }
+        if (inplace_mode && !presentation_track_comment(node, property, 1, value)) presentation_possible = 0
+        expression_last_property_changed = 1
+        return
+    }
     old_value = expression_node_property_value(node, property)
     new_value = property == "style" && value == "plain" ? "" : value
     if (new_value == old_value) {
@@ -3748,6 +4688,12 @@ function expression_set_node_property(node, property, value_node,    resolved, v
     } else if (property == "line_comment") {
         node_line_comment[node] = value
         node_line_comment_modified[node] = 1
+    } else if (property == "head_comment") {
+        node_head_comment[node] = value
+        node_head_comment_modified[node] = 1
+    } else if (property == "foot_comment") {
+        node_foot_comment[node] = value
+        node_foot_comment_modified[node] = 1
     } else if (property == "tag") {
         if (node_kind[node] == "alias") {
             fail("tag cannot be set on an alias")
@@ -3772,6 +4718,8 @@ function expression_set_node_property(node, property, value_node,    resolved, v
         } else if (property == "line_comment" && node_kind[node] == "scalar" &&
             (node_style[node] == "literal" || node_style[node] == "folded")) {
             presentation_track_owned_span(node)
+        } else if (property == "head_comment" || property == "foot_comment") {
+            if (!presentation_track_comment(node, property, 0, value)) presentation_possible = 0
         } else {
             presentation_possible = 0
         }
@@ -4066,6 +5014,33 @@ function expression_json_text(node,    resolved, result, i, collection, key) {
     return result "}"
 }
 
+function expression_json_pretty_text(node, step, level,    resolved, result, i, collection, key, child_indent, prefix) {
+    if (step <= 0) return expression_json_text(node)
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar") return expression_json_text(resolved)
+    child_indent = yaml_spaces((level + 1) * step)
+    prefix = yaml_spaces(level * step)
+    if (node_kind[resolved] == "sequence") {
+        if (!sequence_count[resolved]) return "[]"
+        result = "[\n"
+        for (i = 1; i <= sequence_count[resolved]; i++) {
+            if (i > 1) result = result ",\n"
+            result = result child_indent expression_json_pretty_text(sequence_child[resolved, i], step, level + 1)
+        }
+        return result "\n" prefix "]"
+    }
+    collection = ++collection_serial
+    collect_mapping_keys(resolved, collection)
+    if (!collection_count[collection]) return "{}"
+    result = "{\n"
+    for (i = 1; i <= collection_count[collection]; i++) {
+        key = collection_key[collection, i]
+        if (i > 1) result = result ",\n"
+        result = result child_indent json_quote(key) ": " expression_json_pretty_text(mapping_lookup(resolved, key), step, level + 1)
+    }
+    return result "\n" prefix "}"
+}
+
 function expression_yaml_scalar_text(node,    resolved, value) {
     if (node_kind[node] == "alias") {
         return "*" node_value[node]
@@ -4118,7 +5093,8 @@ function expression_yaml_flow_text(node,    resolved, result, i, key) {
     return result "}"
 }
 
-function expression_yaml_text(node, indent,    resolved, result, i, key, child, inline, prefix) {
+function expression_yaml_text(node, indent, step,    resolved, result, i, key, child, inline, prefix) {
+    if (step == "") step = yaml_indent
     if (node_kind[node] == "alias") {
         return expression_yaml_scalar_text(node)
     }
@@ -4142,7 +5118,7 @@ function expression_yaml_text(node, indent,    resolved, result, i, key, child, 
             if (inline != "") {
                 result = result prefix "- " inline
             } else {
-                result = result prefix "-\n" expression_yaml_text(child, indent + yaml_indent)
+                result = result prefix "-\n" expression_yaml_text(child, indent + step, step)
             }
         }
         return result
@@ -4159,7 +5135,7 @@ function expression_yaml_text(node, indent,    resolved, result, i, key, child, 
         if (inline != "") {
             result = result prefix key ": " inline
         } else {
-            result = result prefix key ":\n" expression_yaml_text(child, indent + yaml_indent)
+            result = result prefix key ":\n" expression_yaml_text(child, indent + step, step)
         }
     }
     return result
@@ -4284,11 +5260,26 @@ function expression_evaluate_context(kind, expression, input,    output, middle,
             expression_stream_push(output, expression_scalar(key == "plain" ? "" : key, "string"))
         } else if (kind == "node_line_comment") {
             expression_stream_push(output, expression_scalar(node_line_comment[node], "string"))
+        } else if (kind == "node_head_comment") {
+            expression_stream_push(output, expression_scalar(node_head_comment[node], "string"))
+        } else if (kind == "node_foot_comment") {
+            expression_stream_push(output, expression_scalar(node_foot_comment[node], "string"))
         } else if (node in node_parent) {
             key = node_parent_edge[node]
             result_node = substr(key, 1, 6) == "index " ? expression_scalar(substr(key, 7), "int") : expression_scalar(substr(key, 5), "string")
-            node_line[result_node] = node_line[node]
-            node_column[result_node] = substr(key, 1, 4) == "key " ? node_indent[node] + 1 : node_column[node]
+            node_origin[result_node] = node
+            if (substr(key, 1, 4) == "key ") node_key_reference[result_node] = 1
+            node_line[result_node] = substr(key, 1, 4) == "key " && (node in node_key_line) ? node_key_line[node] : node_line[node]
+            node_column[result_node] = substr(key, 1, 4) == "key " ? ((node in node_key_column) ? node_key_column[node] : node_indent[node] + 1) : node_column[node]
+            if (substr(key, 1, 4) == "key ") {
+                if (node in node_key_head_comment) node_head_comment[result_node] = node_key_head_comment[node]
+                if (node in node_key_foot_comment) node_foot_comment[result_node] = node_key_foot_comment[node]
+                if (node in node_key_line_comment) node_line_comment[result_node] = node_key_line_comment[node]
+            } else {
+                if (node in node_head_comment) node_head_comment[result_node] = node_head_comment[node]
+                if (node in node_foot_comment) node_foot_comment[result_node] = node_foot_comment[node]
+                if (node in node_line_comment) node_line_comment[result_node] = node_line_comment[node]
+            }
             expression_stream_push(output, result_node)
         }
     }
@@ -4363,9 +5354,126 @@ function expression_evaluate_string(kind, expression, input,    output, i, j, no
     return output
 }
 
+function expression_utility_indent(expression, single, fallback, allow_zero,    stream, node, value) {
+    if (!expression_left[expression]) return fallback
+    stream = expression_evaluate(expression_left[expression], single)
+    if (expression_stream_count[stream] != 1) fail(expression_kind[expression] " requires one indentation value")
+    node = resolve_alias(expression_stream_node[stream, 1])
+    if (node_kind[node] != "scalar" || node_type[node] != "int") fail(expression_kind[expression] " indentation must be an integer")
+    value = node_value[node] + 0
+    if (value < (allow_zero ? 0 : 1) || value > 9) fail(expression_kind[expression] " indentation must be " (allow_zero ? "0 through 9" : "1 through 9"))
+    return value
+}
+
+function expression_shuffle(node,    resolved, result, serial, count, i, j, swap) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "sequence") fail("shuffle requires a sequence")
+    result = new_node("sequence", 0, "", "", "")
+    serial = ++codec_shuffle_serial
+    count = sequence_count[resolved]
+    for (i = 1; i <= count; i++) codec_shuffle_index[serial, i] = i
+    for (i = count; i > 1; i--) {
+        j = (codec_random_next() % i) + 1
+        swap = codec_shuffle_index[serial, i]
+        codec_shuffle_index[serial, i] = codec_shuffle_index[serial, j]
+        codec_shuffle_index[serial, j] = swap
+    }
+    for (i = 1; i <= count; i++) {
+        add_sequence(result, expression_clone_node(sequence_child[resolved, codec_shuffle_index[serial, i]]), 0)
+        delete codec_shuffle_index[serial, i]
+    }
+    return result
+}
+
+function expression_evaluate_utility(kind, expression, input,    output, i, j, node, resolved, single, argument_stream, argument_node, value, result_node, dynamic_expression, dynamic_results, step) {
+    output = expression_stream_new()
+    if (kind == "eval") {
+        if (++dynamic_eval_depth > 32) fail("dynamic eval depth limit exceeded")
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            node = expression_stream_node[input, i]
+            single = expression_stream_single(node)
+            argument_stream = expression_evaluate(expression_left[expression], single)
+            for (j = 1; j <= expression_stream_count[argument_stream]; j++) {
+                value = expression_string_value(expression_stream_node[argument_stream, j])
+                if (value in dynamic_expression_cache) dynamic_expression = dynamic_expression_cache[value]
+                else {
+                    dynamic_expression = expression_parse_fragment(value)
+                    dynamic_expression_cache[value] = dynamic_expression
+                }
+                dynamic_results = expression_evaluate(dynamic_expression, single)
+                expression_stream_append(output, dynamic_results)
+            }
+        }
+        dynamic_eval_depth--
+        return output
+    }
+    if (kind == "load" || kind == "load_str" || kind == "load_base64" || kind == "load_props") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            single = expression_stream_single(expression_stream_node[input, i])
+            argument_stream = expression_evaluate(expression_left[expression], single)
+            for (j = 1; j <= expression_stream_count[argument_stream]; j++) {
+                value = expression_read_file(expression_string_value(expression_stream_node[argument_stream, j]))
+                if (kind == "load") result_node = expression_parse_yaml_text(value)
+                else if (kind == "load_base64") result_node = expression_scalar(codec_base64_decode(value), "string")
+                else if (kind == "load_props") result_node = codec_props_decode(value)
+                else result_node = expression_scalar(value, "string")
+                expression_stream_push(output, result_node)
+            }
+        }
+        return output
+    }
+    for (i = 1; i <= expression_stream_count[input]; i++) {
+        node = expression_stream_node[input, i]
+        resolved = resolve_alias(node)
+        single = expression_stream_single(node)
+        if (kind == "to_json") {
+            step = expression_value[expression] == "compact" ? 0 : expression_utility_indent(expression, single, 2, 1)
+            value = expression_json_pretty_text(node, step, 0)
+            if (step > 0) value = value "\n"
+            result_node = expression_scalar(value, "string")
+        } else if (kind == "to_yaml") {
+            step = expression_utility_indent(expression, single, 2, 0)
+            result_node = expression_scalar(expression_yaml_text(node, 0, step) "\n", "string")
+        } else if (kind == "from_json" || kind == "from_yaml") {
+            value = expression_string_value(node)
+            result_node = kind == "from_json" ? expression_parse_json_text(value) : expression_parse_yaml_text(value)
+        } else if (kind == "to_props") {
+            result_node = expression_scalar(codec_props_walk(node, ""), "string")
+        } else if (kind == "from_props") {
+            result_node = codec_props_decode(expression_string_value(node))
+        } else if (kind == "to_csv" || kind == "to_tsv") {
+            result_node = expression_scalar(codec_delimited_encode(node, kind == "to_csv" ? "," : "\t"), "string")
+        } else if (kind == "from_csv" || kind == "from_tsv") {
+            result_node = codec_delimited_decode(expression_string_value(node), kind == "from_csv" ? "," : "\t")
+        } else if (kind == "codec_base64" || kind == "codec_base64d" || kind == "codec_uri" || kind == "codec_urid" || kind == "codec_sh") {
+            if (node_kind[resolved] != "scalar" || node_type[resolved] != "string") fail(substr(kind, 7) " codec requires a string")
+            value = node_value[resolved]
+            if (kind == "codec_base64") value = codec_base64_encode(value)
+            else if (kind == "codec_base64d") value = codec_base64_decode(value)
+            else if (kind == "codec_uri") value = codec_uri_encode(value)
+            else if (kind == "codec_urid") value = codec_uri_decode(value)
+            else value = codec_shell_encode(value)
+            result_node = expression_scalar(value, "string")
+        } else if (kind == "shuffle") {
+            result_node = expression_shuffle(node)
+        }
+        expression_stream_push(output, result_node)
+    }
+    return output
+}
+
 function expression_evaluate(expression, input,    output, middle, left_stream, right_stream, single, kind, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
     output = expression_stream_new()
     kind = expression_kind[expression]
+
+    if (kind == "eval" || kind == "load" || kind == "load_str" || kind == "load_base64" || kind == "load_props" ||
+        kind == "to_json" || kind == "from_json" || kind == "to_yaml" || kind == "from_yaml" ||
+        kind == "to_props" || kind == "from_props" || kind == "to_csv" || kind == "from_csv" ||
+        kind == "to_tsv" || kind == "from_tsv" ||
+        kind == "codec_base64" || kind == "codec_base64d" || kind == "codec_uri" || kind == "codec_urid" ||
+        kind == "codec_sh" || kind == "shuffle") {
+        return expression_evaluate_utility(kind, expression, input)
+    }
 
     if (kind == "identity") {
         expression_stream_append(output, input)
@@ -4408,7 +5516,8 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
     }
     if (kind == "filename" || kind == "fileindex" || kind == "documentindex" || kind == "path" || kind == "parent" ||
         kind == "node_property" || kind == "node_line" || kind == "node_column" || kind == "node_key" || kind == "node_tag" ||
-        kind == "node_anchor" || kind == "node_alias" || kind == "node_style" || kind == "node_line_comment") {
+        kind == "node_anchor" || kind == "node_alias" || kind == "node_style" || kind == "node_line_comment" ||
+        kind == "node_head_comment" || kind == "node_foot_comment") {
         return expression_evaluate_context(kind, expression, input)
     }
     if (kind == "to_number" || kind == "envsubst") {
@@ -5776,6 +6885,19 @@ function yaml_line_comment(node) {
     return (node in node_line_comment) && node_line_comment[node] != "" ? " # " node_line_comment[node] : ""
 }
 
+function yaml_mapping_line_comment(node) {
+    return (node in node_key_line_comment) && node_key_line_comment[node] != "" ? " # " node_key_line_comment[node] : yaml_line_comment(node)
+}
+
+function emit_yaml_comment(value, indent,    count, i) {
+    if (value == "") return
+    count = split(value, yaml_comment_line, /\n/)
+    for (i = 1; i <= count; i++) {
+        print yaml_spaces(indent) "#" (yaml_comment_line[i] == "" ? "" : " " yaml_comment_line[i])
+        delete yaml_comment_line[i]
+    }
+}
+
 function yaml_inline_node(node,    properties) {
     if (node_kind[node] == "scalar" || node_kind[node] == "alias") {
         return yaml_scalar_text(node)
@@ -5800,39 +6922,48 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
     if (node_kind[node] == "mapping") {
         for (i = 1; i <= mapping_count[node]; i++) {
             key = mapping_key[node, i]
+            child = mapping_child[node, i]
+            emit_yaml_comment(node_key_head_comment[child], indent)
             if (mapping_merge[node, i]) {
                 printf "%s<<:", yaml_spaces(indent)
             } else {
                 printf "%s%s:", yaml_spaces(indent), json_quote(key)
             }
-            child = mapping_child[node, i]
             if (node_kind[child] == "scalar" && (node_style[child] == "literal" || node_style[child] == "folded")) {
                 properties = yaml_properties(child)
-                printf " %s%s%s\n", (properties == "" ? "" : properties " "), yaml_block_indicator(child), yaml_line_comment(child)
+                printf " %s%s%s\n", (properties == "" ? "" : properties " "), yaml_block_indicator(child), yaml_mapping_line_comment(child)
                 emit_yaml_block_scalar(child, indent + yaml_indent)
+                emit_yaml_comment(node_foot_comment[child], indent)
+                emit_yaml_comment(node_head_comment[child], indent)
+                emit_yaml_comment(node_key_foot_comment[child], indent)
                 continue
             }
             inline = yaml_inline_node(child)
             if (inline != "") {
-                printf " %s%s\n", inline, yaml_line_comment(child)
+                printf " %s%s\n", inline, yaml_mapping_line_comment(child)
             } else {
                 properties = yaml_properties(child)
                 if (properties != "") {
                     printf " %s", properties
                 }
-                printf "%s\n", yaml_line_comment(child)
+                printf "%s\n", yaml_mapping_line_comment(child)
                 emit_yaml_collection(child, indent + yaml_indent)
             }
+            emit_yaml_comment(node_foot_comment[child], indent)
+            emit_yaml_comment(node_head_comment[child], indent)
+            emit_yaml_comment(node_key_foot_comment[child], indent)
         }
         return
     }
     for (i = 1; i <= sequence_count[node]; i++) {
         child = sequence_child[node, i]
+        emit_yaml_comment(node_head_comment[child], indent)
         printf "%s-", yaml_spaces(indent)
         if (node_kind[child] == "scalar" && (node_style[child] == "literal" || node_style[child] == "folded")) {
             properties = yaml_properties(child)
             printf " %s%s%s\n", (properties == "" ? "" : properties " "), yaml_block_indicator(child), yaml_line_comment(child)
             emit_yaml_block_scalar(child, indent + yaml_indent)
+            emit_yaml_comment(node_foot_comment[child], indent)
             continue
         }
         inline = yaml_inline_node(child)
@@ -5846,19 +6977,23 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
             printf "%s\n", yaml_line_comment(child)
             emit_yaml_collection(child, indent + yaml_indent)
         }
+        emit_yaml_comment(node_foot_comment[child], indent)
     }
 }
 
 function emit_yaml(node,    inline, properties) {
+    emit_yaml_comment(node_head_comment[node], 0)
     if (node_kind[node] == "scalar" && (node_style[node] == "literal" || node_style[node] == "folded")) {
         properties = yaml_properties(node)
         print (properties == "" ? "" : properties " ") yaml_block_indicator(node) yaml_line_comment(node)
         emit_yaml_block_scalar(node, yaml_indent)
+        emit_yaml_comment(node_foot_comment[node], 0)
         return
     }
     inline = yaml_inline_node(node)
     if (inline != "") {
         print inline yaml_line_comment(node)
+        emit_yaml_comment(node_foot_comment[node], 0)
         return
     }
     properties = yaml_properties(node)
@@ -5866,6 +7001,7 @@ function emit_yaml(node,    inline, properties) {
         print properties
     }
     emit_yaml_collection(node, 0)
+    emit_yaml_comment(node_foot_comment[node], 0)
 }
 
 function presentation_comment_position(value,    i, char, previous, quote, escaped, braces, brackets) {
@@ -6004,12 +7140,72 @@ function presentation_flow_owner(target,    current, parent, owner, line) {
             break
         }
         parent = node_parent[current]
-        if (!parent || (line && node_line[parent] != line)) {
+        if (!parent || (line && node_line[parent] != line && node_style[parent] != "flow")) {
             break
         }
         current = parent
     }
     return owner
+}
+
+function presentation_queue_comment_before(line, value, indent,    item) {
+    item = ++presentation_comment_before_count[line]
+    presentation_comment_before_value[line, item] = value
+    presentation_comment_before_indent[line, item] = indent
+}
+
+function presentation_queue_comment_after(line, value, indent,    item) {
+    item = ++presentation_comment_after_count[line]
+    presentation_comment_after_value[line, item] = value
+    presentation_comment_after_indent[line, item] = indent
+}
+
+function presentation_track_comment(node, property, as_key, value,    source, start, end, line, indent, parent, i) {
+    if (!inplace_mode || !presentation_possible) return 0
+    source = (node in node_origin) ? node_origin[node] : node
+    if (presentation_flow_owner(source)) return 0
+
+    if (as_key) {
+        start = property == "head_comment" ? node_key_head_comment_start[source] : node_key_foot_comment_start[source]
+        end = property == "head_comment" ? node_key_head_comment_end[source] : node_key_foot_comment_end[source]
+    } else {
+        start = property == "head_comment" ? node_head_comment_start[source] : node_foot_comment_start[source]
+        end = property == "head_comment" ? node_head_comment_end[source] : node_foot_comment_end[source]
+    }
+    if (start) {
+        if (!end) end = start
+        for (i = start; i <= end; i++) {
+            if (trim(raw_input_line[i]) !~ /^#/ || i in presentation_line_node || i in presentation_deleted_line) return 0
+        }
+        indent = indentation(raw_input_line[start], start)
+        for (i = start; i <= end; i++) presentation_deleted_line[i] = 1
+        if (value != "") presentation_queue_comment_before(start, value, indent)
+        return 1
+    }
+
+    line = as_key && node_key_line[source] ? node_key_line[source] : node_line[source]
+    if (line < 1) return 0
+    indent = indentation(raw_input_line[line], line)
+    if (as_key && property == "head_comment") {
+        presentation_queue_comment_before(line, value, indent)
+        return 1
+    }
+    if (property == "foot_comment" || (as_key && property == "foot_comment")) {
+        line = presentation_span_end(source)
+        presentation_queue_comment_after(line, value, indent)
+        return 1
+    }
+    parent = (source in node_parent) ? node_parent[source] : 0
+    if (!parent) {
+        presentation_queue_comment_before(line, value, indent)
+    } else if (node_kind[parent] == "sequence") {
+        presentation_queue_comment_before(line, value, indent)
+    } else if (node_kind[source] == "mapping" || node_kind[source] == "sequence") {
+        presentation_queue_comment_after(line, value, indent + yaml_indent)
+    } else {
+        presentation_queue_comment_after(presentation_span_end(source), value, indent)
+    }
+    return 1
 }
 
 function presentation_track_owned_span(node,    line, end, i) {
@@ -6559,6 +7755,15 @@ function emit_presented_reorder(line,    item, source_line, start, end, replacem
     }
 }
 
+function emit_presented_comment(value, indent,    count, i, lines, separator) {
+    count = split(value, lines, /\n/)
+    for (i = 1; i <= count; i++) {
+        separator = lines[i] == "" ? "" : " "
+        printf "%s#%s%s\n", yaml_spaces(indent), separator, lines[i]
+        delete lines[i]
+    }
+}
+
 function emit_preserved_input(start_line, end_line,    line, i, replacement_end) {
     if (!start_line) {
         start_line = 1
@@ -6567,6 +7772,9 @@ function emit_preserved_input(start_line, end_line,    line, i, replacement_end)
         end_line = NR
     }
     for (line = start_line; line <= end_line; line++) {
+        for (i = 1; i <= presentation_comment_before_count[line]; i++) {
+            emit_presented_comment(presentation_comment_before_value[line, i], presentation_comment_before_indent[line, i])
+        }
         if (line in presentation_deleted_line) {
         } else if (line in presentation_line_node) {
             emit_presented_line(line, presentation_line_node[line])
@@ -6586,6 +7794,9 @@ function emit_preserved_input(start_line, end_line,    line, i, replacement_end)
         for (i = 1; i <= presentation_insert_count[line]; i++) {
             emit_presented_insert(presentation_insert_key[line, i], presentation_insert_node[line, i], presentation_insert_indent[line, i])
         }
+        for (i = 1; i <= presentation_comment_after_count[line]; i++) {
+            emit_presented_comment(presentation_comment_after_value[line, i], presentation_comment_after_indent[line, i])
+        }
     }
 }
 
@@ -6596,7 +7807,7 @@ function source_edit_add(kind, start, end,    edit) {
     source_edit_end[edit] = end
 }
 
-function source_edit_compile(start_line, end_line, file,    line, run_start, run_end, replacement_end, i, last_end) {
+function source_edit_compile(start_line, end_line, file,    line, run_start, run_end, replacement_end, i, last_end, comment_replace) {
     if (!presentation_possible) {
         source_edit_file_count[file] = 0
         return 0
@@ -6654,7 +7865,11 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
                 !((run_end + 1) in presentation_reorder_owned_line)) {
                 run_end++
             }
-            source_edit_add("delete", run_start, run_end)
+            comment_replace = 0
+            for (i = run_start; i <= run_end; i++) {
+                if (presentation_comment_before_count[i] || presentation_comment_after_count[i]) comment_replace = 1
+            }
+            source_edit_add(comment_replace ? "replace" : "delete", run_start, run_end)
             line = run_end
             continue
         }
@@ -6662,6 +7877,9 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
             source_edit_add("reorder", line, line)
         }
         if (presentation_sequence_insert_count[line] || presentation_insert_count[line]) {
+            source_edit_add("insert", line, line)
+        }
+        if (presentation_comment_before_count[line] || presentation_comment_after_count[line]) {
             source_edit_add("insert", line, line)
         }
     }
@@ -7073,6 +8291,7 @@ function output_batch_files(query, output_mode,    file, last_file, document, fo
 
 BEGIN {
     document_index = 0
+    codec_initialize()
     query = ENVIRON["YSH_QUERY_TEXT"]
     if (query == "") {
         query = "."
@@ -7206,6 +8425,7 @@ BEGIN {
         }
         if ($0 ~ /^[[:space:]]*#/) {
             multiline_flow_comment_break = 1
+            flow_pending_comment_add($0, NR)
             next
         }
         if (multiline_flow_comment_break) {
@@ -7221,11 +8441,14 @@ BEGIN {
         if (trim(flow_line_clean) == "") {
             next
         }
+        flow_position_bind_pending(length(multiline_flow_text) + 2)
+        flow_position_append($0, flow_line_clean, NR)
         multiline_flow_text = multiline_flow_text " " flow_line_clean
         multiline_flow_depth = flow_balance(multiline_flow_text)
         if (multiline_flow_depth <= 0) {
             source_multiline_flow_end[multiline_flow_line] = NR
             process_line(multiline_flow_text, multiline_flow_line)
+            flow_position_clear()
             multiline_flow_active = 0
             multiline_flow_text = ""
         }
@@ -7266,6 +8489,7 @@ END {
             input_file_end_line[current_input_file_index] = NR
         }
         flush_block()
+        parser_flush_pending_foot()
         for (pending_indent = 0; pending_indent <= max_indent; pending_indent++) {
             if (explicit_key_valid[pending_indent]) {
                 add_explicit_null(pending_indent, NR + 1)
