@@ -27,6 +27,10 @@ PREVIEW=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-preview.XXXXXX")
 EDIT=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-edit.XXXXXX")
 trap 'rm -f "$INPUT" "$ORACLE" "$ROUNDTRIP" "$ACTUAL" "$EXPECTED" "$CANDIDATE" "$CANDIDATE_ORACLE" "$BEFORE" "$PREVIEW" "$EDIT"' 0 1 2 3 15
 
+property_fail() {
+    PROPERTY_FAILURE=$1
+}
+
 generate_case() {
     generated_case=$1
     shrink_level=$2
@@ -148,21 +152,21 @@ property_for_case() {
 run_property() {
     property_input=$1
     property_oracle=$2
-    if ! "$YSH_BINARY" --json . "$property_input" | jq -cS . > "$ACTUAL" 2>/dev/null ||
-        ! jq -cS . "$property_oracle" > "$EXPECTED" || ! cmp -s "$ACTUAL" "$EXPECTED"; then
-        return 1
-    fi
+    PROPERTY_FAILURE=
+    "$YSH_BINARY" --json . "$property_input" | jq -cS . > "$ACTUAL" 2>/dev/null || { property_fail "source parse or canonicalization failed"; return 1; }
+    jq -cS . "$property_oracle" > "$EXPECTED" || { property_fail "oracle canonicalization failed"; return 1; }
+    cmp -s "$ACTUAL" "$EXPECTED" || { property_fail "parsed source differs from oracle"; return 1; }
     case "$PROPERTY" in
     roundtrip)
-        "$YSH_BINARY" -o yaml . "$property_input" > "$ROUNDTRIP" 2>/dev/null || return 1
-        "$YSH_BINARY" --json . "$ROUNDTRIP" | jq -cS . > "$ACTUAL" 2>/dev/null || return 1
-        jq -cS . "$property_oracle" > "$EXPECTED"
-        cmp -s "$ACTUAL" "$EXPECTED"
+        "$YSH_BINARY" -o yaml . "$property_input" > "$ROUNDTRIP" 2>/dev/null || { property_fail "YAML round trip emission failed"; return 1; }
+        "$YSH_BINARY" --json . "$ROUNDTRIP" | jq -cS . > "$ACTUAL" 2>/dev/null || { property_fail "round-trip parse failed"; return 1; }
+        jq -cS . "$property_oracle" > "$EXPECTED" || { property_fail "round-trip oracle failed"; return 1; }
+        cmp -s "$ACTUAL" "$EXPECTED" || { property_fail "round-trip value differs from oracle"; return 1; }
         ;;
     query)
-        "$YSH_BINARY" --json "$QUERY" "$property_input" | jq -cS . > "$ACTUAL" 2>/dev/null || return 1
-        jq -cS "$QUERY" "$property_oracle" > "$EXPECTED" 2>/dev/null || return 1
-        cmp -s "$ACTUAL" "$EXPECTED"
+        "$YSH_BINARY" --json "$QUERY" "$property_input" | jq -cS . > "$ACTUAL" 2>/dev/null || { property_fail "query execution failed"; return 1; }
+        jq -cS "$QUERY" "$property_oracle" > "$EXPECTED" 2>/dev/null || { property_fail "query oracle failed"; return 1; }
+        cmp -s "$ACTUAL" "$EXPECTED" || { property_fail "query result differs from oracle"; return 1; }
         ;;
     mutation)
         cp "$property_input" "$EDIT"
@@ -172,19 +176,20 @@ run_property() {
         else
             preview_status=$?
         fi
-        [ "$preview_status" -eq 1 ] || return 1
-        cmp -s "$EDIT" "$BEFORE" || return 1
-        grep -q '^--- ' "$PREVIEW" || return 1
-        "$YSH_BINARY" -i "$QUERY" "$EDIT" >/dev/null 2>&1 || return 1
-        "$YSH_BINARY" --json . "$EDIT" | jq -cS . > "$ACTUAL" 2>/dev/null || return 1
-        jq -cS "$QUERY" "$property_oracle" > "$EXPECTED" 2>/dev/null || return 1
-        cmp -s "$ACTUAL" "$EXPECTED"
+        [ "$preview_status" -eq 1 ] || { property_fail "diff returned $preview_status instead of drift"; return 1; }
+        cmp -s "$EDIT" "$BEFORE" || { property_fail "diff modified its input"; return 1; }
+        grep -q '^--- ' "$PREVIEW" || { property_fail "diff returned no file header"; return 1; }
+        "$YSH_BINARY" -i "$QUERY" "$EDIT" >/dev/null 2>&1 || { property_fail "in-place mutation failed"; return 1; }
+        "$YSH_BINARY" --json . "$EDIT" | jq -cS . > "$ACTUAL" 2>/dev/null || { property_fail "mutated YAML did not parse"; return 1; }
+        jq -cS "$QUERY" "$property_oracle" > "$EXPECTED" 2>/dev/null || { property_fail "mutation oracle failed"; return 1; }
+        cmp -s "$ACTUAL" "$EXPECTED" || { property_fail "committed mutation differs from oracle"; return 1; }
         ;;
     esac
 }
 
 preserve_failure() {
     failed_case=$1
+    failure_reason=$PROPERTY_FAILURE
     failure_dir=$FAILURE_ROOT/ysh-fuzz-failure-$failed_case
     mkdir -p "$failure_dir"
     cp "$INPUT" "$failure_dir/input.yml"
@@ -200,7 +205,8 @@ preserve_failure() {
     done
     printf '%s\n' "YSH_FUZZ_REPLAY=$failed_case YSH_FUZZ_SEED=$FUZZ_SEED ./test/fuzz.sh" > "$failure_dir/replay.sh"
     chmod 755 "$failure_dir/replay.sh"
-    printf 'Grammar-guided %s property failed for case %s; minimized replay saved in %s\n' "$PROPERTY" "$failed_case" "$failure_dir" >&2
+    printf 'Grammar-guided %s property failed for case %s: %s; minimized replay saved in %s\n' \
+        "$PROPERTY" "$failed_case" "$failure_reason" "$failure_dir" >&2
 }
 
 if [ -n "$FUZZ_REPLAY" ]; then
