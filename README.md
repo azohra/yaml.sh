@@ -38,7 +38,13 @@ Check: 6 file(s) would change; no files written
 
 ## Install one file
 
-The hosted installer downloads the release artifact, verifies its pinned SHA-256 digest, then writes it to `/usr/local/bin`:
+With Homebrew:
+
+```sh
+brew install azohra/tools/ysh
+```
+
+Or install the release directly. The hosted installer downloads the artifact, verifies its pinned SHA-256 digest, then writes it to `/usr/local/bin`:
 
 ```sh
 curl -fsSL https://yaml.azohra.com/install | sh
