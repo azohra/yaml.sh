@@ -1,0 +1,65 @@
+# kind	name	status	forms	evidence
+operator	Add	supported	numbers, strings, arrays, maps, null; +=	testExpressionArithmetic
+operator	Alternative	supported	// with lazy right-hand evaluation	testExpressionAlternativeDefaults
+operator	Anchor and alias	focused	inspect, rename, assign, explode; graph identity retained	testExpressionWritableYamlGraphMetadata
+operator	Array to map	supported	array_to_map with zero-based string keys	testExpressionCapabilityClosure
+operator	Assign and update	supported	absolute, relative, and compound assignment across multiple paths	testExpressionRelativeAndCompoundUpdates
+operator	Boolean	supported	and, or, not, any, all, any_c, all_c	testExpressionBooleanFilters
+operator	Collect into array	supported	[], [expr], stream collection	testExpressionArrayAndObjectConstruction
+operator	Column	supported	exact value and key columns in block and multiline flow YAML; generated nodes return 0	testExpressionNodeMetadata
+operator	Comments	supported	read/write head, line, and foot comments on values and keys; strict block-source edits	testInplaceEditsPresentationMetadata
+operator	Compare	supported	>, >=, <, <= across scalar values	testExpressionSelectAndComparisons
+operator	Contains	supported	portable string containment	testExpressionSequenceAndStringHelpers
+operator	Create object	supported	literal and computed keys; stream values	testExpressionArrayAndObjectConstruction
+operator	Date and time	excluded	calendar and timezone operators are not implemented	testExpressionErrors
+operator	Delete	supported	del, delpaths, mapping and sequence targets	testExpressionPathBasedUpdates
+operator	Divide	supported	numeric / and /=; zero is rejected	testExpressionArithmetic
+operator	Document index	supported	documentIndex across streams and files	testEvalAllAcrossFiles
+operator	Encode and decode	focused	from_json, from_yaml, from_toml, from_ini, from_xml, from_props, from_csv, from_tsv; matching to_* and shorthand forms; Base64, URI, shell	testConfigurationFormatCodecs, testExpressionPortableUtilities
+operator	Entries	supported	to_entries, from_entries, with_entries	testExpressionEntries
+operator	Environment	supported	env, strenv, envsubst options; disable switch	testExpressionEnvironmentComposition
+operator	Equals	supported	scalar == and !=	testExpressionSelectAndComparisons
+operator	Error	supported	error(message) with short-circuiting guards	testExpressionErrorGuards
+operator	Eval	focused	eval(EXPR) compiles YAML.sh expressions dynamically with node and depth ceilings	testExpressionPortableUtilities
+operator	File context	supported	filename, fileIndex, multi-file and writable eval-all context	testMultipleInputEvaluationAndMetadata
+operator	Filter	supported	arrays and mapping values	testExpressionFocusedCollectionOperators
+operator	First	supported	first value and first(condition)	testExpressionFocusedCollectionOperators
+operator	Flatten	focused	complete recursive flatten	testExpressionProjectedCollectionsAndQuantifiers
+operator	Group by	supported	scalar grouping keys	testExpressionProjectedCollectionsAndQuantifiers
+operator	Has	supported	mapping keys and positive/negative sequence indexes	testExpressionCollectionHelpers
+operator	Keys	supported	mapping keys and sequence indexes	testExpressionCollectionHelpers
+operator	Kind	supported	scalar, map, seq	testExpressionKindAndType
+operator	Length	supported	strings, collections, null	testExpressionCollectionHelpers
+operator	Line	supported	one-based source line, 0 for generated nodes	testSourceLines
+operator	Load	focused	load, load_str, load_base64, load_props; byte ceiling and disable switch	testExpressionPortableUtilities
+operator	Min	supported	min, min_by	testExpressionProjectedCollectionsAndQuantifiers
+operator	Map	supported	map, map_values, mapping and sequence inputs	testExpressionMapAndCommaStreams
+operator	Max	supported	max, max_by	testExpressionProjectedCollectionsAndQuantifiers
+operator	Modulo	supported	numeric % and %=	testExpressionArithmetic
+operator	Multiply and merge	supported	arithmetic, deep merge, *+, *d, *?, *n policies	testExpressionMergeModifiers
+operator	Omit	supported	selected mapping keys or sequence indexes	testExpressionFocusedCollectionOperators
+operator	Parent	supported	structural parent lookup	testExpressionStructuralContextAndScopedUpdates
+operator	Path	supported	path lookup plus setpath and delpaths	testExpressionPathBasedUpdates
+operator	Pick	supported	selected mapping keys or sequence indexes	testExpressionFocusedCollectionOperators
+operator	Pipe	supported	streams, empty streams, precedence	testExpressionIterationAndPipes
+operator	Pivot	focused	rectangular and ragged sequences; map rows	testExpressionFocusedCollectionOperators
+operator	Recursive descent	supported	.., optional traversal, recursive selection and updates	testExpressionRecursiveAndOptionalTraversal
+operator	Reduce	supported	reduce, ireduce, whole-stream eval-all folding	testExpressionReduceAndDeepMerge
+operator	Reverse	supported	sequences	testExpressionSequenceAndStringHelpers
+operator	Root	supported	graph/document root from any selected descendant	testConfigurationPointersAndPatches
+operator	Select	supported	scalar and structural predicates	testExpressionSelectAndComparisons
+operator	Shuffle	focused	portable Fisher-Yates shuffle; --shuffle-seed supplies reproducible runs	testExpressionPortableUtilities
+operator	Slice array	supported	positive, negative, and open sequence slices	testExpressionSlicesInterpolationAndRegex
+operator	Sort	supported	sort, sort_by, scalar ordering	testExpressionProjectedCollectionsAndQuantifiers
+operator	Sort keys	supported	targeted and recursive sort_keys(..)	testExpressionCapabilityClosure
+operator	Split into documents	focused	split_doc is explicit and idempotent; YAML streams are always document-separated	testExpressionCapabilityClosure
+operator	Strings	focused	interpolation, string slices, case, trim, to_string, split/join, contains/prefix/suffix, POSIX test/sub	testExpressionCapabilityClosure, testConfigurationPointersAndPatches
+operator	Style	focused	scalar and collection style read/write; source compiler decides preservation	testExpressionBlockStylesAndOutputControls
+operator	Subtract	supported	numeric - and -=	testExpressionArithmetic
+operator	Tag	supported	read/write core and custom tags	testExpressionWritableYamlGraphMetadata
+operator	To number	supported	decimal integer and float strings	testExpressionConversionAndKeyOrdering
+operator	Traverse	supported	keys, dynamic keys, indexes, splats, optional traversal	testExpressionIterationAndPipes
+operator	Union	supported	comma streams	testExpressionMapAndCommaStreams
+operator	Unique	supported	unique, unique_by	testExpressionProjectedCollectionsAndQuantifiers
+operator	Variables	supported	value bindings, ref, dynamic lookup, reducer bindings	testExpressionVariablesAndDynamicIndexes
+operator	With	supported	scoped updates over one or many matches	testExpressionStructuralContextAndScopedUpdates

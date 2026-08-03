@@ -1,11 +1,11 @@
 # YAML in shell. No, really.
 
-YAML.sh is a serious YAML tool built in an intentionally mischievous medium: one readable POSIX shell executable with portable AWK inside. It queries, transforms, validates, converts, inspects, and edits YAML without acquiring another language runtime.
+YAML.sh queries, transforms, validates, and edits YAML in one readable POSIX shell file with portable AWK inside. Common edits keep the comments and formatting around them.
 
 ```sh
-ysh '.services[] | select(.enabled) | .name' config.yml
-ysh --preserve-only --diff '.release.channel = "stable"' services/*.yml
-ysh --schema service.schema.json --apply-patch promote.json --diff service.yml
+ysh '.books[] | select(.read) | .title' reading.yml
+ysh --preserve-only --diff '.theme = "midnight"' settings.yml
+ysh --schema settings.schema.json '.' settings.yml
 ```
 
 ## Start with the job
@@ -13,33 +13,27 @@ ysh --schema service.schema.json --apply-patch promote.json --diff service.yml
 - [Install one file and run the first query](getting-started.md).
 - [Copy a recipe for filtering, updates, composition, or validation](recipes.md).
 - [Learn paths, streams, construction, and updates](queries.md).
-- [Validate, patch, compare, and convert configuration](contracts.md).
+- [Validate, patch, and convert configuration](contracts.md).
 - [Check, compose, and update files or document streams](documents.md).
 - [Choose value, JSON, YAML, metadata, AST, or events](output.md).
 
-## The product
+## What it can do
 
-The released `ysh` contains a POSIX shell launcher and portable AWK engine. It needs no package manager, language runtime, YAML library, plugin host, or opaque binary.
+- **Query and transform.** Use paths, pipes, filters, reducers, construction, and updates across files and YAML documents.
+- **Edit carefully.** Preview changes with `--check` or `--diff`; use `--preserve-only` when comments and formatting must stay put.
+- **Validate, patch, and convert.** Apply JSON Schema, JSON Patch, and Merge Patch, or move between YAML, JSON, TOML, INI, XML, properties, CSV, and TSV.
+- **Inspect strange input.** View types, source locations, parser events, an AST, or an explanation of an edit.
 
-Its useful shape comes from four parts:
-
-- **A real graph.** Mappings, sequences, tags, anchors, aliases, merges, source locations, and empty collections retain their meaning.
-- **A compact language.** Familiar paths, pipes, filters, reducers, construction, and updates operate on writable node streams.
-- **A source compiler.** Common changes become owned edit spans, so unrelated bytes and attached comments survive. `--preserve-only` makes that a precondition.
-- **A repository transaction.** Check, diff, and write share prepared candidates. Multi-file updates use snapshots, detect drift, skip no-ops, and retain rollback material.
-
-Yq-shaped syntax is a useful interface influence and comparison oracle. It is not the reason YAML.sh exists.
+The released `ysh` contains the complete shell launcher and AWK engine. Copy one file, read it, and run it without another language runtime.
 
 ## Know the boundary
 
-The docs separate product claims from test volume:
-
 - [YAML support](supported_yml.md) records accepted and rejected syntax.
-- [Operator manifest](operators.md) classifies the yq-shaped surface with named evidence.
-- [Configuration contracts](contracts.md) define schemas, patches, and non-YAML codecs.
-- [Security and limits](security.md) defines capabilities, resource ceilings, and write guarantees.
+- [Queries](queries.md) defines the expression language.
+- [Validate, patch, and convert](contracts.md) defines schemas, patches, and non-YAML formats.
+- [Security and limits](security.md) explains optional capabilities, resource ceilings, and write behavior.
 
-Unsupported neighboring input should fail clearly instead of returning a plausible lie.
+Unsupported syntax fails clearly rather than returning a plausible result.
 
 ## Open the hood
 
@@ -49,6 +43,4 @@ ysh --ast config.yml
 ysh --explain=json --diff '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 
-The [internals guide](internals.md) follows a document through the graph, evaluator, emitter, and source compiler. The [development guide](development.md) explains how exact capabilities map to fixtures, properties, and external oracles.
-
-YAML.sh is built for fun. The contract is serious.
+The [internals guide](internals.md) follows a document through parsing, evaluation, output, and careful source edits. The [development guide](development.md) explains the codebase and test suite.

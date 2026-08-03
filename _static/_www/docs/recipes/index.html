@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -113,7 +113,7 @@
             <pre><code class="language-sh">ysh '.server.port' config.yml
 </code></pre>
           </div>
-          <p>Use <code>-r</code> when another command needs unquoted scalar text:</p>
+          <p>Scalar output is unquoted by default. <code>-r</code> is an optional spelling for that mode when a script benefits from making the intent explicit:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">host=$(ysh -r '.server.host' config.yml)
@@ -139,7 +139,7 @@ ysh '.services | filter(.port &gt;= 8000) | map(.name)' config.yml
             <pre><code class="language-sh">ysh --diff '.image.tag = &quot;stable&quot;' deploy.yml
 </code></pre>
           </div>
-          <p>Exit status is <code>0</code> for clean, <code>1</code> for drift, and <code>2</code> for an invalid query or input. Use <code>--check</code> when a file list is enough. Then commit the same prepared update:</p>
+          <p>Exit status is <code>0</code> when no change is needed, <code>1</code> when the file would change, and <code>2</code> for an invalid query or input. Use <code>--check</code> when a quiet answer is enough. Then write the same update:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh -i '.image.tag = &quot;stable&quot;' deploy.yml
@@ -153,8 +153,8 @@ ysh '.services | filter(.port &gt;= 8000) | map(.name)' config.yml
 ysh --preserve-only -i '.image.tag = &quot;stable&quot;' deploy.yml
 </code></pre>
           </div>
-          <p>The command fails instead of falling back to regenerated YAML.</p>
-          <p>Update a repository as one transaction:</p>
+          <p>The command fails instead of falling back to regenerated YAML. See <a href="/docs/documents/">documents and file edits</a> for the complete preservation and write behavior.</p>
+          <p>Apply the same checked edit to several files:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --check '.image.tag = &quot;stable&quot;' services/*.yml
@@ -171,7 +171,7 @@ ysh --diff &quot;$query&quot; deploy.yml
 ysh -i &quot;$query&quot; deploy.yml
 </code></pre>
           </div>
-          <p><code>error(MESSAGE)</code> aborts the complete transaction. Boolean <code>and</code> and <code>or</code> short-circuit, so the error runs only when its guard fails.</p>
+          <p><code>error(MESSAGE)</code> aborts the complete command. Boolean <code>and</code> and <code>or</code> short-circuit, so the error runs only when its guard fails.</p>
           <h2 id="set-values-from-the-environment"><a href="#set-values-from-the-environment">Set values from the environment<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p><code>strenv</code> always creates a string. <code>env</code> parses the variable as YAML.</p>
           <div class="code-block">
@@ -202,7 +202,7 @@ ysh '.rows | @csv' config.yml
             <pre><code class="language-sh">ysh --schema service.schema.json '.' service.yml
 </code></pre>
           </div>
-          <p>Preview and apply the same RFC 6902 patch through the YAML source compiler:</p>
+          <p>Preview and apply the same RFC 6902 patch while preserving supported YAML source details:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --apply-patch change.json --preserve-only --diff service.yml
@@ -215,7 +215,7 @@ ysh --apply-patch change.json --preserve-only -i service.yml
             <pre><code class="language-sh">ysh --json --generate-patch desired.yml '.' current.yml &gt; change.json
 </code></pre>
           </div>
-          <p>See <a href="/docs/contracts/">configuration contracts</a> for Merge Patch, structured schema errors, and direct TOML/INI/XML conversion.</p>
+          <p>See <a href="/docs/contracts/">validate, patch, and convert</a> for Merge Patch, structured schema errors, and direct TOML/INI/XML conversion.</p>
           <h2 id="load-local-configuration"><a href="#load-local-configuration">Load local configuration<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -230,7 +230,7 @@ ysh -n 'load_props(&quot;application.properties&quot;)'
             <pre><code class="language-sh">ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
 </code></pre>
           </div>
-          <p>The right mapping wins at scalar leaves. This focused <code>eval-all</code> workflow covers configuration layering; it is not yq's entire stream engine.</p>
+          <p>The right mapping wins at scalar leaves.</p>
           <p>Choose how arrays and keys merge:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -249,7 +249,7 @@ ysh eval-all --check &quot;$query&quot; release.yml services/*.yml
 ysh eval-all -i &quot;$query&quot; release.yml services/*.yml
 </code></pre>
           </div>
-          <p>All mutated files preflight and commit together. Unchanged files are not replaced.</p>
+          <p>All changed candidates are prepared before writing. Unchanged files are not replaced.</p>
           <h2 id="work-across-every-document"><a href="#work-across-every-document">Work across every document<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>

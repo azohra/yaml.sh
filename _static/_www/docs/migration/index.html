@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -170,7 +170,7 @@ ysh --document 1 '.name' stream.yml
             <li><code>-T</code>, because the transpiled representation is gone.</li>
             <li><code>-q</code> and <code>-Q</code>, because the positional query replaces them.</li>
             <li><code>-s</code>, <code>-l</code>, <code>-L</code>, and <code>-c</code>, because node selection uses one query grammar. The old <code>-I</code> meaning is gone; modern <code>-I N</code> controls YAML indentation.</li>
-            <li>The v0.x meaning of <code>-i</code>. Modern YAML.sh uses <code>-i</code> for atomic yq-style file updates and preserves rich presentation for common edits.</li>
+            <li>The v0.x meaning of <code>-i</code>. Modern YAML.sh uses <code>-i</code> for in-place updates. Each file replacement is an atomic same-directory rename, and common edits preserve comments and formatting.</li>
             <li><code>--next</code>, because <code>--document N</code> addresses a document directly.</li>
           </ul>
           <p>If a script depends on v0.x behavior, pin <code>v0.4.0</code> while migrating.</p>

@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -106,7 +106,7 @@
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
           <h1 id="parser-internals">Parser internals</h1>
-          <p>The release remains one shell script, with a semantic graph, source-presentation layer, and repository transaction working together.</p>
+          <p>The release remains one shell script, with a semantic graph, source-preservation layer, and batch file coordinator working together.</p>
           <div class="code-block">
             <div class="code-head"><span>text</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-text">/bin/sh CLI
@@ -125,15 +125,15 @@ source-edit compiler or value / JSON / YAML / metadata / AST / events
 </code></pre>
           </div>
           <h2 id="the-shell-layer"><a href="#the-shell-layer">The shell layer<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>The <code>/bin/sh</code> launcher handles arguments, input, output mode, and edit transactions. It snapshots every source beside the original, evaluates those stable bytes, and prepares each transformed candidate once. <code>--check</code>, <code>--diff</code>, and <code>-i</code> inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement.</p>
+          <p>The <code>/bin/sh</code> launcher handles arguments, input, output mode, and batch edits. It snapshots every source beside the original, evaluates those stable bytes, and prepares each transformed candidate once. <code>--check</code>, <code>--diff</code>, and <code>-i</code> inspect or commit that same plan. Net-zero candidates are removed before reporting or replacement.</p>
           <p>Live inputs are compared with their snapshots after evaluation and again before commit; each changed target is checked immediately before replacement. A mismatch aborts without overwriting the external change. The snapshots are also the rollback material, so a failed batch restores what the query actually read. Each sibling rename is atomic, but the complete multi-file sequence is not one globally atomic filesystem operation.</p>
           <p>A bounded embedded AWK renderer produces unified diffs without adding a runtime dependency.</p>
           <p>Embedded AWK programs arrive through here-documents, avoiding small <code>ARG_MAX</code> limits in minimal systems. Query text travels through the POSIX environment so AWK never rewrites backslashes before lexing interpolation or regex syntax.</p>
           <p>The development sources remain separate:</p>
           <div class="code-block">
             <div class="code-head"><span>text</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-text">src/ysh.sh       portable CLI launcher and repository transaction
-src/awk/*.awk    ordered parser, graph, query, contract, and source modules
+            <pre><code class="language-text">src/ysh.sh       portable CLI launcher and batch edit coordinator
+src/awk/*.awk    ordered parser, graph, query, validation, and source modules
 src/diff.awk     bounded unified-diff renderer
 </code></pre>
           </div>
@@ -169,7 +169,7 @@ ysh --events input.yml
           </div>
           <p><code>--ast</code> is the storage view. <code>--events</code> is the parser-style structural view. Neither is a public serialization format intended for feeding back into YAML.sh.</p>
           <h2 id="why-awk"><a href="#why-awk">Why AWK<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>AWK provides portable text processing, associative arrays, recursion, and a small enough runtime model to ship the complete implementation as readable source. The constraint is the point: YAML.sh is a serious parser built in an intentionally mischievous medium.</p>
+          <p>AWK provides portable text processing, associative arrays, recursion, and a small enough runtime model to ship the complete implementation as readable source. The constraint stays visible in the implementation instead of hiding behind another runtime.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>

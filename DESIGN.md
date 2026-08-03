@@ -2,34 +2,35 @@
 
 ## Product
 
-YAML.sh is a useful YAML programming tool built under a joyful constraint: one
+YAML.sh is an improbably capable YAML tool built under a joyful constraint: one
 readable POSIX shell file, powered by portable AWK. It queries, transforms,
-validates, converts, inspects, and source-edits YAML without acquiring another
-language runtime.
+validates, converts, inspects, and carefully edits YAML without installing
+another language runtime.
 
 The released `ysh` remains one text executable. Its implementation is POSIX
-`/bin/sh` and portable AWK; repository edits may use the ordinary host file
-utilities documented in the runtime contract.
+`/bin/sh` and portable AWK; file edits may use the ordinary host utilities
+documented in the runtime requirements.
 
-The premise is the product, not a deployment scenario. YAML.sh is useful when
-any of these matter:
+The constraint should make ordinary YAML work easier, not prescribe where the
+tool belongs. YAML.sh is useful for quick reads and transformations, and it is
+especially distinctive when any of these matter:
 
-- the target already has a shell and AWK but should not acquire another runtime;
 - a YAML change must retain comments, style, ordering, and unrelated bytes;
-- several files must be evaluated from stable snapshots and changed as one
-  preflighted, rollback-capable operation;
-- configuration behavior needs inspectable limits and a small execution model;
+- the target already has a shell and AWK and should not need another runtime;
+- one expression must inspect or update several related files safely;
+- the execution model and its limits should remain inspectable;
 - the executable itself should remain readable, copyable source.
 
 Familiar yq-shaped syntax lowers the cost of learning the language. It is an
 interface influence and a differential oracle, not the product identity.
 
-## Invariants
+## Durable constraints
 
 1. **One shipped file.** Development sources may be modular; `ysh` is the
    complete release artifact.
 2. **Portable implementation.** The query engine stays within POSIX shell and
-   the AWK implementations in CI. A broader runtime requires a major release.
+   the AWK implementations covered by the portability tests. A broader runtime
+   requires a major release.
 3. **Structure before text.** Parsing produces a node graph. Queries, schemas,
    patches, codecs, and emitters share that representation.
 4. **Source is a first-class output.** YAML edits compile against owned source
@@ -48,11 +49,16 @@ interface influence and a differential oracle, not the product identity.
    select a major version. Only a necessary break in the documented contract
    does.
 10. **Fun sharpens the constraint.** Novelty is welcome; accidental complexity,
-    filler, and parity for its own sake are not.
+    filler, and parity for its own sake are not. Do not turn verification or
+    repository machinery into the product identity.
+
+These constraints define YAML.sh. Individual operators, codecs, defaults,
+limits, implementation modules, supported hosts, and verification jobs describe
+the current release and may evolve compatibly.
 
 ## Decision filter
 
-A capability belongs when it materially improves portable configuration work
+A capability belongs when it materially improves portable YAML work
 and composes with the graph, source compiler, or transaction model. Prefer a
 small general primitive over a collection of workflow-specific flags.
 
@@ -75,27 +81,27 @@ Development source is organized by responsibility and assembled in dependency
 order:
 
 ```text
-shell CLI + transaction coordinator
+shell CLI + batch edit coordinator
               ↓
 AWK limits, diagnostics, codecs, YAML parser, graph
               ↓
-query lexer/parser/evaluator + contracts
+query lexer/parser/evaluator + validation and patches
               ↓
 semantic emitters + source edit compiler
               ↓
-value output / exact candidate / repository transaction
+value output / exact candidate / batch file update
 ```
 
 The graph is the internal boundary. Parsers create nodes; programs transform
-node streams; contracts inspect or mutate nodes; emitters serialize nodes; the
-source compiler compares the final graph with recorded YAML ownership.
+node streams; validators and patches inspect or mutate nodes; emitters serialize
+nodes; the source compiler compares the final graph with recorded YAML ownership.
 
 Subsystems may use AWK's shared arrays, but new code should go through named
 graph and stream operations instead of adding unrelated direct mutations.
 Large dispatchers should delegate coherent operator families while preserving
 one evaluation model and measured performance.
 
-## Runtime contract
+## Runtime requirements
 
 Read-only queries require:
 
@@ -103,10 +109,10 @@ Read-only queries require:
 - a supported AWK;
 - the shell's standard built-ins.
 
-Source-aware check, diff, and write additionally use commonly available host
+Check, diff, and write additionally use commonly available host
 utilities: `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc`. `mktemp` is widespread
-but not specified by POSIX; CI owns the supported host behavior. Installation
-has a separate network and checksum contract.
+but not specified by POSIX, so YAML.sh tests this path on every supported host.
+Installation has separate network and checksum requirements.
 
 These dependencies are not additional language runtimes or libraries. They are
 still dependencies and must be documented and tested honestly.

@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Validate, patch, compare, and convert configuration without another runtime.">
+  <meta name="description" content="Validate schemas, apply standard patches, and convert configuration formats.">
   <meta name="theme-color" content="#101410">
-  <meta property="og:title" content="Configuration contracts · YAML.sh">
-  <meta property="og:description" content="Validate, patch, compare, and convert configuration without another runtime.">
+  <meta property="og:title" content="Validate, patch &amp; convert · YAML.sh">
+  <meta property="og:description" content="Validate schemas, apply standard patches, and convert configuration formats.">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com/docs/contracts/">
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/docs/docs.css">
   <script src="/docs/docs.js" defer></script>
-  <title>Configuration contracts · YAML.sh docs</title>
+  <title>Validate, patch &amp; convert · YAML.sh docs</title>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/" aria-current="page">Config contracts</a></li>
+              <li><a href="/docs/contracts/" aria-current="page">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/">Operator manifest</a></li>
+              <li><a href="/docs/operators/">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/" aria-current="page">Config contracts</a></li>
+              <li><a href="/docs/contracts/" aria-current="page">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -105,8 +105,8 @@
     <main id="content" class="doc-content">
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
-          <h1 id="configuration-contracts">Configuration contracts</h1>
-          <p>Validate a document, apply a standard patch, generate a reviewable change set, or cross a format boundary. The work stays in the same graph used by queries and YAML source edits.</p>
+          <h1 id="validate-patch-convert">Validate, patch &amp; convert</h1>
+          <p>Validate a document, apply a standard patch, generate a reviewable change set, or convert configuration formats with the same <code>ysh</code> command.</p>
           <h2 id="validate-before-a-script-continues"><a href="#validate-before-a-script-continues">Validate before a script continues<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -127,7 +127,7 @@ ysh -e 'schema_valid(load(&quot;service.schema.json&quot;))' service.yml
 </code></pre>
           </div>
           <p>Each error contains <code>instancePath</code>, <code>schemaPath</code>, <code>keyword</code>, and <code>message</code>. Values are never copied into diagnostics.</p>
-          <p>The JSON Schema 2020-12 profile covers boolean schemas; <code>type</code>, <code>const</code>, <code>enum</code>; local <code>$ref</code> and <code>$defs</code>; composition and <code>if</code>/<code>then</code>/<code>else</code>; object properties, property names, dependent schemas/keys, patterns, and additional properties; tuple/items/contains and array limits; string length and POSIX patterns; and numeric bounds and multiples. Remote and dynamic references fail closed; annotation-driven <code>unevaluated*</code> vocabularies are rejected.</p>
+          <p>The JSON Schema 2020-12 profile covers boolean schemas; <code>type</code>, <code>const</code>, and <code>enum</code>; local <code>$ref</code> and <code>$defs</code>; composition and <code>if</code>/<code>then</code>/<code>else</code>; object properties, property names, dependent schemas and keys, patterns, and additional properties; tuple and item validation; array limits; string length and POSIX patterns; and numeric bounds and multiples. Remote and dynamic references are rejected, as are annotation-driven <code>unevaluated*</code> vocabularies.</p>
           <h2 id="apply-json-patch"><a href="#apply-json-patch">Apply JSON Patch<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -135,8 +135,8 @@ ysh -e 'schema_valid(load(&quot;service.schema.json&quot;))' service.yml
 ysh --apply-patch deploy.patch.json -i deploy.yml
 </code></pre>
           </div>
-          <p>All six RFC 6902 operations are supported: <code>add</code>, <code>remove</code>, <code>replace</code>, <code>move</code>, <code>copy</code>, and <code>test</code>. Paths use RFC 6901 JSON Pointer, including <code>~0</code>, <code>~1</code>, array indexes, and <code>-</code> append. The release gate runs 108 enabled assertions from the pinned JSON Patch community and RFC-example corpora.</p>
-          <p>On YAML input, patch mutations enter the normal source compiler. A strict edit can preserve comments and refuse regeneration:</p>
+          <p>All six RFC 6902 operations are supported: <code>add</code>, <code>remove</code>, <code>replace</code>, <code>move</code>, <code>copy</code>, and <code>test</code>. Paths use RFC 6901 JSON Pointer, including <code>~0</code>, <code>~1</code>, array indexes, and <code>-</code> append.</p>
+          <p>On YAML input, patches use the same comment-preserving edit path as expressions. A strict edit can preserve source formatting or refuse the change:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh --preserve-only --apply-patch deploy.patch.json -i deploy.yml
@@ -177,12 +177,12 @@ ysh -o toml '.service' config.yml
           <div class="table-wrap"><table>
             <thead><tr>
               <th>Format</th>
-              <th>Contract</th>
+              <th>Supported profile</th>
             </tr></thead>
             <tbody>
               <tr>
                 <td>TOML 1.0</td>
-                <td>Tables, dotted keys, arrays, inline tables, array tables, strings, integers, floats, booleans, and date/time values. Decoder and encoder each pass all 205 official valid fixtures.</td>
+                <td>Tables, dotted keys, arrays, inline tables, array tables, strings, integers, floats, booleans, and date/time values.</td>
               </tr>
               <tr>
                 <td>INI</td>
@@ -194,8 +194,8 @@ ysh -o toml '.service' config.yml
               </tr>
             </tbody>
           </table></div>
-          <p>TOML's portable baseline excludes 12 raw-byte cases that AWK cannot reliably observe after record decoding: bare CR, NUL, invalid UTF-8, and UTF-16. The other 462 invalid fixtures fail closed; hosts that expose NUL bytes reject five more.</p>
-          <p>Non-YAML formats are semantic codecs, not presentation-preserving editors. Mixed XML text/child ordering is not retained. Convert or query one document at a time; use YAML input for <code>-i</code>, repository transactions, source comments, and exact byte preservation.</p>
+          <p>The TOML parser rejects invalid syntax. Its portable byte-level boundary excludes bare CR, NUL, invalid UTF-8, and UTF-16 cases that some AWK hosts cannot expose reliably after record decoding.</p>
+          <p>Non-YAML formats are semantic codecs, not presentation-preserving editors. Mixed XML text/child ordering is not retained. Convert or query one document at a time; use YAML input for in-place editing, comments, and source preservation.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>

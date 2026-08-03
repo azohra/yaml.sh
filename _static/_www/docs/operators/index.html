@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The audited YAML-oriented operator surface and evidence for every claim.">
+  <meta name="description" content="Operators, supported forms, and practical boundaries.">
   <meta name="theme-color" content="#101410">
-  <meta property="og:title" content="Operator manifest · YAML.sh">
-  <meta property="og:description" content="The audited YAML-oriented operator surface and evidence for every claim.">
+  <meta property="og:title" content="Operator reference · YAML.sh">
+  <meta property="og:description" content="Operators, supported forms, and practical boundaries.">
   <meta property="og:image" content="https://yaml.azohra.com/og.png">
   <link rel="canonical" href="https://yaml.azohra.com/docs/operators/">
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/docs/docs.css">
   <script src="/docs/docs.js" defer></script>
-  <title>Operator manifest · YAML.sh docs</title>
+  <title>Operator reference · YAML.sh docs</title>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
@@ -38,15 +38,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/" aria-current="page">Operator manifest</a></li>
+              <li><a href="/docs/operators/" aria-current="page">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -77,15 +77,15 @@
             <p class="nav-title">Use</p>
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
-              <li><a href="/docs/operators/" aria-current="page">Operator manifest</a></li>
+              <li><a href="/docs/operators/" aria-current="page">Operator reference</a></li>
               <li><a href="/docs/documents/">Files & documents</a></li>
               <li><a href="/docs/output/">Output & metadata</a></li>
             </ul>
           </section>
           <section class="nav-group">
-            <p class="nav-title">Trust</p>
+            <p class="nav-title">Reference</p>
             <ul>
-              <li><a href="/docs/contracts/">Config contracts</a></li>
+              <li><a href="/docs/contracts/">Validate, patch & convert</a></li>
               <li><a href="/docs/supported_yml/">YAML support</a></li>
               <li><a href="/docs/yq-compatibility/">yq compatibility</a></li>
               <li><a href="/docs/security/">Security & limits</a></li>
@@ -105,468 +105,282 @@
     <main id="content" class="doc-content">
       <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
       <article>
-          <h1 id="operator-manifest">Operator manifest</h1>
-          <p>This is the audited YAML-oriented surface for the current release. “Supported” means the listed forms are expected to agree with yq for documented inputs. “Focused” names a smaller portable contract. “Excluded” is a tested boundary—not a guess.</p>
-          <p>The evidence column names the focused test or release gate that owns each claim. The differential gate compares supported programs with mikefarah/yq v4.53.3; the parser-boundary gate makes exclusions fail closed.</p>
-          <div class="table-wrap table-wide"><table>
+          <h1 id="operator-reference">Operator reference</h1>
+          <p>This page is the compact index to YAML.sh's expression language. The <a href="/docs/queries/">query guide</a> explains each family with examples.</p>
+          <h2 id="select-and-combine"><a href="#select-and-combine">Select and combine<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="table-wrap"><table>
             <thead><tr>
-              <th>yq area</th>
-              <th>Status</th>
-              <th>YAML.sh forms or boundary</th>
-              <th>Evidence</th>
+              <th>Job</th>
+              <th>Forms</th>
             </tr></thead>
             <tbody>
               <tr>
-                <td>Add</td>
-                <td>Supported</td>
-                <td>numbers, strings, arrays, maps, null; <code>+=</code></td>
-                <td><code>testExpressionArithmetic</code></td>
+                <td>Paths</td>
+                <td><code>.</code>, <code>.name</code>, <code>.[&quot;name&quot;]</code>, <code>.[INDEX]</code>, slices, dynamic keys</td>
               </tr>
               <tr>
-                <td>Alternative</td>
-                <td>Supported</td>
-                <td><code>//</code> with lazy right-hand evaluation</td>
-                <td><code>testExpressionAlternativeDefaults</code></td>
+                <td>Traversal</td>
+                <td><code>.[]</code>, optional <code>?</code>, recursive <code>..</code></td>
               </tr>
               <tr>
-                <td>Anchor and alias</td>
-                <td>Focused</td>
-                <td>inspect, rename, assign, <code>explode</code>; graph identity retained</td>
-                <td><code>testExpressionWritableYamlGraphMetadata</code></td>
-              </tr>
-              <tr>
-                <td>Array to map</td>
-                <td>Supported</td>
-                <td><code>array_to_map</code> with zero-based string keys</td>
-                <td><code>testExpressionCapabilityClosure</code></td>
-              </tr>
-              <tr>
-                <td>Assign and update</td>
-                <td>Supported</td>
-                <td>absolute, relative, and compound assignment across multiple paths</td>
-                <td><code>testExpressionRelativeAndCompoundUpdates</code></td>
-              </tr>
-              <tr>
-                <td>Boolean</td>
-                <td>Supported</td>
-                <td><code>and</code>, <code>or</code>, <code>not</code>, <code>any</code>, <code>all</code>, <code>any_c</code>, <code>all_c</code></td>
-                <td><code>testExpressionBooleanFilters</code></td>
-              </tr>
-              <tr>
-                <td>Collect into array</td>
-                <td>Supported</td>
-                <td><code>[]</code>, <code>[expr]</code>, stream collection</td>
-                <td><code>testExpressionArrayAndObjectConstruction</code></td>
-              </tr>
-              <tr>
-                <td>Column</td>
-                <td>Supported</td>
-                <td>exact value and key columns in block and multiline flow YAML; generated nodes return 0</td>
-                <td><code>testExpressionNodeMetadata</code></td>
-              </tr>
-              <tr>
-                <td>Comments</td>
-                <td>Supported</td>
-                <td>read/write head, line, and foot comments on values and keys; strict block-source edits</td>
-                <td><code>testInplaceEditsPresentationMetadata</code></td>
-              </tr>
-              <tr>
-                <td>Compare</td>
-                <td>Supported</td>
-                <td><code>&gt;</code>, <code>&gt;=</code>, <code>&lt;</code>, <code>&lt;=</code> across scalar values</td>
-                <td><code>testExpressionSelectAndComparisons</code></td>
-              </tr>
-              <tr>
-                <td>Contains</td>
-                <td>Supported</td>
-                <td>portable string containment</td>
-                <td><code>testExpressionSequenceAndStringHelpers</code></td>
-              </tr>
-              <tr>
-                <td>Create object</td>
-                <td>Supported</td>
-                <td>literal and computed keys; stream values</td>
-                <td><code>testExpressionArrayAndObjectConstruction</code></td>
-              </tr>
-              <tr>
-                <td>Date and time</td>
-                <td>Excluded</td>
-                <td>no portable cross-platform date runtime</td>
-                <td><code>testExpressionErrors</code></td>
-              </tr>
-              <tr>
-                <td>Delete</td>
-                <td>Supported</td>
-                <td><code>del</code>, <code>delpaths</code>, mapping and sequence targets</td>
-                <td><code>testExpressionPathBasedUpdates</code></td>
-              </tr>
-              <tr>
-                <td>Divide</td>
-                <td>Supported</td>
-                <td>numeric <code>/</code> and <code>/=</code>; zero is rejected</td>
-                <td><code>testExpressionArithmetic</code></td>
-              </tr>
-              <tr>
-                <td>Document index</td>
-                <td>Supported</td>
-                <td><code>documentIndex</code> across streams and files</td>
-                <td><code>testEvalAllAcrossFiles</code></td>
-              </tr>
-              <tr>
-                <td>Encode and decode</td>
-                <td>Focused</td>
-                <td><code>from_json</code>, <code>from_yaml</code>, <code>from_toml</code>, <code>from_ini</code>, <code>from_xml</code>, <code>from_props</code>, <code>from_csv</code>, <code>from_tsv</code>; matching <code>to_*</code> and shorthand forms; Base64, URI, shell</td>
-                <td><code>testConfigurationFormatCodecs</code>, <code>testExpressionPortableUtilities</code></td>
-              </tr>
-              <tr>
-                <td>Entries</td>
-                <td>Supported</td>
-                <td><code>to_entries</code>, <code>from_entries</code>, <code>with_entries</code></td>
-                <td><code>testExpressionEntries</code></td>
-              </tr>
-              <tr>
-                <td>Environment</td>
-                <td>Supported</td>
-                <td><code>env</code>, <code>strenv</code>, <code>envsubst</code> options; disable switch</td>
-                <td><code>testExpressionEnvironmentComposition</code></td>
-              </tr>
-              <tr>
-                <td>Equals</td>
-                <td>Supported</td>
-                <td>structural <code>==</code> and <code>!=</code></td>
-                <td><code>testExpressionSelectAndComparisons</code></td>
-              </tr>
-              <tr>
-                <td>Error</td>
-                <td>Supported</td>
-                <td><code>error(message)</code> with short-circuiting guards</td>
-                <td><code>testExpressionErrorGuards</code></td>
-              </tr>
-              <tr>
-                <td>Eval</td>
-                <td>Focused</td>
-                <td><code>eval(EXPR)</code> compiles YAML.sh expressions dynamically with node and depth ceilings</td>
-                <td><code>testExpressionPortableUtilities</code></td>
-              </tr>
-              <tr>
-                <td>File context</td>
-                <td>Supported</td>
-                <td><code>filename</code>, <code>fileIndex</code>, multi-file and writable <code>eval-all</code> context</td>
-                <td><code>testMultipleInputEvaluationAndMetadata</code></td>
+                <td>Streams</td>
+                <td>pipe <code>|</code>, comma union, array collection <code>[EXPRESSION]</code></td>
               </tr>
               <tr>
                 <td>Filter</td>
-                <td>Supported</td>
-                <td>arrays and mapping values</td>
-                <td><code>testExpressionFocusedCollectionOperators</code></td>
+                <td><code>select</code>, <code>filter</code>, <code>first</code></td>
               </tr>
               <tr>
-                <td>First</td>
-                <td>Supported</td>
-                <td>first value and <code>first(condition)</code></td>
-                <td><code>testExpressionFocusedCollectionOperators</code></td>
+                <td>Defaults</td>
+                <td><code>LEFT // RIGHT</code></td>
               </tr>
               <tr>
-                <td>Flatten</td>
-                <td>Focused</td>
-                <td>complete recursive flatten</td>
-                <td><code>testExpressionProjectedCollectionsAndQuantifiers</code></td>
+                <td>Logic</td>
+                <td><code>and</code>, <code>or</code>, <code>not</code>, <code>any</code>, <code>all</code>, <code>any_c</code>, <code>all_c</code></td>
               </tr>
               <tr>
-                <td>Group by</td>
-                <td>Supported</td>
-                <td>scalar grouping keys</td>
-                <td><code>testExpressionProjectedCollectionsAndQuantifiers</code></td>
-              </tr>
-              <tr>
-                <td>Has</td>
-                <td>Supported</td>
-                <td>mapping keys and positive/negative sequence indexes</td>
-                <td><code>testExpressionCollectionHelpers</code></td>
-              </tr>
-              <tr>
-                <td>Keys</td>
-                <td>Supported</td>
-                <td>mapping keys and sequence indexes</td>
-                <td><code>testExpressionCollectionHelpers</code></td>
-              </tr>
-              <tr>
-                <td>Kind</td>
-                <td>Supported</td>
-                <td><code>scalar</code>, <code>map</code>, <code>seq</code></td>
-                <td><code>testExpressionKindAndType</code></td>
-              </tr>
-              <tr>
-                <td>Length</td>
-                <td>Supported</td>
-                <td>strings, collections, null</td>
-                <td><code>testExpressionCollectionHelpers</code></td>
-              </tr>
-              <tr>
-                <td>Line</td>
-                <td>Supported</td>
-                <td>one-based source line, 0 for generated nodes</td>
-                <td><code>testSourceLines</code></td>
-              </tr>
-              <tr>
-                <td>Load</td>
-                <td>Focused</td>
-                <td><code>load</code>, <code>load_str</code>, <code>load_base64</code>, <code>load_props</code>; byte ceiling and disable switch</td>
-                <td><code>testExpressionPortableUtilities</code></td>
-              </tr>
-              <tr>
-                <td>Min</td>
-                <td>Supported</td>
-                <td><code>min</code>, <code>min_by</code></td>
-                <td><code>testExpressionProjectedCollectionsAndQuantifiers</code></td>
-              </tr>
-              <tr>
-                <td>Map</td>
-                <td>Supported</td>
-                <td><code>map</code>, <code>map_values</code>, mapping and sequence inputs</td>
-                <td><code>testExpressionMapAndCommaStreams</code></td>
-              </tr>
-              <tr>
-                <td>Max</td>
-                <td>Supported</td>
-                <td><code>max</code>, <code>max_by</code></td>
-                <td><code>testExpressionProjectedCollectionsAndQuantifiers</code></td>
-              </tr>
-              <tr>
-                <td>Modulo</td>
-                <td>Supported</td>
-                <td>numeric <code>%</code> and <code>%=</code></td>
-                <td><code>testExpressionArithmetic</code></td>
-              </tr>
-              <tr>
-                <td>Multiply and merge</td>
-                <td>Supported</td>
-                <td>arithmetic, deep merge, <code>*+</code>, <code>*d</code>, <code>*?</code>, <code>*n</code> policies</td>
-                <td><code>testExpressionMergeModifiers</code></td>
-              </tr>
-              <tr>
-                <td>Omit</td>
-                <td>Supported</td>
-                <td>selected mapping keys or sequence indexes</td>
-                <td><code>testExpressionFocusedCollectionOperators</code></td>
-              </tr>
-              <tr>
-                <td>Parent</td>
-                <td>Supported</td>
-                <td>structural parent lookup</td>
-                <td><code>testExpressionStructuralContextAndScopedUpdates</code></td>
-              </tr>
-              <tr>
-                <td>Path</td>
-                <td>Supported</td>
-                <td>path lookup plus <code>setpath</code> and <code>delpaths</code></td>
-                <td><code>testExpressionPathBasedUpdates</code></td>
-              </tr>
-              <tr>
-                <td>Pick</td>
-                <td>Supported</td>
-                <td>selected mapping keys or sequence indexes</td>
-                <td><code>testExpressionFocusedCollectionOperators</code></td>
-              </tr>
-              <tr>
-                <td>Pipe</td>
-                <td>Supported</td>
-                <td>streams, empty streams, precedence</td>
-                <td><code>testExpressionIterationAndPipes</code></td>
-              </tr>
-              <tr>
-                <td>Pivot</td>
-                <td>Focused</td>
-                <td>rectangular and ragged sequences; map rows</td>
-                <td><code>testExpressionFocusedCollectionOperators</code></td>
-              </tr>
-              <tr>
-                <td>Recursive descent</td>
-                <td>Supported</td>
-                <td><code>..</code>, optional traversal, recursive selection and updates</td>
-                <td><code>testExpressionRecursiveAndOptionalTraversal</code></td>
-              </tr>
-              <tr>
-                <td>Reduce</td>
-                <td>Supported</td>
-                <td><code>reduce</code>, <code>ireduce</code>, whole-stream eval-all folding</td>
-                <td><code>testExpressionReduceAndDeepMerge</code></td>
-              </tr>
-              <tr>
-                <td>Reverse</td>
-                <td>Supported</td>
-                <td>sequences</td>
-                <td><code>testExpressionSequenceAndStringHelpers</code></td>
-              </tr>
-              <tr>
-                <td>Root</td>
-                <td>Supported</td>
-                <td>graph/document root from any selected descendant</td>
-                <td><code>testConfigurationPointersAndPatches</code></td>
-              </tr>
-              <tr>
-                <td>Select</td>
-                <td>Supported</td>
-                <td>scalar and structural predicates</td>
-                <td><code>testExpressionSelectAndComparisons</code></td>
-              </tr>
-              <tr>
-                <td>Shuffle</td>
-                <td>Focused</td>
-                <td>portable Fisher–Yates shuffle; <code>--shuffle-seed</code> supplies reproducible runs</td>
-                <td><code>testExpressionPortableUtilities</code></td>
-              </tr>
-              <tr>
-                <td>Slice array</td>
-                <td>Supported</td>
-                <td>positive, negative, and open sequence slices</td>
-                <td><code>testExpressionSlicesInterpolationAndRegex</code></td>
-              </tr>
-              <tr>
-                <td>Sort</td>
-                <td>Supported</td>
-                <td><code>sort</code>, <code>sort_by</code>, scalar ordering</td>
-                <td><code>testExpressionProjectedCollectionsAndQuantifiers</code></td>
-              </tr>
-              <tr>
-                <td>Sort keys</td>
-                <td>Supported</td>
-                <td>targeted and recursive <code>sort_keys(..)</code></td>
-                <td><code>testExpressionCapabilityClosure</code></td>
-              </tr>
-              <tr>
-                <td>Split into documents</td>
-                <td>Focused</td>
-                <td><code>split_doc</code> is explicit and idempotent; YAML streams are always document-separated</td>
-                <td><code>testExpressionCapabilityClosure</code></td>
-              </tr>
-              <tr>
-                <td>Strings</td>
-                <td>Focused</td>
-                <td>interpolation, string slices, case, <code>trim</code>, <code>to_string</code>, split/join, contains/prefix/suffix, POSIX <code>test</code>/<code>sub</code></td>
-                <td><code>testExpressionCapabilityClosure</code>, <code>testConfigurationPointersAndPatches</code></td>
-              </tr>
-              <tr>
-                <td>Style</td>
-                <td>Focused</td>
-                <td>scalar and collection style read/write; source compiler decides preservation</td>
-                <td><code>testExpressionBlockStylesAndOutputControls</code></td>
-              </tr>
-              <tr>
-                <td>Subtract</td>
-                <td>Supported</td>
-                <td>numeric <code>-</code> and <code>-=</code></td>
-                <td><code>testExpressionArithmetic</code></td>
-              </tr>
-              <tr>
-                <td>Tag</td>
-                <td>Supported</td>
-                <td>read/write core and custom tags</td>
-                <td><code>testExpressionWritableYamlGraphMetadata</code></td>
-              </tr>
-              <tr>
-                <td>To number</td>
-                <td>Supported</td>
-                <td>decimal integer and float strings</td>
-                <td><code>testExpressionConversionAndKeyOrdering</code></td>
-              </tr>
-              <tr>
-                <td>Traverse</td>
-                <td>Supported</td>
-                <td>keys, dynamic keys, indexes, splats, optional traversal</td>
-                <td><code>testExpressionIterationAndPipes</code></td>
-              </tr>
-              <tr>
-                <td>Union</td>
-                <td>Supported</td>
-                <td>comma streams</td>
-                <td><code>testExpressionMapAndCommaStreams</code></td>
-              </tr>
-              <tr>
-                <td>Unique</td>
-                <td>Supported</td>
-                <td><code>unique</code>, <code>unique_by</code></td>
-                <td><code>testExpressionProjectedCollectionsAndQuantifiers</code></td>
+                <td>Compare scalars</td>
+                <td><code>==</code>, <code>!=</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>&lt;</code>, <code>&lt;=</code></td>
               </tr>
               <tr>
                 <td>Variables</td>
-                <td>Supported</td>
-                <td>value bindings, <code>ref</code>, dynamic lookup, reducer bindings</td>
-                <td><code>testExpressionVariablesAndDynamicIndexes</code></td>
+                <td><code>as $name</code>, <code>ref $name</code>, <code>reduce</code>, <code>ireduce</code></td>
               </tr>
               <tr>
-                <td>With</td>
-                <td>Supported</td>
-                <td>scoped updates over one or many matches</td>
-                <td><code>testExpressionStructuralContextAndScopedUpdates</code></td>
+                <td>Context</td>
+                <td><code>path</code>, <code>parent</code>, <code>root</code>, <code>key</code>, <code>line</code>, <code>column</code>, <code>tag</code></td>
+              </tr>
+              <tr>
+                <td>Input context</td>
+                <td><code>filename</code>, <code>fileIndex</code>, <code>documentIndex</code></td>
               </tr>
             </tbody>
           </table></div>
-          <h2 id="cli-boundaries"><a href="#cli-boundaries">CLI boundaries<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>YAML.sh reads YAML, JSON, TOML, INI, and XML and emits values or those semantic formats. Non-YAML input handles one semantic document at a time; source-aware <code>-i</code>, multi-file transactions, and presentation metadata remain YAML contracts. Date arithmetic, system execution, regex capture objects, and yq’s complete format-specific flag surface remain outside the contract.</p>
-          <h2 id="configuration-contracts"><a href="#configuration-contracts">Configuration contracts<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>These are YAML.sh capabilities rather than yq operator-catalog rows.</p>
-          <div class="table-wrap table-wide"><table>
+          <p>Equality compares scalar values. Mappings and sequences are not structurally equal merely because they contain the same values.</p>
+          <h2 id="build-and-update"><a href="#build-and-update">Build and update<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="table-wrap"><table>
             <thead><tr>
-              <th>Contract</th>
-              <th>Status</th>
+              <th>Job</th>
               <th>Forms</th>
-              <th>Evidence</th>
             </tr></thead>
             <tbody>
               <tr>
-                <td>JSON Pointer</td>
-                <td>Supported</td>
-                <td>RFC 6901 lookup and escaping</td>
-                <td><code>testConfigurationPointersAndPatches</code></td>
+                <td>Construct</td>
+                <td>arrays, objects, computed object keys</td>
               </tr>
               <tr>
-                <td>JSON Patch</td>
-                <td>Supported</td>
-                <td>RFC 6902 add/remove/replace/move/copy/test; deterministic diff generation</td>
-                <td>108 pinned external assertions, source-edit and CLI tests</td>
+                <td>Assign</td>
+                <td><code>=</code>, <code>|=</code>, <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code></td>
               </tr>
               <tr>
-                <td>Merge Patch</td>
-                <td>Supported</td>
-                <td>RFC 7396 object merge and replacement semantics</td>
-                <td><code>testConfigurationPointersAndPatches</code>, CLI tests</td>
+                <td>Delete</td>
+                <td><code>del</code>, <code>delpaths</code></td>
               </tr>
               <tr>
-                <td>JSON Schema</td>
-                <td>Focused</td>
-                <td>documented 2020-12 validation vocabulary, local <code>$ref</code>, value-free path diagnostics</td>
-                <td>701 pinned official assertions, <code>testConfigurationSchemaContracts</code></td>
+                <td>Paths</td>
+                <td><code>setpath</code>, <code>delpaths</code></td>
               </tr>
               <tr>
-                <td>TOML</td>
-                <td>Focused</td>
-                <td>decoder and encoder each pass the complete official valid 1.0 corpus; 462/474 invalid rejections</td>
-                <td>pinned <code>toml-test</code> v2.2.0</td>
+                <td>Scoped update</td>
+                <td><code>with(PATH; UPDATE)</code></td>
               </tr>
               <tr>
-                <td>INI</td>
-                <td>Focused</td>
-                <td>global scalars and nested dotted sections</td>
-                <td><code>testConfigurationFormatCodecs</code></td>
+                <td>Arithmetic</td>
+                <td><code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>%</code></td>
               </tr>
               <tr>
-                <td>XML</td>
-                <td>Focused</td>
-                <td><code>+@attribute</code> / <code>+content</code> data profile; repeated elements; no DTD/custom entities</td>
-                <td><code>testConfigurationFormatCodecs</code></td>
+                <td>Merge mappings</td>
+                <td><code>*</code>, plus <code>*+</code>, <code>*d</code>, <code>*?</code>, and <code>*n</code> policies</td>
+              </tr>
+              <tr>
+                <td>YAML properties</td>
+                <td>read or write <code>tag</code>, <code>anchor</code>, <code>alias</code>, <code>style</code>, <code>head_comment</code>, <code>line_comment</code>, <code>foot_comment</code></td>
+              </tr>
+              <tr>
+                <td>Alias materialization</td>
+                <td><code>explode</code></td>
               </tr>
             </tbody>
           </table></div>
-          <p>For parser syntax rather than query operators, see <a href="/docs/supported_yml/">YAML support</a>. For the practical comparison, see <a href="/docs/yq-compatibility/">yq compatibility</a>.</p>
+          <p>Updating through an alias or inherited merge value follows the shared YAML node. Anchor renames keep referring aliases valid. Invalid or recursive alias construction is rejected.</p>
+          <h2 id="collections"><a href="#collections">Collections<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Family</th>
+              <th>Forms</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td>Size and keys</td>
+                <td><code>length</code>, <code>keys</code>, <code>has</code>, <code>kind</code>, <code>type</code></td>
+              </tr>
+              <tr>
+                <td>Transform</td>
+                <td><code>map</code>, <code>map_values</code>, <code>to_entries</code>, <code>from_entries</code>, <code>with_entries</code></td>
+              </tr>
+              <tr>
+                <td>Order</td>
+                <td><code>sort</code>, <code>sort_by</code>, <code>sort_keys</code>, <code>reverse</code>, <code>shuffle</code></td>
+              </tr>
+              <tr>
+                <td>Group and deduplicate</td>
+                <td><code>group_by</code>, <code>unique</code>, <code>unique_by</code></td>
+              </tr>
+              <tr>
+                <td>Select values</td>
+                <td><code>min</code>, <code>min_by</code>, <code>max</code>, <code>max_by</code>, <code>pick</code>, <code>omit</code></td>
+              </tr>
+              <tr>
+                <td>Reshape</td>
+                <td><code>flatten</code>, <code>pivot</code>, <code>array_to_map</code>, <code>add</code></td>
+              </tr>
+              <tr>
+                <td>Documents</td>
+                <td><code>split_doc</code></td>
+              </tr>
+            </tbody>
+          </table></div>
+          <p><code>--shuffle-seed N</code> makes <code>shuffle</code> reproducible. Sorting and grouping use scalar keys. <code>flatten</code> is recursive.</p>
+          <h2 id="strings-and-regular-expressions"><a href="#strings-and-regular-expressions">Strings and regular expressions<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Job</th>
+              <th>Forms</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td>Case and whitespace</td>
+                <td><code>upcase</code>, <code>downcase</code>, <code>trim</code></td>
+              </tr>
+              <tr>
+                <td>Convert</td>
+                <td><code>to_string</code>, <code>to_number</code></td>
+              </tr>
+              <tr>
+                <td>Split and join</td>
+                <td><code>split</code>, <code>join</code></td>
+              </tr>
+              <tr>
+                <td>Match text</td>
+                <td><code>contains</code>, <code>startswith</code>, <code>endswith</code>, <code>test</code>, <code>sub</code></td>
+              </tr>
+              <tr>
+                <td>Compose</td>
+                <td><code>&quot;value: \(EXPRESSION)&quot;</code> interpolation</td>
+              </tr>
+            </tbody>
+          </table></div>
+          <p><code>test</code> and global <code>sub</code> use the host AWK's POSIX extended regular expressions. Regex flags, capture objects, and replacement backreferences are not supported. Interpolation accepts the first scalar result.</p>
+          <h2 id="environment-files-and-dynamic-expressions"><a href="#environment-files-and-dynamic-expressions">Environment, files, and dynamic expressions<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Job</th>
+              <th>Forms</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td>Environment</td>
+                <td><code>env</code>, <code>strenv</code>, <code>envsubst</code></td>
+              </tr>
+              <tr>
+                <td>Local files</td>
+                <td><code>load</code>, <code>load_str</code>, <code>load_base64</code>, <code>load_props</code></td>
+              </tr>
+              <tr>
+                <td>Dynamic expression</td>
+                <td><code>eval(EXPR)</code></td>
+              </tr>
+              <tr>
+                <td>Stop with an error</td>
+                <td><code>error(MESSAGE)</code></td>
+              </tr>
+            </tbody>
+          </table></div>
+          <p>Environment access, query-selected file reads, and dynamic evaluation can be disabled independently. See <a href="/docs/security/">security and limits</a>.</p>
+          <h2 id="encode-and-decode"><a href="#encode-and-decode">Encode and decode<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Format</th>
+              <th>Decode</th>
+              <th>Encode</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td>YAML</td>
+                <td><code>from_yaml</code>, <code>@yamld</code></td>
+                <td><code>to_yaml</code>, <code>@yaml</code></td>
+              </tr>
+              <tr>
+                <td>JSON</td>
+                <td><code>from_json</code>, <code>@jsond</code></td>
+                <td><code>to_json</code>, <code>@json</code></td>
+              </tr>
+              <tr>
+                <td>TOML</td>
+                <td><code>from_toml</code>, <code>@tomld</code></td>
+                <td><code>to_toml</code>, <code>@toml</code></td>
+              </tr>
+              <tr>
+                <td>INI</td>
+                <td><code>from_ini</code>, <code>@inid</code></td>
+                <td><code>to_ini</code>, <code>@ini</code></td>
+              </tr>
+              <tr>
+                <td>XML data</td>
+                <td><code>from_xml</code>, <code>@xmld</code></td>
+                <td><code>to_xml</code>, <code>@xml</code></td>
+              </tr>
+              <tr>
+                <td>Properties</td>
+                <td><code>from_props</code>, <code>@propsd</code></td>
+                <td><code>to_props</code>, <code>@props</code></td>
+              </tr>
+              <tr>
+                <td>CSV</td>
+                <td><code>from_csv</code>, <code>@csvd</code></td>
+                <td><code>to_csv</code>, <code>@csv</code></td>
+              </tr>
+              <tr>
+                <td>TSV</td>
+                <td><code>from_tsv</code>, <code>@tsvd</code></td>
+                <td><code>to_tsv</code>, <code>@tsv</code></td>
+              </tr>
+              <tr>
+                <td>Base64</td>
+                <td><code>@base64d</code></td>
+                <td><code>@base64</code></td>
+              </tr>
+              <tr>
+                <td>URI</td>
+                <td><code>@urid</code></td>
+                <td><code>@uri</code></td>
+              </tr>
+              <tr>
+                <td>Shell text</td>
+                <td>—</td>
+                <td><code>@sh</code></td>
+              </tr>
+            </tbody>
+          </table></div>
+          <p>TOML, INI, and XML use documented data profiles rather than reproducing every application-specific extension. See <a href="/docs/contracts/">validate, patch, and convert</a>.</p>
+          <h2 id="configuration-operations"><a href="#configuration-operations">Configuration operations<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Expressions also provide RFC 6901 <code>pointer</code>, RFC 6902 <code>apply_patch</code> and <code>diff_patch</code>, RFC 7396 <code>merge_patch</code>, and the documented JSON Schema operators <code>schema_valid</code> and <code>schema_errors</code>.</p>
+          <h2 id="current-boundary"><a href="#current-boundary">Current boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Date/time operators, system execution, regex capture objects and flags, and application-specific YAML tag construction are not implemented. XML is available as a secure data codec; it is not an XPath or XML application runtime. See <a href="/docs/yq-compatibility/">yq compatibility</a> only when translating an existing yq program.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
       <ol>
-        <li class="level-2"><a href="#cli-boundaries">CLI boundaries</a></li>
-        <li class="level-2"><a href="#configuration-contracts">Configuration contracts</a></li>
+        <li class="level-2"><a href="#select-and-combine">Select and combine</a></li>
+        <li class="level-2"><a href="#build-and-update">Build and update</a></li>
+        <li class="level-2"><a href="#collections">Collections</a></li>
+        <li class="level-2"><a href="#strings-and-regular-expressions">Strings and regular expressions</a></li>
+        <li class="level-2"><a href="#environment-files-and-dynamic-expressions">Environment, files, and dynamic expressions</a></li>
+        <li class="level-2"><a href="#encode-and-decode">Encode and decode</a></li>
+        <li class="level-2"><a href="#configuration-operations">Configuration operations</a></li>
+        <li class="level-2"><a href="#current-boundary">Current boundary</a></li>
       </ol>
       <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/operators.md">Edit this page</a>
     </aside>

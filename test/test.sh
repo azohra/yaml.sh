@@ -7,12 +7,13 @@ testVersion() {
 testHelp() {
     result=$(./ysh --help)
     assertEquals 0 $?
-    assertContains "$result" "yq-style paths"
+    assertContains "$result" "One readable shell file"
+    assertContains "$result" "familiar to yq users"
     assertContains "$result" "events"
     assertContains "$result" "explain"
-    assertContains "$result" "transactionally"
-    assertContains "$result" "preview the exact transaction"
-    assertContains "$result" "refuse edits that would regenerate"
+    assertContains "$result" "rolling back a failed write"
+    assertContains "$result" "preview edits as unified diffs"
+    assertContains "$result" "cannot keep comments and formatting"
     assertContains "$result" "disable eval()"
     assertContains "$(PATH=/nonexistent ./ysh --help)" "YAML.sh"
 }
@@ -124,6 +125,8 @@ testExpressionSelectAndComparisons() {
     assertEquals "web" "$(./ysh '.services[] | select(.tier == "frontend") | .name' test/expressions.yml)"
     assertEquals "worker" "$(./ysh '.services[] | select(.name != "api" and .enabled == false) | .name' test/expressions.yml)"
     assertEquals "$(printf "%s\n" true true false)" "$(./ysh '.services[] | .port >= 8080' test/expressions.yml)"
+    assertEquals "false" "$(./ysh -n '[1, 2] == [1, 2]')"
+    assertEquals "false" "$(./ysh -n '{a: 1} == {a: 1}')"
 }
 
 testExpressionBooleanFilters() {
@@ -1680,8 +1683,10 @@ testReleaseArtifactsStayInSync() {
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
     assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.17"
-    assertContains "$(cat _static/_www/story/index.html)" "<strong>v1.8</strong>"
+    assertContains "$(cat _static/_www/story/index.html)" "One POSIX shell file"
+    assertNotContains "$(cat _static/_www/story/index.html)" "story-timeline"
+    assertNotContains "$(cat _static/_www/story/index.html)" "releases/tag/"
+    assertNotContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.17"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
     assertNotContains "$(cat _static/_www/index.html)" "A real parser this time"
@@ -1694,13 +1699,16 @@ testReleaseArtifactsStayInSync() {
     assertNotContains "$(cat README.md)" "og-v1.8.png"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
     assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
-    assertContains "$(cat _static/_www/docs/operators.md)" "| Array to map | Supported |"
-    assertContains "$(cat _static/_www/docs/operators.md)" "| Split into documents | Focused |"
-    assertContains "$(cat _static/_www/docs/operators.md)" "| JSON Patch | Supported |"
-    assertContains "$(cat _static/_www/docs/contracts.md)" "205 official valid fixtures"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "parser-boundary matrix"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "fail before producing a graph"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "common configuration shapes"
+    assertContains "$(cat _static/_www/docs/operators.md)" "# Operator reference"
+    assertContains "$(cat _static/_www/docs/operators.md)" "array_to_map"
+    assertContains "$(cat _static/_www/docs/operators.md)" "split_doc"
+    assertNotContains "$(cat _static/_www/docs/operators.md)" "testExpression"
+    assertContains "$(cat _static/_www/docs/contracts.md)" "# Validate, patch & convert"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "# YAML support"
+    assertNotContains "$(cat _static/_www/docs/supported_yml.md)" "Date/time, XML"
+    operator_tab=$(printf '\t')
+    assertContains "$(cat test/operator-manifest.tsv)" "operator${operator_tab}Array to map${operator_tab}supported"
+    assertContains "$(cat test/operator-manifest.tsv)" "operator${operator_tab}Split into documents${operator_tab}focused"
     assertNotContains "$(cat _static/_www/index.html)" "35/35"
     assertNotContains "$(cat README.md)" "35/35"
 }

@@ -1,6 +1,6 @@
-# Configuration contracts
+# Validate, patch & convert
 
-Validate a document, apply a standard patch, generate a reviewable change set, or cross a format boundary. The work stays in the same graph used by queries and YAML source edits.
+Validate a document, apply a standard patch, generate a reviewable change set, or convert configuration formats with the same `ysh` command.
 
 ## Validate before a script continues
 
@@ -23,7 +23,7 @@ ysh -e 'schema_valid(load("service.schema.json"))' service.yml
 
 Each error contains `instancePath`, `schemaPath`, `keyword`, and `message`. Values are never copied into diagnostics.
 
-The JSON Schema 2020-12 profile covers boolean schemas; `type`, `const`, `enum`; local `$ref` and `$defs`; composition and `if`/`then`/`else`; object properties, property names, dependent schemas/keys, patterns, and additional properties; tuple/items/contains and array limits; string length and POSIX patterns; and numeric bounds and multiples. Remote and dynamic references fail closed; annotation-driven `unevaluated*` vocabularies are rejected.
+The JSON Schema 2020-12 profile covers boolean schemas; `type`, `const`, and `enum`; local `$ref` and `$defs`; composition and `if`/`then`/`else`; object properties, property names, dependent schemas and keys, patterns, and additional properties; tuple and item validation; array limits; string length and POSIX patterns; and numeric bounds and multiples. Remote and dynamic references are rejected, as are annotation-driven `unevaluated*` vocabularies.
 
 ## Apply JSON Patch
 
@@ -32,9 +32,9 @@ ysh --apply-patch deploy.patch.json --diff deploy.yml
 ysh --apply-patch deploy.patch.json -i deploy.yml
 ```
 
-All six RFC 6902 operations are supported: `add`, `remove`, `replace`, `move`, `copy`, and `test`. Paths use RFC 6901 JSON Pointer, including `~0`, `~1`, array indexes, and `-` append. The release gate runs 108 enabled assertions from the pinned JSON Patch community and RFC-example corpora.
+All six RFC 6902 operations are supported: `add`, `remove`, `replace`, `move`, `copy`, and `test`. Paths use RFC 6901 JSON Pointer, including `~0`, `~1`, array indexes, and `-` append.
 
-On YAML input, patch mutations enter the normal source compiler. A strict edit can preserve comments and refuse regeneration:
+On YAML input, patches use the same comment-preserving edit path as expressions. A strict edit can preserve source formatting or refuse the change:
 
 ```sh
 ysh --preserve-only --apply-patch deploy.patch.json -i deploy.yml
@@ -74,12 +74,12 @@ ysh -p xml -o json '.catalog.item' catalog.xml
 ysh -o toml '.service' config.yml
 ```
 
-| Format | Contract |
+| Format | Supported profile |
 |---|---|
-| TOML 1.0 | Tables, dotted keys, arrays, inline tables, array tables, strings, integers, floats, booleans, and date/time values. Decoder and encoder each pass all 205 official valid fixtures. |
+| TOML 1.0 | Tables, dotted keys, arrays, inline tables, array tables, strings, integers, floats, booleans, and date/time values. |
 | INI | Global scalar keys and nested dotted sections. Values remain strings; duplicate keys fail. |
 | XML | One data root; attributes become `+@name`, text becomes `+content` beside children, and repeated elements become arrays. Names and XML 1.0 characters are checked; DTDs and custom entities are disabled. |
 
-TOML's portable baseline excludes 12 raw-byte cases that AWK cannot reliably observe after record decoding: bare CR, NUL, invalid UTF-8, and UTF-16. The other 462 invalid fixtures fail closed; hosts that expose NUL bytes reject five more.
+The TOML parser rejects invalid syntax. Its portable byte-level boundary excludes bare CR, NUL, invalid UTF-8, and UTF-16 cases that some AWK hosts cannot expose reliably after record decoding.
 
-Non-YAML formats are semantic codecs, not presentation-preserving editors. Mixed XML text/child ordering is not retained. Convert or query one document at a time; use YAML input for `-i`, repository transactions, source comments, and exact byte preservation.
+Non-YAML formats are semantic codecs, not presentation-preserving editors. Mixed XML text/child ordering is not retained. Convert or query one document at a time; use YAML input for in-place editing, comments, and source preservation.
