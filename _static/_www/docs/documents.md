@@ -24,6 +24,14 @@ ysh -d 1 '.environment' stream.yml
 
 Anchors and tag handles are scoped to their document. Empty explicit documents are represented as null rather than disappearing from the stream.
 
+Stream selected values as explicit documents with `split_doc`:
+
+```sh
+ysh -o=yaml '.services[] | split_doc' config.yml
+```
+
+YAML.sh already places a document separator between multiple YAML results, so `split_doc` is idempotent rather than a switch that changes safe output into unsafe concatenation.
+
 In-place mode applies the same expression independently to every document:
 
 ```sh
@@ -59,3 +67,9 @@ ysh eval-all -i "$query" release.yml services/*.yml
 ```
 
 Every source file participates in drift detection; every mutated source participates in commit. A read-only source file that does not change is not replaced.
+
+To fold the complete file stream into one document:
+
+```sh
+ysh eval-all '. as $document ireduce ({}; . * $document)' defaults.yml region.yml secrets.yml
+```

@@ -20,6 +20,12 @@ function trim_right_horizontal(value) {
     return value
 }
 
+function leading_horizontal_width(value,    copy) {
+    copy = value
+    sub(/[^ \t].*$/, "", copy)
+    return length(copy)
+}
+
 function trim_quoted_right(value, double_quoted) {
     if (double_quoted && match(value, /\\[ \t]+$/)) {
         return substr(value, 1, RSTART + 1)
@@ -264,6 +270,9 @@ function scalar_type(raw, tag, value,    lowered, normalized_tag) {
 }
 
 function strip_inline_comment(value,    i, char, previous, quote, escaped, braces, brackets) {
+    if (!index(value, "#")) {
+        return trim(value)
+    }
     quote = ""
     escaped = 0
     braces = 0
@@ -855,6 +864,9 @@ function parse_value(value, source_line, indent, allow_block,    cleaned, remain
     if (allow_block && remainder ~ /^[|>]/) {
         fail("invalid block scalar indicator on line " source_line)
     }
+    if (substr(remainder, 1, 1) == "@" || substr(remainder, 1, 1) == "`") {
+        fail("reserved indicator cannot start a plain scalar on line " source_line)
+    }
     if (!(substr(remainder, 1, 1) == "*" && valid_anchor_name(substr(remainder, 2))) &&
         find_top_level_colon(remainder, 1)) {
         fail("mapping indicator inside plain scalar on line " source_line)
@@ -1030,7 +1042,7 @@ function flush_block(    value, i, line, previous, more, previous_more, seen_non
     block_count = 0
 }
 
-function parse_mapping_into(value, parent, indent, source_line,    separator, raw_key, key, child, raw_value, is_merge) {
+function parse_mapping_into(value, parent, indent, source_line,    separator, raw_key, key, child, raw_value, raw_suffix, is_merge) {
     if (indent > max_indent) {
         max_indent = indent
     }
@@ -1043,12 +1055,14 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     raw_key = trim(substr(value, 1, separator - 1))
     key = parse_scalar_key(raw_key, source_line)
     is_merge = parsed_key_is_merge
-    raw_value = trim(substr(value, separator + 1))
+    raw_suffix = substr(value, separator + 1)
+    raw_value = trim(raw_suffix)
     if (raw_key != "" && raw_value ~ /^-[[:space:]]/) {
         fail("block sequence entries must begin on their own line " source_line)
     }
     child = parse_value(raw_value, source_line, indent, 1)
     node_indent[child] = indent
+    node_column[child] = raw_value == "" ? indent + separator + 1 : indent + separator + leading_horizontal_width(raw_suffix) + 1
     add_mapping(parent, key, child, source_line, is_merge)
     if (source_line in source_line_comment) {
         node_line_comment[child] = source_line_comment[source_line]
@@ -1130,6 +1144,8 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
         separator = find_mapping_separator(remainder, 1)
         if (separator && substr(remainder, 1, 1) != "{" && substr(remainder, 1, 1) != "[") {
             item = new_node("mapping", source_line, "", "", tag)
+            node_indent[item] = indent
+            node_column[item] = nested_indent + 1
             bind_anchor(anchor, item, source_line)
             add_sequence(sequence, item, source_line)
             context_node[indent] = item
@@ -1145,6 +1161,7 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
         node_line_comment[item] = source_line_comment[source_line]
     }
     node_indent[item] = indent
+    node_column[item] = original == "" ? indent + 2 : nested_indent + 1
     if (node_kind[item] == "pending" || node_kind[item] == "mapping" ||
         (node_kind[item] == "scalar" && is_plain_scalar_source(original, source_line))) {
         context_node[indent] = item
@@ -1233,6 +1250,7 @@ function add_explicit_value(indent, text, source_line,    parent, child, raw_val
         add_mapping(parent, explicit_key[indent], child, source_line, 0)
     }
     node_indent[child] = indent
+    node_column[child] = raw_value == "" ? indent + 2 : indent + 2 + leading_horizontal_width(substr(text, 2))
     delete explicit_key[indent]
     delete explicit_key_valid[indent]
     if (node_kind[child] == "pending" || (node_kind[child] == "scalar" && raw_value != "" &&
@@ -1632,6 +1650,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         fail("unknown syntax on line " source_line)
     }
     root = parse_value(text, source_line, indent, 1)
+    node_column[root] = indent + 1
     document_root[document_index] = root
     document_file_index[document_index] = current_input_file_index
     document_filename[document_index] = current_input_filename
@@ -1729,6 +1748,9 @@ function multiline_scalar_quote(raw,    first_line, indent, text, clean, separat
 }
 
 function flow_balance(value,    i, char, quote, escaped, braces, brackets, previous) {
+    if (!index(value, "[") && !index(value, "{")) {
+        return 0
+    }
     quote = ""
     escaped = 0
     braces = 0
@@ -2419,15 +2441,17 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             expression = expression_new("regex_sub", argument, child, "")
         } else if (name == "length" || name == "keys" || name == "kind" || name == "type" || name == "to_entries" || name == "from_entries" ||
             name == "sort" || name == "unique" || name == "flatten" || name == "reverse" || name == "upcase" || name == "downcase" ||
+            name == "trim" || name == "to_string" || name == "array_to_map" || name == "split_doc" ||
             name == "min" || name == "max" || name == "any" || name == "all" || name == "add" || name == "path" ||
             name == "parent" || name == "to_number" || name == "documentindex" ||
             name == "fileindex" || name == "filename" || name == "empty" || name == "line" || name == "key" ||
-            name == "tag" || name == "anchor" || name == "alias" || name == "style" || name == "line_comment" || name == "pivot") {
+            name == "column" || name == "tag" || name == "anchor" || name == "alias" || name == "style" || name == "line_comment" || name == "pivot") {
             if (expression_token_type == "left_parenthesis") {
                 expression_lex_next()
                 expression_expect("right_parenthesis")
             }
             if (name == "line") name = "node_line"
+            else if (name == "column") name = "node_column"
             else if (name == "key") name = "node_key"
             else if (name == "tag") name = "node_tag"
             else if (name == "anchor") name = "node_anchor"
@@ -2762,6 +2786,32 @@ function expression_sort_mapping(node,    result, collection, count, i, j, key) 
         key = expression_sorted_key[i]
         add_mapping(result, key, expression_clone_node(mapping_lookup(node, key)), 0, 0)
         delete expression_sorted_key[i]
+    }
+    return result
+}
+
+function expression_sort_keys_clone(node, recursive,    resolved, result, i, replacement) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "mapping") {
+        result = expression_sort_mapping(resolved)
+        if (recursive) {
+            for (i = 1; i <= mapping_count[result]; i++) {
+                replacement = expression_sort_keys_clone(mapping_child[result, i], 1)
+                mapping_child[result, i] = replacement
+                node_parent[replacement] = result
+                node_parent_edge[replacement] = "key " mapping_key[result, i]
+            }
+        }
+        return result
+    }
+    result = expression_clone_node(node)
+    if (recursive && node_kind[resolved] == "sequence") {
+        for (i = 1; i <= sequence_count[result]; i++) {
+            replacement = expression_sort_keys_clone(sequence_child[result, i], 1)
+            sequence_child[result, i] = replacement
+            node_parent[replacement] = result
+            node_parent_edge[replacement] = "index " (i - 1)
+        }
     }
     return result
 }
@@ -4016,6 +4066,113 @@ function expression_json_text(node,    resolved, result, i, collection, key) {
     return result "}"
 }
 
+function expression_yaml_scalar_text(node,    resolved, value) {
+    if (node_kind[node] == "alias") {
+        return "*" node_value[node]
+    }
+    resolved = resolve_alias(node)
+    value = node_value[resolved]
+    if (node_type[resolved] == "null" && value == "") {
+        return "null"
+    }
+    if (node_type[resolved] != "string" || presentation_plain_safe(value)) {
+        return value
+    }
+    return json_quote(value)
+}
+
+function expression_yaml_inline_text(node,    resolved) {
+    if (node_kind[node] == "alias" || node_kind[resolve_alias(node)] == "scalar") {
+        return expression_yaml_scalar_text(node)
+    }
+    resolved = resolve_alias(node)
+    if ((node_kind[resolved] == "mapping" && !mapping_count[resolved]) ||
+        (node_kind[resolved] == "sequence" && !sequence_count[resolved])) {
+        return node_kind[resolved] == "mapping" ? "{}" : "[]"
+    }
+    if (node_style[resolved] == "flow") {
+        return expression_yaml_flow_text(resolved)
+    }
+    return ""
+}
+
+function expression_yaml_flow_text(node,    resolved, result, i, key) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar" || node_kind[node] == "alias") {
+        return expression_yaml_scalar_text(node)
+    }
+    result = node_kind[resolved] == "sequence" ? "[" : "{"
+    if (node_kind[resolved] == "sequence") {
+        for (i = 1; i <= sequence_count[resolved]; i++) {
+            if (i > 1) result = result ", "
+            result = result expression_yaml_flow_text(sequence_child[resolved, i])
+        }
+        return result "]"
+    }
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        if (i > 1) result = result ", "
+        key = mapping_key[resolved, i]
+        key = presentation_plain_safe(key) ? key : json_quote(key)
+        result = result key ": " expression_yaml_flow_text(mapping_child[resolved, i])
+    }
+    return result "}"
+}
+
+function expression_yaml_text(node, indent,    resolved, result, i, key, child, inline, prefix) {
+    if (node_kind[node] == "alias") {
+        return expression_yaml_scalar_text(node)
+    }
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar") {
+        return expression_yaml_scalar_text(resolved)
+    }
+    if (node_style[resolved] == "flow") {
+        return expression_yaml_flow_text(resolved)
+    }
+    prefix = yaml_spaces(indent)
+    result = ""
+    if (node_kind[resolved] == "sequence") {
+        if (!sequence_count[resolved]) {
+            return "[]"
+        }
+        for (i = 1; i <= sequence_count[resolved]; i++) {
+            child = sequence_child[resolved, i]
+            inline = expression_yaml_inline_text(child)
+            if (result != "") result = result "\n"
+            if (inline != "") {
+                result = result prefix "- " inline
+            } else {
+                result = result prefix "-\n" expression_yaml_text(child, indent + yaml_indent)
+            }
+        }
+        return result
+    }
+    if (!mapping_count[resolved]) {
+        return "{}"
+    }
+    for (i = 1; i <= mapping_count[resolved]; i++) {
+        key = mapping_key[resolved, i]
+        child = mapping_child[resolved, i]
+        inline = expression_yaml_inline_text(child)
+        if (result != "") result = result "\n"
+        key = presentation_plain_safe(key) ? key : json_quote(key)
+        if (inline != "") {
+            result = result prefix key ": " inline
+        } else {
+            result = result prefix key ":\n" expression_yaml_text(child, indent + yaml_indent)
+        }
+    }
+    return result
+}
+
+function expression_to_string(node,    resolved) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] == "scalar") {
+        return node_type[resolved] == "null" && node_value[resolved] == "" ? "null" : node_value[resolved]
+    }
+    return expression_yaml_text(node, 0)
+}
+
 function expression_interpolation_text(node,    resolved) {
     resolved = resolve_alias(node)
     if (node_kind[resolved] != "scalar") {
@@ -4073,43 +4230,8 @@ function expression_entry(key, value, key_type,    entry) {
     return entry
 }
 
-function expression_evaluate(expression, input,    output, middle, left_stream, right_stream, single, kind, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+function expression_evaluate_context(kind, expression, input,    output, middle, i, node, resolved, key, result_node) {
     output = expression_stream_new()
-    kind = expression_kind[expression]
-
-    if (kind == "identity") {
-        expression_stream_append(output, input)
-        return output
-    }
-    if (kind == "empty") {
-        return output
-    }
-    if (kind == "error") {
-        key = "aborted"
-        argument_stream = expression_evaluate(expression_left[expression], input)
-        if (expression_stream_count[argument_stream]) {
-            node = resolve_alias(expression_stream_node[argument_stream, 1])
-            key = node_kind[node] == "scalar" ? node_value[node] : ""
-        }
-        fail(key)
-    }
-    if (kind == "env" || kind == "strenv") {
-        if (disable_env_ops) {
-            fail("environment operations are disabled")
-        }
-        key = expression_value[expression]
-        if (kind == "env" && !(key in ENVIRON)) {
-            fail("value for env variable '" key "' not provided in env()")
-        }
-        for (i = 1; i <= expression_stream_count[input]; i++) {
-            if (kind == "strenv") {
-                expression_stream_push(output, expression_scalar(ENVIRON[key], "string"))
-            } else {
-                expression_stream_push(output, parse_value(ENVIRON[key], 0, -1, 0))
-            }
-        }
-        return output
-    }
     if (kind == "filename" || kind == "fileindex" || kind == "documentindex") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = resolve_alias(expression_stream_node[input, i])
@@ -4144,34 +4266,150 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
-    if (kind == "node_line" || kind == "node_key" || kind == "node_tag" || kind == "node_anchor" || kind == "node_alias" ||
-        kind == "node_style" || kind == "node_line_comment") {
+    for (i = 1; i <= expression_stream_count[input]; i++) {
+        node = expression_stream_node[input, i]
+        resolved = resolve_alias(node)
+        if (kind == "node_line") {
+            expression_stream_push(output, expression_scalar(node_line[node] "", "int"))
+        } else if (kind == "node_column") {
+            expression_stream_push(output, expression_scalar(node_column[node] + 0 "", "int"))
+        } else if (kind == "node_tag") {
+            expression_stream_push(output, expression_scalar(expression_type_name(resolved), "string"))
+        } else if (kind == "node_anchor") {
+            expression_stream_push(output, expression_scalar(node_anchor[node], "string"))
+        } else if (kind == "node_alias") {
+            expression_stream_push(output, expression_scalar(node_kind[node] == "alias" ? node_value[node] : "", "string"))
+        } else if (kind == "node_style") {
+            key = node_style[node]
+            expression_stream_push(output, expression_scalar(key == "plain" ? "" : key, "string"))
+        } else if (kind == "node_line_comment") {
+            expression_stream_push(output, expression_scalar(node_line_comment[node], "string"))
+        } else if (node in node_parent) {
+            key = node_parent_edge[node]
+            result_node = substr(key, 1, 6) == "index " ? expression_scalar(substr(key, 7), "int") : expression_scalar(substr(key, 5), "string")
+            node_line[result_node] = node_line[node]
+            node_column[result_node] = substr(key, 1, 4) == "key " ? node_indent[node] + 1 : node_column[node]
+            expression_stream_push(output, result_node)
+        }
+    }
+    return output
+}
+
+function expression_evaluate_string(kind, expression, input,    output, i, j, node, key, single, argument_stream, argument, right_stream, child, result_node) {
+    output = expression_stream_new()
+    if (kind == "upcase" || kind == "downcase" || kind == "trim" || kind == "to_string") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = expression_stream_node[input, i]
-            resolved = resolve_alias(node)
-            if (kind == "node_line") {
-                expression_stream_push(output, expression_scalar(node_line[node] "", "int"))
-            } else if (kind == "node_tag") {
-                expression_stream_push(output, expression_scalar(expression_type_name(resolved), "string"))
-            } else if (kind == "node_anchor") {
-                expression_stream_push(output, expression_scalar(node_anchor[node], "string"))
-            } else if (kind == "node_alias") {
-                expression_stream_push(output, expression_scalar(node_kind[node] == "alias" ? node_value[node] : "", "string"))
-            } else if (kind == "node_style") {
-                key = node_style[node]
-                expression_stream_push(output, expression_scalar(key == "plain" ? "" : key, "string"))
-            } else if (kind == "node_line_comment") {
-                expression_stream_push(output, expression_scalar(node_line_comment[node], "string"))
-            } else if (node in node_parent) {
-                key = node_parent_edge[node]
-                if (substr(key, 1, 6) == "index ") {
-                    expression_stream_push(output, expression_scalar(substr(key, 7), "int"))
-                } else {
-                    expression_stream_push(output, expression_scalar(substr(key, 5), "string"))
-                }
+            node = resolve_alias(expression_stream_node[input, i])
+            if (kind == "to_string") {
+                expression_stream_push(output, expression_scalar(expression_to_string(node), "string"))
+                continue
+            }
+            if (node_kind[node] != "scalar" || node_type[node] != "string") fail(kind " requires a string")
+            key = node_value[node]
+            if (kind == "trim") {
+                sub(/^[[:space:]]+/, "", key)
+                sub(/[[:space:]]+$/, "", key)
+            } else {
+                key = kind == "upcase" ? toupper(key) : tolower(key)
+            }
+            expression_stream_push(output, expression_scalar(key, "string"))
+        }
+        return output
+    }
+    if (kind == "regex_test" || kind == "regex_sub") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            node = resolve_alias(expression_stream_node[input, i])
+            if (node_kind[node] != "scalar" || node_type[node] != "string") fail((kind == "regex_test" ? "test" : "sub") " requires a string")
+            single = expression_stream_single(node)
+            argument_stream = expression_evaluate(expression_left[expression], single)
+            if (!expression_stream_count[argument_stream]) fail("regular expression requires a pattern")
+            argument = expression_string_value(expression_stream_node[argument_stream, 1])
+            key = node_value[node]
+            if (kind == "regex_test") {
+                expression_stream_push(output, expression_boolean(key ~ argument))
+                continue
+            }
+            right_stream = expression_evaluate(expression_right[expression], single)
+            if (!expression_stream_count[right_stream]) fail("regular expression replacement requires a string")
+            child = expression_string_value(expression_stream_node[right_stream, 1])
+            expression_stream_push(output, expression_scalar(expression_regex_replace_all(key, argument, child), "string"))
+        }
+        return output
+    }
+    for (i = 1; i <= expression_stream_count[input]; i++) {
+        node = resolve_alias(expression_stream_node[input, i])
+        single = expression_stream_single(node)
+        argument_stream = expression_evaluate(expression_left[expression], single)
+        if (!expression_stream_count[argument_stream]) fail(kind " requires an argument")
+        argument = expression_string_value(expression_stream_node[argument_stream, 1])
+        if (kind == "join") {
+            if (node_kind[node] != "sequence") fail("join requires a sequence")
+            key = ""
+            for (j = 1; j <= sequence_count[node]; j++) key = key (j > 1 ? argument : "") expression_string_value(sequence_child[node, j])
+            expression_stream_push(output, expression_scalar(key, "string"))
+            continue
+        }
+        if (node_kind[node] != "scalar" || node_type[node] != "string") fail(kind " requires a string")
+        key = node_value[node]
+        if (kind == "contains") expression_stream_push(output, expression_boolean(index(key, argument) > 0))
+        else if (kind == "startswith") expression_stream_push(output, expression_boolean(substr(key, 1, length(argument)) == argument))
+        else if (kind == "endswith") expression_stream_push(output, expression_boolean(substr(key, length(key) - length(argument) + 1) == argument))
+        else {
+            result_node = new_node("sequence", 0, "", "", "")
+            expression_split_string(key, argument, result_node)
+            expression_stream_push(output, result_node)
+        }
+    }
+    return output
+}
+
+function expression_evaluate(expression, input,    output, middle, left_stream, right_stream, single, kind, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+    output = expression_stream_new()
+    kind = expression_kind[expression]
+
+    if (kind == "identity") {
+        expression_stream_append(output, input)
+        return output
+    }
+    if (kind == "split_doc") {
+        # YAML.sh already separates every YAML stream result into a valid document.
+        # Keep split_doc explicit and idempotent instead of weakening that contract.
+        expression_stream_append(output, input)
+        return output
+    }
+    if (kind == "empty") {
+        return output
+    }
+    if (kind == "error") {
+        key = "aborted"
+        argument_stream = expression_evaluate(expression_left[expression], input)
+        if (expression_stream_count[argument_stream]) {
+            node = resolve_alias(expression_stream_node[argument_stream, 1])
+            key = node_kind[node] == "scalar" ? node_value[node] : ""
+        }
+        fail(key)
+    }
+    if (kind == "env" || kind == "strenv") {
+        if (disable_env_ops) {
+            fail("environment operations are disabled")
+        }
+        key = expression_value[expression]
+        if (kind == "env" && !(key in ENVIRON)) {
+            fail("value for env variable '" key "' not provided in env()")
+        }
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            if (kind == "strenv") {
+                expression_stream_push(output, expression_scalar(ENVIRON[key], "string"))
+            } else {
+                expression_stream_push(output, parse_value(ENVIRON[key], 0, -1, 0))
             }
         }
         return output
+    }
+    if (kind == "filename" || kind == "fileindex" || kind == "documentindex" || kind == "path" || kind == "parent" ||
+        kind == "node_property" || kind == "node_line" || kind == "node_column" || kind == "node_key" || kind == "node_tag" ||
+        kind == "node_anchor" || kind == "node_alias" || kind == "node_style" || kind == "node_line_comment") {
+        return expression_evaluate_context(kind, expression, input)
     }
     if (kind == "to_number" || kind == "envsubst") {
         if (kind == "envsubst" && disable_env_ops) {
@@ -4364,6 +4602,24 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         variable = expression_value[expression]
         had = variable in expression_variable_node
         previous = expression_variable_node[variable]
+        if (eval_all_mode && expression == eval_all_top_expression) {
+            left_stream = expression_evaluate(expression_left[expression], input)
+            right_stream = expression_evaluate(expression_right[expression], input)
+            accumulator = expression_stream_count[right_stream] ? expression_stream_node[right_stream, 1] : expression_null()
+            for (j = 1; j <= expression_stream_count[left_stream]; j++) {
+                expression_variable_node[variable] = expression_stream_node[left_stream, j]
+                single = expression_stream_single(accumulator)
+                update_stream = expression_evaluate(expression_child[expression, 1], single)
+                accumulator = expression_stream_count[update_stream] ? expression_stream_node[update_stream, 1] : expression_null()
+            }
+            expression_stream_push(output, accumulator)
+            if (had) {
+                expression_variable_node[variable] = previous
+            } else {
+                delete expression_variable_node[variable]
+            }
+            return output
+        }
         for (i = 1; i <= expression_stream_count[input]; i++) {
             single = expression_stream_single(expression_stream_node[input, i])
             left_stream = expression_evaluate(expression_left[expression], single)
@@ -5005,6 +5261,20 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
+    if (kind == "array_to_map") {
+        for (i = 1; i <= expression_stream_count[input]; i++) {
+            node = resolve_alias(expression_stream_node[input, i])
+            if (node_kind[node] != "sequence") {
+                fail("array_to_map requires a sequence")
+            }
+            result_node = new_node("mapping", 0, "", "", "")
+            for (j = 1; j <= sequence_count[node]; j++) {
+                add_mapping(result_node, (j - 1) "", expression_clone_node(sequence_child[node, j]), 0, 0)
+            }
+            expression_stream_push(output, result_node)
+        }
+        return output
+    }
     if (kind == "sort" || kind == "unique" || kind == "reverse" || kind == "flatten") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = resolve_alias(expression_stream_node[input, i])
@@ -5050,12 +5320,18 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
     }
     if (kind == "sort_keys") {
         middle = expression_evaluate(expression_left[expression], input)
-        for (i = 1; i <= expression_stream_count[middle]; i++) {
-            node = resolve_alias(expression_stream_node[middle, i])
-            if (node_kind[node] != "mapping") {
-                fail("sort_keys requires a mapping")
+        matched = expression_kind[expression_left[expression]] == "recursive"
+        if (matched) {
+            if (expression_stream_count[middle]) {
+                if (inplace_mode) {
+                    presentation_possible = 0
+                }
+                expression_stream_push(output, expression_sort_keys_clone(expression_stream_node[middle, 1], 1))
             }
-            expression_stream_push(output, expression_sort_mapping(node))
+            return output
+        }
+        for (i = 1; i <= expression_stream_count[middle]; i++) {
+            expression_stream_push(output, expression_sort_keys_clone(expression_stream_node[middle, i], 0))
         }
         return output
     }
@@ -5201,83 +5477,10 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
-    if (kind == "upcase" || kind == "downcase") {
-        for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "scalar" || node_type[node] != "string") {
-                fail(kind " requires a string")
-            }
-            expression_stream_push(output, expression_scalar(kind == "upcase" ? toupper(node_value[node]) : tolower(node_value[node]), "string"))
-        }
-        return output
-    }
-    if (kind == "regex_test" || kind == "regex_sub") {
-        for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "scalar" || node_type[node] != "string") {
-                fail((kind == "regex_test" ? "test" : "sub") " requires a string")
-            }
-            single = expression_stream_single(node)
-            argument_stream = expression_evaluate(expression_left[expression], single)
-            if (!expression_stream_count[argument_stream]) {
-                fail("regular expression requires a pattern")
-            }
-            argument = expression_string_value(expression_stream_node[argument_stream, 1])
-            key = node_value[node]
-            if (kind == "regex_test") {
-                expression_stream_push(output, expression_boolean(key ~ argument))
-                continue
-            }
-            right_stream = expression_evaluate(expression_right[expression], single)
-            if (!expression_stream_count[right_stream]) {
-                fail("regular expression replacement requires a string")
-            }
-            child = expression_string_value(expression_stream_node[right_stream, 1])
-            key = expression_regex_replace_all(key, argument, child)
-            expression_stream_push(output, expression_scalar(key, "string"))
-        }
-        return output
-    }
-    if (kind == "contains" || kind == "startswith" || kind == "endswith" || kind == "split" || kind == "join") {
-        for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            single = expression_stream_single(node)
-            argument_stream = expression_evaluate(expression_left[expression], single)
-            if (!expression_stream_count[argument_stream]) {
-                fail(kind " requires an argument")
-            }
-            argument = expression_string_value(expression_stream_node[argument_stream, 1])
-            if (kind == "join") {
-                if (node_kind[node] != "sequence") {
-                    fail("join requires a sequence")
-                }
-                key = ""
-                for (j = 1; j <= sequence_count[node]; j++) {
-                    if (j > 1) {
-                        key = key argument
-                    }
-                    key = key expression_string_value(sequence_child[node, j])
-                }
-                expression_stream_push(output, expression_scalar(key, "string"))
-                continue
-            }
-            if (node_kind[node] != "scalar" || node_type[node] != "string") {
-                fail(kind " requires a string")
-            }
-            key = node_value[node]
-            if (kind == "contains") {
-                expression_stream_push(output, expression_boolean(index(key, argument) > 0))
-            } else if (kind == "startswith") {
-                expression_stream_push(output, expression_boolean(substr(key, 1, length(argument)) == argument))
-            } else if (kind == "endswith") {
-                expression_stream_push(output, expression_boolean(substr(key, length(key) - length(argument) + 1) == argument))
-            } else {
-                result_node = new_node("sequence", 0, "", "", "")
-                expression_split_string(key, argument, result_node)
-                expression_stream_push(output, result_node)
-            }
-        }
-        return output
+    if (kind == "upcase" || kind == "downcase" || kind == "trim" || kind == "to_string" ||
+        kind == "regex_test" || kind == "regex_sub" || kind == "contains" || kind == "startswith" ||
+        kind == "endswith" || kind == "split" || kind == "join") {
+        return expression_evaluate_string(kind, expression, input)
     }
     if (kind == "length" || kind == "keys" || kind == "kind" || kind == "type" || kind == "has") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
@@ -5666,6 +5869,9 @@ function emit_yaml(node,    inline, properties) {
 }
 
 function presentation_comment_position(value,    i, char, previous, quote, escaped, braces, brackets) {
+    if (!index(value, "#")) {
+        return 0
+    }
     quote = ""
     escaped = 0
     braces = 0

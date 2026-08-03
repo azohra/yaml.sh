@@ -7,7 +7,7 @@ SOURCE=$ROOT/_static/_www/docs
 DOCS=${YSH_DOCS_OUTPUT:-$SOURCE}
 RENDERER=$ROOT/build/docs-page.awk
 VERSION=${YSH_DOCS_VERSION:-$(sed -n 's/^YSH_VERSION=//p' "$ROOT/ysh" | head -n 1)}
-PAGES='README getting-started recipes queries documents output yq-compatibility supported_yml security migration internals development'
+PAGES='README getting-started recipes queries operators documents output yq-compatibility supported_yml security migration internals development'
 
 mkdir -p "$DOCS"
 
@@ -17,6 +17,7 @@ description_for() {
     getting-started) printf '%s\n' 'Install one file and solve the first YAML task.' ;;
     recipes) printf '%s\n' 'Copyable solutions for configuration work.' ;;
     queries) printf '%s\n' 'Paths, filters, construction, updates, and context.' ;;
+    operators) printf '%s\n' 'The audited YAML-oriented operator surface and evidence for every claim.' ;;
     documents) printf '%s\n' 'Work across YAML streams and multiple files.' ;;
     output) printf '%s\n' 'Choose value, JSON, YAML, metadata, AST, or events.' ;;
     yq-compatibility) printf '%s\n' 'The useful overlap with yq and the deliberate boundary.' ;;

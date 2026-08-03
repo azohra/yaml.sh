@@ -1,7 +1,7 @@
 BUILDERS = $(shell find build/*)
 INSTALL_DIR=/usr/local/bin
 
-.PHONY: lint test docs-check conformance differential fuzz presentation adversarial benchmark scale all install uninstall docs clean
+.PHONY: lint test docs-check operator-manifest conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
 
 all: ysh lint test docs-check
 
@@ -12,16 +12,22 @@ ysh: src/ysh.sh src/ysh.awk src/diff.awk Makefile $(BUILDERS)
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/operator-manifest.sh test/conformance.sh test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
 	@./test/test.sh
 	@./test/workflows.sh
+	@./test/parser-boundaries.sh
 
 docs-check: ysh
 	@echo "📚 Checking static documentation"
 	@./test/docs.sh
+	@./test/operator-manifest.sh
+
+operator-manifest: ysh
+	@echo "🧾 Auditing the operator surface"
+	@./test/operator-manifest.sh
 
 conformance: ysh
 	@echo "🧭 Measuring YAML conformance"
@@ -38,6 +44,10 @@ fuzz: ysh
 presentation: ysh
 	@echo "🎨 Exercising presentation mutations"
 	@./test/presentation-matrix.sh
+
+parser-boundaries: ysh
+	@echo "🚧 Auditing parser boundaries"
+	@./test/parser-boundaries.sh
 
 adversarial: ysh
 	@echo "🛡️  Exercising resource limits"

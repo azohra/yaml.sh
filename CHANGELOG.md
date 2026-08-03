@@ -4,6 +4,29 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.14.0] - 2026-08-02
+
+Version 1.14 closes the useful portable operator surface and makes its boundary auditable.
+
+### Added
+
+- `trim`, `to_string`, `column`, `array_to_map`, and `split_doc`.
+- Recursive `sort_keys(..)` and whole-stream `ireduce` in `eval-all`.
+- An operator manifest covering every YAML-oriented yq area as supported, focused, or deliberately excluded, with named evidence for every row.
+- A parser-boundary gate for valid neighboring syntax and fail-closed rejections.
+
+### Changed
+
+- Source-context and string evaluators are isolated from the central dispatch.
+- Fast paths skip comment and flow scans on ordinary lines; the 5,000-record benchmark is roughly twice as fast on the release machine.
+- README, docs, site, and story describe useful jobs and guarantees instead of using corpus size as product copy.
+
+### Boundaries
+
+- `column` covers block value/key nodes; generated nodes return 0 and flow-child columns remain focused.
+- `split_doc` is explicit and idempotent because YAML.sh already separates every YAML stream result into a valid document.
+- Dates, codecs, loads, dynamic evaluation, system execution, regex capture objects, and random shuffle remain excluded.
+
 ## [1.13.0] - 2026-08-02
 
 Version 1.13 makes source fidelity a compiled edit plan rather than a mutation-time guess.

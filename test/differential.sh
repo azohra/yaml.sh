@@ -142,6 +142,7 @@ select(fileIndex == 0) * select(fileIndex == 1)
 select(fileIndex == 0) | keys
 select(fileIndex == 1) | sort_keys(.)
 select(fileIndex == 1) | path
+. as $document ireduce ({}; . * $document)
 EOF
 printf 'yq v4.53.3 eval-all results: %s/%s pass\n' "$eval_all_passed" "$eval_all_total"
 if [ "$total" -lt 2500 ]; then

@@ -388,6 +388,7 @@ blockquote p { margin: 0 !important; color: var(--ink) !important; }
 }
 
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table-wide table { min-width: 720px; }
 
 th {
   color: var(--paper);

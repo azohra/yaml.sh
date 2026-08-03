@@ -9,11 +9,11 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 | Traverse and streams | Strong | paths, dynamic keys, indexes, optional traversal, recursive descent, pipes, unions, slices |
 | Select and logic | Strong | `select`, `filter`, comparisons, short-circuiting `and`/`or`, `not`, `//`, `any`, `all`, `error` guards |
 | Build and mutate | Strong | arrays, computed keys, reducers, `=`, `|=`, compound updates, `setpath`, `delpaths`, `del`, `with`, deep merge and `*+`/`*d`/`*?`/`*n` policies |
-| Collections | Strong | `map`, `map_values`, entries, sort/group/unique/min/max families, flatten, reverse, add, first, pick, omit, pivot |
-| Context | Strong | `path`, `parent`, `key`, `line`, `tag`, `filename`, `fileIndex`, `documentIndex` |
+| Collections | Strong | `map`, `map_values`, entries, sort/group/unique/min/max families, recursive key sorting, flatten, reverse, `array_to_map`, add, first, pick, omit, pivot |
+| Context | Strong | `path`, `parent`, `key`, `line`, focused `column`, `tag`, `filename`, `fileIndex`, `documentIndex` |
 | Environment | Strong | `env`, `strenv`, `envsubst`, defaults, `nu`/`ne`/`ff`, security disable switch |
-| Files and documents | Strong | one-process multi-file evaluation; all-document mode; writable cross-file `eval-all`; exact no-write diffs; snapshot-guarded transactions |
-| Strings | Focused | interpolation, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
+| Files and documents | Strong | one-process multi-file evaluation; all-document mode; whole-stream reduction; `split_doc`; writable cross-file `eval-all`; exact no-write diffs; snapshot-guarded transactions |
+| Strings | Focused | interpolation, trim, string conversion, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
 | YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
 | YAML presentation | Focused | compiled scalar, flow, block-scalar, record, and reorder spans; writable line comments and styles |
 
@@ -48,10 +48,10 @@ yq remains the better choice for its complete operator surface, many codecs, pol
 | `shuffle` | Portable deterministic behavior would not match yq's randomized output. |
 | Complete yq CLI flag parity | Format conversion, colors, XML flags, splitting, shell completion, and similar surfaces are out of scope. |
 
-Some areas remain partial: `eval-all` supports combined reads, bindings, merges, and cross-file transactions but is not a general clone of yq's stream engine. Anchor renames deliberately keep existing aliases valid, even where yq leaves their displayed alias name unchanged.
+Some areas remain partial: column data is focused on block nodes, collection string conversion emits stable YAML rather than preserving every source spelling, and anchor renames deliberately keep existing aliases valid even where yq leaves their displayed alias name unchanged.
 
 ## Compared with yq
 
-The suite compares canonical JSON with mikefarah/yq v4.53.3 across 2,630 categorized programs plus Kubernetes, Compose, GitHub Actions, GitLab CI, deployment-overlay, metadata, and cross-file workflows. See [YAML support](supported_yml.md) for parser coverage and limits.
+The [operator manifest](operators.md) audits every YAML-oriented yq area and names the evidence behind each status. The differential suite then compares those forms with pinned yq v4.53.3 across generated variations, configuration workflows, metadata, and cross-file programs. See [YAML support](supported_yml.md) for parser coverage and limits.
 
 If a form is not in the query guide or tests, treat it as unsupported even when a nearby form works.

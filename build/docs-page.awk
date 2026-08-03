@@ -121,8 +121,8 @@ function table_cells(row, cells,    count, cleaned, cell, ch, i, in_code, key) {
 
 function render_table(    row_count, cell_count, cells, r, c, tag) {
     if (table_count < 2) return
-    print "          <div class=\"table-wrap\"><table>"
     cell_count = table_cells(table_line[1], cells)
+    print "          <div class=\"table-wrap" (cell_count >= 4 ? " table-wide" : "") "\"><table>"
     print "            <thead><tr>"
     for (c = 1; c <= cell_count; c++) print "              <th>" inline(trim(cells[c])) "</th>"
     print "            </tr></thead>"
@@ -165,8 +165,9 @@ function nav_group(label, a, al, b, bl, c, cl, d, dl) {
 
 function print_nav() {
     nav_group("Start", "index", "Overview", "getting-started", "Install & quick start", "recipes", "Recipes", "", "")
-    nav_group("Use", "queries", "Query language", "documents", "Files & documents", "output", "Output & metadata", "yq-compatibility", "yq compatibility")
-    nav_group("Trust", "supported_yml", "YAML support", "security", "Security & limits", "internals", "How it works", "development", "Development")
+    nav_group("Use", "queries", "Query language", "operators", "Operator manifest", "documents", "Files & documents", "output", "Output & metadata")
+    nav_group("Trust", "supported_yml", "YAML support", "yq-compatibility", "yq compatibility", "security", "Security & limits", "", "")
+    nav_group("Build", "internals", "How it works", "development", "Development", "migration", "Migration", "", "")
 }
 
 function print_header() {

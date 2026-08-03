@@ -96,6 +96,13 @@ expressions.yml	.metadata | .channel = "stable"
 expressions.yml	.metadata | del(.region)
 expressions.yml	.services | del(.[1]) | map(.name)
 expressions.yml	.. | select(type == "!!str")
+# v1.14 capability closure
+expressions.yml	"  yaml.sh  " | trim
+expressions.yml	[1, true, null, "cat"] | map(to_string)
+expressions.yml	["zero", "one"] | array_to_map
+expressions.yml	.metadata.owner | column
+expressions.yml	sort_keys(..)
+expressions.yml	.services[].name | split_doc
 advanced.yml	.scalar
 advanced.yml	.scalar_alias
 advanced.yml	.mapping_alias.color

@@ -50,6 +50,8 @@ jobs:
         run: |
           make fuzz
           make presentation
+          make operator-manifest
+          make parser-boundaries
           make adversarial
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" YSH_FUZZ_MATRICES=1 make fuzz
       - name: Verify scale contract

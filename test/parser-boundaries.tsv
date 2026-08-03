@@ -1,0 +1,16 @@
+# outcome	case	YAML with backslash escapes
+accept	explicit-scalar-key	? name\n: value\n
+accept	tag-directive	%TAG !e! tag:example.com,2026:\n---\nvalue: !e!thing payload\n
+accept	multiline-flow	items: [\n  one,\n  {name: two}\n]\n
+accept	block-scalar	message: |-\n  hello\n  world\n
+accept	nested-sequence	items:\n  - - one\n    - two\n
+reject	collection-key	? [a, b]\n: value\n
+reject	tab-indentation	root:\n\tchild: value\n
+reject	unclosed-flow	items: [one, two\n
+reject	forward-alias	value: *later\nother: &later yes\n
+reject	scalar-merge	base: 1\nitem:\n  <<: 1\n
+reject	bad-unicode-escape	value: "\\u12ZZ"\n
+reject	duplicate-key	name: one\nname: two\n
+reject	malformed-directive	%YAML 1.x\n---\nname: value\n
+reject	reserved-indicator	value: @not-a-plain-scalar\n
+reject	recursive-alias	value: &value\n  self: *value\n

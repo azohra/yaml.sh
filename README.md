@@ -16,7 +16,7 @@
   <a href="https://yaml.azohra.com">Website</a> ·
   <a href="https://yaml.azohra.com/docs/">Docs</a> ·
   <a href="https://yaml.azohra.com/docs/recipes/">Recipes</a> ·
-  <a href="https://yaml.azohra.com/docs/yq-compatibility/">yq compatibility</a>
+  <a href="https://yaml.azohra.com/docs/operators/">Operator manifest</a>
 </p>
 
 ---
@@ -78,6 +78,7 @@ Read and filter:
 ysh '.server.ports[1]' config.yml
 ysh '.services[] | select(.enabled) | .name' config.yml
 ysh '.services | filter(.port >= 8000) | map(.name)' config.yml
+ysh '.owner | trim' config.yml
 ```
 
 Build and update:
@@ -88,6 +89,7 @@ ysh -o=yaml '.replicas += 1 | del(.metadata.internal)' deploy.yml
 ysh -i '.image.tag = "stable"' deploy.yml
 ysh -i 'setpath(["jobs", "deploy", "runs-on"]; "ubuntu-latest")' workflow.yml
 ysh -i '.metadata.release = "2026-08"' services/*.yml
+ysh -o=yaml 'sort_keys(..)' config.yml
 ```
 
 Compose files and environment:
@@ -95,6 +97,7 @@ Compose files and environment:
 ```sh
 IMAGE_TAG=stable ysh -i '.image.tag = strenv(IMAGE_TAG)' deploy.yml
 ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
+ysh eval-all '. as $doc ireduce ({}; . * $doc)' defaults.yml region.yml secrets.yml
 ysh eval-all -i 'select(fileIndex == 0).tag as $tag | select(fileIndex > 0).image.tag = $tag' release.yml services/*.yml
 ```
 
@@ -120,6 +123,7 @@ Inspect the parser:
 ```sh
 ysh --type '.release.created' config.yml
 ysh --line '.services[0].port' config.yml
+ysh '[.services[0].port | line, .services[0].port | column]' config.yml
 ysh --events config.yml
 ysh --ast config.yml
 ysh --explain -i '.image.tag = "stable"' deploy.yml
@@ -144,22 +148,19 @@ After evaluation, YAML.sh compiles a non-overlapping edit plan against the origi
 
 Multi-file `-i` evaluates preserved source snapshots, then verifies the live inputs still match before replacing anything. Each changed file is checked again immediately before its atomic sibling rename. Drift aborts the transaction; a commit failure or interrupt restores the evaluated snapshots. Writable `eval-all` can read one file and update another under the same guarded transaction.
 
-## Tested where it matters
+## Know what you can rely on
 
-The test suite covers parser behavior, yq-shaped queries, safe edits, portability, and useful scale:
+Every public claim has an owner:
 
-| Evidence | What it establishes |
+| Guarantee | Evidence |
 | --- | --- |
-| Pinned YAML Test Suite | Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases |
-| Pinned yq differential | 2,630 categorized programs plus Kubernetes, Compose, Actions, GitLab CI, overlay, metadata, and cross-file workflows |
-| Grammar/property matrix | Every combination of 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties |
-| Source-edit matrix | Exact strict preview and commit across scalar styles, flow spans, block scalars, reorders, records, comments, aliases, and merges |
-| Repository transactions | Exact diffs, strict refusal, source-drift detection, no-op, cross-file data flow, rollback, and interruption |
-| Scale checks | 125,000 nodes with a strict one-line preview; 1,500 documents; ≤224 MiB RSS |
+| Parsed YAML has the documented graph semantics | Pinned YAML Test Suite outcomes plus a fail-closed boundary matrix |
+| Listed yq-shaped forms agree with yq | A form-by-form manifest, differential oracle, and configuration workflows |
+| A preview is the candidate that will be committed | Shared check/diff/write plans, drift races, injected failures, and rollback tests |
+| Strict edits keep bytes outside owned spans | Exact source-preservation properties across scalar, flow, block, record, alias, and reorder edits |
+| The one-file runtime stays portable and bounded | Cross-AWK/shell CI plus time, node, depth, document, and memory limits |
 
-Supported behavior has a test. Nearby unsupported behavior gets an explicit error instead of a confident misparse.
-
-See [YAML support](https://yaml.azohra.com/docs/supported_yml/) for syntax and limits, and the [yq capability map](https://yaml.azohra.com/docs/yq-compatibility/) for feature overlap.
+The [operator manifest](https://yaml.azohra.com/docs/operators/) says supported, focused, or excluded for every YAML-oriented yq area. [YAML support](https://yaml.azohra.com/docs/supported_yml/) does the same for syntax. Nearby unsupported input gets an explicit error instead of a confident misparse.
 
 ## A deliberately small security model
 
@@ -208,7 +209,7 @@ Run `ysh --help` for the complete interface.
 make all
 ```
 
-That builds the standalone file, runs ShellCheck, and executes the behavioral suite. The portability matrix covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells. The longer conformance, differential, fuzz, presentation, adversarial, and scale evidence runs before releases and weekly.
+That builds the standalone file, runs ShellCheck, and executes the behavioral suite. The portability matrix covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells. Release evidence adds the operator manifest, parser boundaries, conformance, yq differential, preservation properties, fault injection, and scale.
 
 The implementation is intentionally inspectable. Start with the [internals guide](https://yaml.azohra.com/docs/internals/) or [development guide](https://yaml.azohra.com/docs/development/).
 

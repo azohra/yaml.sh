@@ -17,10 +17,12 @@ src/diff.awk            bounded unified-diff renderer
 test/test.sh            behavioral suite
 test/conformance.sh     pinned YAML Test Suite gate
 test/differential.sh    pinned yq comparison gate
+test/operator-manifest.sh audited operator/form contract
 test/yq-corpus-base.tsv hand-written differential cases
 test/generate-yq-corpus.sh reproducible categorized expansion
 test/fuzz.sh            grammar-guided replayable properties
 test/presentation-matrix.sh exact compound-edit matrix
+test/parser-boundaries.sh deliberate accept/reject boundary matrix
 test/adversarial.sh     resource and recursion guards
 bench/benchmark.sh      repeatable throughput sample
 bench/scale.sh          125,000-node resource contract
@@ -54,7 +56,7 @@ For every supported feature:
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 
-Run `make conformance` with `YAML_TEST_SUITE_DIR` set to the pinned data checkout. Run `make differential` with yq v4.53.3 and jq available. `make fuzz` crosses 6 layouts, 7 collection sizes, 2 states, and 8 parser/query/mutation properties; set `YSH_FUZZ_MATRICES` and `YSH_FUZZ_SEED` for rotating value sweeps. `make presentation`, `make adversarial`, and `make scale` cover exact source retention, hostile shapes, and bounded scale.
+Run `make operator-manifest` and `make parser-boundaries` before expanding the public contract. `make conformance` uses the pinned YAML Test Suite; `make differential` uses yq v4.53.3 and jq. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover replayable grammar properties, exact source retention, hostile shapes, and bounded scale.
 
 ## Add expression behavior
 

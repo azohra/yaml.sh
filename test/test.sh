@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.13.0" "$(./ysh --version)"
+    assertEquals "v1.14.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -343,6 +343,15 @@ testExpressionConversionAndKeyOrdering() {
     assertContains "$result" "cannot convert value to number"
 }
 
+testExpressionCapabilityClosure() {
+    assertEquals '"cat"' "$(printf '%s\n' 'value: "  cat  "' | ./ysh --json '.value | trim')"
+    assertEquals '["1","true","null","~","cat","an: object","- array\n- 2"]' "$(printf '%s\n' '- 1' '- true' '- null' '- ~' '- cat' '- an: object' '- - array' '  - 2' | ./ysh --json 'map(to_string)')"
+    assertEquals '{"0":"zero","1":{"name":"one"}}' "$(printf '%s\n' '- zero' '- name: one' | ./ysh --json 'array_to_map')"
+    assertEquals '[4,1,0]' "$(printf '%s\n' 'a: cat' 'b: bob' | ./ysh --json '[.b | column, .b | key | column, {"a": "new"} | column]')"
+    assertEquals "$(printf '%s\n' '"a": "cat"' '---' '"b": "dog"')" "$(printf '%s\n' '- a: cat' '- b: dog' | ./ysh -o=yaml '.[] | split_doc')"
+    assertEquals '{"a":{"c":3,"d":4},"b":2}' "$(printf '%s\n' 'b: 2' 'a:' '  d: 4' '  c: 3' | ./ysh --json 'sort_keys(..)')"
+}
+
 testExpressionFocusedCollectionOperators() {
     input=$(printf '%s\n' 'a:' '  - cat' '  - dog' '  - cow')
     assertEquals '"dog"' "$(printf '%s\n' "$input" | ./ysh --json '.a | first(. == "dog")')"
@@ -405,6 +414,7 @@ testEvalAllAcrossFiles() {
     assertEquals "$expected" "$(./ysh eval-all --json '[filename, fileIndex, documentIndex]' "$first" "$second")"
     assertEquals '[{"a":1},{"b":2},{"c":3}]' "$(./ysh ea --json '[.]' "$first" "$second")"
     assertEquals "$(printf '%s\n' '{"a":1,"b":2}' '{"a":1,"c":3}')" "$(./ysh ea --json 'select(fileIndex == 0) * select(fileIndex == 1)' "$first" "$second")"
+    assertEquals '{"a":1,"b":2,"c":3}' "$(./ysh ea --json '. as $document ireduce ({}; . * $document)' "$first" "$second")"
     rm -f "$first" "$second"
 }
 
@@ -1075,6 +1085,12 @@ testExpressionErrors() {
     result=$(./ysh -n '[1, 2]["x":]' 2>&1)
     assertNotEquals 0 $?
     assertContains "$result" "slice start requires an integer"
+
+    for query in now 'to_json' 'eval(".")' 'load("neighbor.yml")' shuffle; do
+        result=$(./ysh -n "$query" 2>&1)
+        assertNotEquals 0 $?
+        assertContains "$result" "unknown expression operator"
+    done
 }
 
 testScalarAndCollectionTypes() {
@@ -1392,12 +1408,12 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.13.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.14.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.13.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.13"
-    assertNotContains "$(cat _static/_www/story/index.html)" "v1.8"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.14.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.14"
+    assertContains "$(cat _static/_www/story/index.html)" "<strong>v1.8</strong>"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
     assertNotContains "$(cat _static/_www/index.html)" "A real parser this time"
@@ -1410,11 +1426,10 @@ testReleaseArtifactsStayInSync() {
     assertNotContains "$(cat README.md)" "og-v1.8.png"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
     assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "282 accepted cases"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "91 strict-invalid cases"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "2,630 categorized programs"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "6 layouts × 7 collection sizes × 2 states × 8"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "Repository transaction suite"
+    assertContains "$(cat _static/_www/docs/operators.md)" "| Array to map | Supported |"
+    assertContains "$(cat _static/_www/docs/operators.md)" "| Split into documents | Focused |"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "parser-boundary matrix"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "fail before producing a graph"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "Kubernetes, Compose, GitHub Actions, GitLab CI"
     assertNotContains "$(cat _static/_www/index.html)" "35/35"
     assertNotContains "$(cat README.md)" "35/35"
