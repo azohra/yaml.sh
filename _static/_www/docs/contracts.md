@@ -80,6 +80,6 @@ ysh -o toml '.service' config.yml
 | INI | Global scalar keys and nested dotted sections. Values remain strings; duplicate keys fail. |
 | XML | One data root; attributes become `+@name`, text becomes `+content` beside children, and repeated elements become arrays. Names and XML 1.0 characters are checked; DTDs and custom entities are disabled. |
 
-TOML's remaining 12 official invalid cases concern raw byte sequences portable AWK cannot reliably observe after record decoding: bare CR, NUL, invalid UTF-8, and UTF-16. The other 462 invalid fixtures fail closed.
+TOML's portable baseline excludes 12 raw-byte cases that AWK cannot reliably observe after record decoding: bare CR, NUL, invalid UTF-8, and UTF-16. The other 462 invalid fixtures fail closed; hosts that expose NUL bytes reject five more.
 
 Non-YAML formats are semantic codecs, not presentation-preserving editors. Mixed XML text/child ordering is not retained. Convert or query one document at a time; use YAML input for `-i`, repository transactions, source comments, and exact byte preservation.

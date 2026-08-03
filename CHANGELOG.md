@@ -27,7 +27,7 @@ Version 1.16 turns the node graph into a portable configuration contract engine.
 - Non-YAML input is semantic, one-document conversion; source-aware in-place editing remains YAML-only.
 - XML rejects DTDs and custom entities and uses the documented `+@attribute` / `+content` data shape.
 - JSON Schema uses POSIX ERE, local `$ref`, and the documented validation vocabulary; remote/dynamic references and annotation-driven unevaluated vocabularies are not implied.
-- Twelve TOML invalid fixtures require raw-byte distinctions unavailable through portable AWK record/string APIs: bare CR, embedded NUL, invalid UTF-8, and UTF-16 input.
+- The portable baseline excludes twelve TOML invalid fixtures that require raw-byte distinctions unavailable consistently across AWK record/string APIs: bare CR, embedded NUL, invalid UTF-8, and UTF-16 input. Hosts that expose NUL reject five more.
 
 ## [1.15.0] - 2026-08-02
 

@@ -44,7 +44,7 @@ yq remains the better choice for date arithmetic, broad XML controls, polished p
 |---|---|
 | Non-YAML source editing | TOML, INI, and XML are semantic one-document codecs. Exact source-aware editing remains YAML-only. |
 | XML application features | The secure data profile has no DTD, custom entities, XInclude, XPath, or network/file resolution. |
-| TOML raw-byte rejection | Portable AWK cannot reliably observe twelve invalid byte-level fixtures after host record decoding; all 205 decoder and encoder fixtures and 462 other invalid fixtures are pinned. |
+| TOML raw-byte rejection | The portable baseline excludes twelve invalid byte-level fixtures after host record decoding; all 205 decoder and encoder fixtures and 462 other invalid fixtures are pinned. Hosts that expose NUL reject five more. |
 | JSON Schema | The documented 2020-12 profile uses local references and POSIX ERE. Dynamic/remote references and unevaluated annotation vocabularies are outside it. |
 | Date/time and timezone operators | Portable AWK has no cross-platform timezone database or reliable host date API. |
 | System execution | Expressions never launch commands. |

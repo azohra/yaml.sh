@@ -194,7 +194,7 @@ ysh -o toml '.service' config.yml
               </tr>
             </tbody>
           </table></div>
-          <p>TOML's remaining 12 official invalid cases concern raw byte sequences portable AWK cannot reliably observe after record decoding: bare CR, NUL, invalid UTF-8, and UTF-16. The other 462 invalid fixtures fail closed.</p>
+          <p>TOML's portable baseline excludes 12 raw-byte cases that AWK cannot reliably observe after record decoding: bare CR, NUL, invalid UTF-8, and UTF-16. The other 462 invalid fixtures fail closed; hosts that expose NUL bytes reject five more.</p>
           <p>Non-YAML formats are semantic codecs, not presentation-preserving editors. Mixed XML text/child ordering is not retained. Convert or query one document at a time; use YAML input for <code>-i</code>, repository transactions, source comments, and exact byte preservation.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
