@@ -5,7 +5,7 @@ install_dir=${YSH_INSTALL_DIR:-/usr/local/bin}
 temporary_file=$(mktemp "${TMPDIR:-/tmp}/ysh.XXXXXX")
 trap 'rm -f "${temporary_file}"' 0 HUP INT TERM
 
-expected_sha256=b1725acaf870763a0c8b4195eff0235f3e27e3a3c8154ea107efc256b489d8b4
+expected_sha256=8eca81fb8e0ffd4676d3f2dde9603d2bef5c2a9fb2154fc83a102ce2de95002c
 curl -fsSL https://github.com/azohra/yaml.sh/releases/download/v1.11.0/ysh -o "${temporary_file}"
 
 if command -v sha256sum >/dev/null 2>&1; then

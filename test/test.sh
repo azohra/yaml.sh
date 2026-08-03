@@ -814,6 +814,26 @@ testInplacePreservesSortedSequenceBlocks() {
     rm -f "$inplace_file"
 }
 
+testInplacePreservesIndentlessSequenceMaps() {
+    inplace_file=test/.tmp-inplace-indentless-$$.yml
+    printf '%s\n' 'meta:' '  enabled: false' 'items:' '- name: first' '  score: 4' '- name: second' '  score: 8' 'tail: kept' > "$inplace_file"
+
+    ./ysh --preserve-only -i '.meta.checked = true | .items |= map(.score += 1)' "$inplace_file"
+    assertEquals 0 $?
+    expected=$(printf '%s\n' 'meta:' '  enabled: false' '  checked: true' 'items:' '- name: first' '  score: 5' '- name: second' '  score: 9' 'tail: kept')
+    assertEquals "$expected" "$(cat "$inplace_file")"
+
+    ./ysh --preserve-only -i '.items += [{name: "third", score: 12}]' "$inplace_file"
+    assertEquals 0 $?
+    assertEquals 1 "$(grep -c 'name: first' "$inplace_file")"
+    assertEquals 1 "$(grep -c 'name: second' "$inplace_file")"
+    assertEquals 3 "$(./ysh '.items | length' "$inplace_file")"
+    assertEquals third "$(./ysh '.items[2].name' "$inplace_file")"
+    assertEquals 'tail: kept' "$(tail -1 "$inplace_file")"
+
+    rm -f "$inplace_file"
+}
+
 testInplacePreservesRichYamlPresentation() {
     inplace_file=test/.tmp-inplace-rich-$$.yml
     cp test/presentation.yml "$inplace_file"
