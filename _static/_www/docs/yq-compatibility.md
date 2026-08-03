@@ -12,7 +12,7 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 | Collections | Strong | `map`, `map_values`, entries, sort/group/unique/min/max families, flatten, reverse, add, first, pick, omit, pivot |
 | Context | Strong | `path`, `parent`, `key`, `line`, `tag`, `filename`, `fileIndex`, `documentIndex` |
 | Environment | Strong | `env`, `strenv`, `envsubst`, defaults, `nu`/`ne`/`ff`, security disable switch |
-| Files and documents | Strong | one-process multi-file evaluation; all-document mode; writable cross-file `eval-all`; no-write checks; preflighted transactions |
+| Files and documents | Strong | one-process multi-file evaluation; all-document mode; writable cross-file `eval-all`; exact no-write diffs; preflighted transactions |
 | Strings | Focused | interpolation, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
 | YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
 | YAML presentation | Focused | comments and styles survive common edits; line comments and scalar/collection styles are writable |
@@ -27,7 +27,8 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 - It runs where `/bin/sh` and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.
 - Input bytes, graph nodes, and collection depth are bounded; file-loading and dynamic-code operators do not exist, and environment access can be disabled.
 - `--ast` and `--events` expose the parser directly when a strange document needs explaining.
-- `--check` uses the real write path and reports clean, drift, or error without touching files.
+- `--check`, `--diff`, and `-i` share one prepared edit plan. Previewed bytes are committed bytes; net-zero updates are no-ops.
+- `--preserve-only` turns source fidelity into an enforceable precondition instead of a best-effort promise.
 - Multi-file queries compile once. Writable `eval-all` can read one file, mutate several others, preflight the complete set, skip no-ops, and roll back commit failures.
 - `--explain=json` produces one value-free audit record per input for CI.
 - Parser outcomes, invalid input, yq comparisons, presentation edits, and useful scale are covered by repeatable tests.

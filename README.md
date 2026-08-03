@@ -32,8 +32,12 @@ web
 
 $ ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
 
-$ ysh --check '.image.tag = "stable"' deploy/*.yml
-Check: 6 file(s) would change; no files written
+$ ysh --preserve-only --diff '.image.tag = "stable"' deploy/*.yml
+--- a/deploy/api.yml
++++ b/deploy/api.yml
+@@ -1,2 +1,2 @@
+-image: app:old # promoted by CI
++image: app:stable # promoted by CI
 ```
 
 ## Install one file
@@ -94,14 +98,16 @@ ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml prod
 ysh eval-all -i 'select(fileIndex == 0).tag as $tag | select(fileIndex > 0).image.tag = $tag' release.yml services/*.yml
 ```
 
-Check and commit a repository with the same query:
+Preview and commit a repository with the same query:
 
 ```sh
 ysh --check '.image.tag = "stable"' services/*.yml
+ysh --diff '.image.tag = "stable"' services/*.yml
+ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
 ysh -i '.image.tag = "stable"' services/*.yml
 ```
 
-`--check` writes nothing and exits `0` when clean, `1` when files would change, and `2` on an invalid query or input. Multi-file reads compile the query once; multi-file writes preflight once and replace only files whose YAML actually changed.
+`--check` and `--diff` write nothing and exit `0` when clean, `1` for drift, and `2` on error. Diff mode prints the exact candidates that `-i` would commit. Add `--preserve-only` to reject any edit that would regenerate YAML presentation.
 
 Inspect the parser:
 
@@ -114,7 +120,7 @@ ysh --explain -i '.image.tag = "stable"' deploy.yml
 ysh --explain=json -i '.image.tag = "stable"' deploy/*.yml 2>changes.jsonl
 ```
 
-`--explain` writes mutation paths and the presentation decision to stderr, without echoing values. Its JSON form emits one audit record per input.
+`--explain` writes mutation paths and the presentation decision to stderr, without echoing values. Its JSON form emits one audit record per input, including whether the final prepared candidate actually differs.
 
 The [recipe book](https://yaml.azohra.com/docs/recipes/) starts with tasks. The [query guide](https://yaml.azohra.com/docs/queries/) covers the language.
 
@@ -128,7 +134,7 @@ YAML stream → node graph → aliases + merges → expression stream → values
 
 Mappings remain mappings. Empty collections survive. Tags and source lines stay attached. Anchors and aliases retain shared identity. Updates operate on selected nodes rather than reconstructed strings.
 
-Common in-place replacements, inserts, deletes, and sequence reorders preserve comments, whitespace, quoting, styles, anchors, tags, and directives. Styles, tags, anchors, and aliases are writable graph metadata. Larger structural changes fall back to deterministic semantic YAML.
+Common replacements, block mapping/sequence appends, inserts, deletes, and sequence reorders preserve comments, whitespace, quoting, styles, anchors, tags, and directives. Styles, tags, anchors, and aliases are writable graph metadata. Larger structural changes fall back to deterministic semantic YAML unless `--preserve-only` is set.
 
 Multi-file `-i` is one transaction: all inputs parse and transform before the first replacement. A commit failure or interrupt restores preserved originals. Writable `eval-all` can read a value from one file and update another under the same transaction.
 
@@ -141,9 +147,9 @@ The test suite covers parser behavior, yq-shaped queries, safe edits, portabilit
 | Pinned YAML Test Suite | Expected semantics for 282 accepted cases; rejection for 91 strict-invalid cases |
 | Pinned yq differential | 2,628 categorized programs plus Kubernetes, Compose, Actions, GitLab CI, overlay, metadata, and cross-file workflows |
 | Grammar/property matrix | Every combination of 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties |
-| Presentation matrix | Exact compound edits across scalar styles and value/comment variants |
-| Repository transactions | Clean, drift, error, no-op, cross-file data flow, rollback, and interruption behavior |
-| Scale checks | 125,000 nodes; 1,500 documents; ≤224 MiB RSS |
+| Presentation matrix | Strict preview and exact compound edits across scalar styles and value/comment variants |
+| Repository transactions | Exact diffs, strict refusal, clean/drift/error, no-op, cross-file data flow, rollback, and interruption |
+| Scale checks | 125,000 nodes with a strict one-line preview; 1,500 documents; ≤224 MiB RSS |
 
 Supported behavior has a test. Nearby unsupported behavior gets an explicit error instead of a confident misparse.
 
@@ -177,6 +183,8 @@ ysh eval-all QUERY FILE...
 | `-r`, `--json`, `-y` | Raw scalar, JSON, or YAML shortcuts |
 | `-i` | Transactionally update one or more real files |
 | `--check` | Report whether the same update would change files: clean `0`, drift `1`, error `2` |
+| `--diff` | Print the prepared transaction as unified diffs: clean `0`, drift `1`, error `2` |
+| `--preserve-only` | Refuse an edit that would regenerate source presentation |
 | `-n` | Build output without reading input |
 | `-e` | Fail on empty, null, or false output |
 | `-I N`, `--unwrap-scalar=false` | Control YAML indentation or retain scalar presentation |

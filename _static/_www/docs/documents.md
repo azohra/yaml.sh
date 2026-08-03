@@ -36,10 +36,19 @@ Several files form one in-place transaction:
 
 ```sh
 ysh --check '.release.channel = "stable"' services/*.yml
+ysh --diff '.release.channel = "stable"' services/*.yml
 ysh -i '.release.channel = "stable"' services/*.yml
 ```
 
-The query is compiled once and every file is parsed in one AWK process. Check mode writes nothing and returns clean `0`, drift `1`, or error `2`. In-place mode prepares every changed candidate before replacing an original; no-op files are untouched, and a commit failure or interrupt rolls back files already changed.
+The query is compiled once and every file is parsed in one AWK process. Check mode reports which files drift; diff mode prints the exact prepared candidates. Both write nothing and return clean `0`, drift `1`, or error `2`.
+
+Add `--preserve-only` to `--check`, `--diff`, or `-i` when source fidelity is a requirement:
+
+```sh
+ysh --preserve-only --diff '.release.channel = "stable"' services/*.yml
+```
+
+If any changed file would need deterministic YAML regeneration, the complete preflight fails with exit `2`. In-place mode replaces nothing until all candidates pass; no-op files stay untouched, and a commit failure or interrupt rolls back files already changed.
 
 Use `eval-all` when files need to share data. The combined stream keeps `filename`, `fileIndex`, and `documentIndex` on every root:
 

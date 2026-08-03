@@ -4,6 +4,27 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.11.0] - 2026-08-02
+
+Version 1.11 makes edits reviewable before they become writes.
+
+### Added
+
+- `--diff` renders the exact prepared transaction as unified diffs without changing a file. It returns clean `0`, drift `1`, or error `2`.
+- `--preserve-only` rejects an edit when YAML.sh cannot retain the source presentation instead of silently regenerating it.
+- Presentation-preserving append support for block sequences and ordinary block mappings.
+
+### Changed
+
+- `--check`, `--diff`, `--explain`, and `-i` now consume the same prepared candidates. A mutation that returns to the original bytes is a true no-op, reported as `"changed":false` in JSON explanations.
+- The built-in diff renderer uses a bounded trace and an exact large-change fallback, keeping the one-file POSIX shell + AWK runtime.
+- Property, presentation, transaction, and existing scale gates now exercise no-write previews and strict edits.
+
+### Boundaries
+
+- Strict mode intentionally rejects flow-layout rewrites and transformations that materialize shared aliases. Run `--diff` without `--preserve-only` when semantic YAML regeneration is acceptable.
+- Unified diff output contains the changed values. `--explain=json` remains the value-free audit format.
+
 ## [1.10.0] - 2026-08-02
 
 Version 1.10 makes the repository the unit of work: one compiled query, one AWK process, and one preflighted transaction.

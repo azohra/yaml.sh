@@ -118,7 +118,7 @@ This is useful while extending the parser or reducing an unexpected input to a m
 ysh --explain -i '.image.tag = "stable"' deploy.yml
 ```
 
-The report includes parsed/generated node counts, result and mutation counts, changed paths, and whether presentation was preserved or regenerated. Values are intentionally omitted.
+The report includes parsed/generated node counts, result and mutation counts, mutation paths, whether presentation was preserved or regenerated, and the final plan's `changed` boolean. Values are intentionally omitted. A mutate-then-revert expression may record operations while `changed` remains false.
 
 For `eval-all`, `parsed_nodes`, results, and mutations belong to each input; `generated_nodes` is transaction-wide because the query is evaluated once across the combined stream.
 
@@ -131,3 +131,11 @@ ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 Transaction reports are released only after every file commits. An aborted or rolled-back transaction emits an error and no audit records.
 
 Add `--check` to run the same transformation without writing. JSON explain mode remains pure JSON Lines; exit status reports clean `0`, drift `1`, or error `2`.
+
+Use `--diff` to put the prepared unified diff on stdout while keeping the value-free explanation on stderr:
+
+```sh
+ysh --diff --explain=json '.image.tag = "stable"' services/*.yml 2>changes.jsonl
+```
+
+Unlike the explain record, a diff necessarily contains changed values.
