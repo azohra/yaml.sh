@@ -67,7 +67,7 @@ jobs:
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make differential
       - name: Run deterministic and adversarial suites
         env:
-          YSH_FUZZ_MATRICES: 4
+          YSH_FUZZ_MATRICES: 1
           YSH_FUZZ_SEED: ${{ github.run_number }}
         run: |
           make fuzz

@@ -22,6 +22,7 @@ Version 1.17 refounds YAML.sh around its own product: a portable node graph, sou
 - Runtime and security documentation now distinguishes read-only `/bin/sh` + AWK use, edit-mode host utilities, trusted documents, query programs, and restricted capabilities.
 - README, website, docs, evergreen SVG brand art, and project story return to YAML.sh's actual premise: **YAML in shell. No, really.** Yq remains a syntax influence and differential oracle rather than the product definition.
 - CI classifies product guidance and security policy changes correctly; release evidence validates the public contract directly.
+- Release fuzzing runs the complete 672-combination structural matrix once per AWK instead of repeating the same shape four times with different scalar values.
 
 ### Compatibility
 
