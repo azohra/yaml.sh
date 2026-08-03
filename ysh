@@ -5950,7 +5950,7 @@ function presentation_track_insert(target,    parent, key, i, child, first_line,
     presentation_insert_indent[after, i] = indent
 }
 
-function presentation_span_end(target,    start, start_indent, line, raw, raw_indent, end) {
+function presentation_span_end(target,    start, start_indent, line, raw, raw_indent, end, text, lookahead, following, following_indent) {
     start = node_line[target]
     start_indent = indentation(raw_input_line[start], start)
     end = start
@@ -5961,6 +5961,28 @@ function presentation_span_end(target,    start, start_indent, line, raw, raw_in
             continue
         }
         raw_indent = indentation(raw, line)
+        text = trim(raw)
+        if (node_kind[target] == "sequence" && raw_indent == start_indent) {
+            if (text == "-" || text ~ /^-[[:space:]]/) {
+                end = line
+                continue
+            }
+            if (text ~ /^#/) {
+                lookahead = line + 1
+                while (lookahead <= NR && (trim(raw_input_line[lookahead]) == "" || trim(raw_input_line[lookahead]) ~ /^#/)) {
+                    lookahead++
+                }
+                if (lookahead <= NR) {
+                    following = raw_input_line[lookahead]
+                    following_indent = indentation(following, lookahead)
+                    following = trim(following)
+                    if (following_indent == start_indent && (following == "-" || following ~ /^-[[:space:]]/)) {
+                        end = line
+                        continue
+                    }
+                }
+            }
+        }
         if (trim(raw) ~ /^#/ && raw_indent <= start_indent) {
             break
         }
