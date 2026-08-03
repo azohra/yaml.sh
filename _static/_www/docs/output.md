@@ -50,7 +50,17 @@ Set YAML indentation from one through nine spaces with `-I N` or `--indent=N`. U
 
 The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/collection styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.
 
-The `-i` presentation layer patches the original source for common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders. Other structural changes use the semantic emitter.
+For edits, evaluation finishes before YAML.sh compiles a source plan. The plan must contain non-overlapping owned spans; only then is a candidate emitted.
+
+| Edit | Source behavior |
+| --- | --- |
+| Scalar replacement | Keeps surrounding spacing, quote style, properties, and line comment |
+| Flow mapping or sequence | Rewrites the changed collection span; keeps bytes and closing comments outside it |
+| Literal/folded scalar | Keeps block style, indentation, and header comment while replacing content |
+| Block insert, append, delete, or reorder | Moves or removes the complete record span with its attached comments |
+| Alias or merged value | Updates the owned anchor source; alias and merge occurrences stay intact |
+
+Stable flow formatting may normalize whitespace and key quoting inside a changed flow span. Multiline flow spans with internal comments are refused in strict mode because compacting them would discard comment ownership. A structural change without a safe source plan uses the semantic emitter, or fails before candidate output under `--preserve-only`.
 
 With several inputs, source snapshots are evaluated and every changed candidate is built before the first replacement. Live files must still match those snapshots before reporting or commit, and each changed target is checked again immediately before replacement. No-op files are not replaced. The snapshots allow rollback if a later commit fails or the process is interrupted. Permission bits survive; symlinks, duplicate paths, and newline-containing names are refused.
 
@@ -118,7 +128,7 @@ This is useful while extending the parser or reducing an unexpected input to a m
 ysh --explain -i '.image.tag = "stable"' deploy.yml
 ```
 
-The report includes parsed/generated node counts, result and mutation counts, mutation paths, whether presentation was preserved or regenerated, and the final plan's `changed` boolean. Values are intentionally omitted. A mutate-then-revert expression may record operations while `changed` remains false.
+The report includes parsed/generated node counts, result and mutation counts, mutation paths, whether presentation was preserved or regenerated, the compiled `source_edits` count, and the final plan's `changed` boolean. Values are intentionally omitted. A mutate-then-revert expression may record operations while `changed` remains false.
 
 For `eval-all`, `parsed_nodes`, results, and mutations belong to each input; `generated_nodes` is transaction-wide because the query is evaluated once across the combined stream.
 

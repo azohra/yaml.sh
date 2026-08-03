@@ -138,4 +138,56 @@ while [ "$case_id" -le "$last_case" ]; do
     case_id=$((case_id + 1))
 done
 
-printf 'Presentation mutation matrix: %s cases pass — 3 scalar styles × 3 value/comment variants\n' "$passed"
+printf '%s\n' \
+    'meta: {' \
+    '  enabled: false,' \
+    '  labels: [one, two]' \
+    '} # flow tail' \
+    'settings: # header' \
+    '  # zed setting' \
+    '  z: 1' \
+    '  # alpha setting' \
+    '  a: 2' \
+    'items:' \
+    '  # first record' \
+    '  - name: one' \
+    '    score: 1' \
+    '  # second record' \
+    '  - name: two' \
+    '    score: 2' \
+    'note: |-' \
+    '  old line' \
+    'tail: kept' > "$INPUT"
+printf '%s\n' \
+    'meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail' \
+    'settings: # header' \
+    '  # alpha setting' \
+    '  a: 2' \
+    '  # zed setting' \
+    '  z: 1' \
+    'items:' \
+    '  # second record' \
+    '  - name: two' \
+    '    score: 2' \
+    'note: |-' \
+    '  new line' \
+    'tail: kept' > "$EXPECTED"
+cp "$INPUT" "$BEFORE"
+owned_query='.meta.enabled = true | .meta.labels += ["three"] | .settings = sort_keys(.settings) | del(.items[0]) | .note = "new line"'
+if "$YSH_BINARY" --preserve-only --diff "$owned_query" "$INPUT" > "$DIFF_OUTPUT" 2>/dev/null; then
+    diff_status=0
+else
+    diff_status=$?
+fi
+if [ "$diff_status" -ne 1 ] || ! cmp -s "$INPUT" "$BEFORE"; then
+    printf '%s\n' 'Source-owned diff was not an exact non-writing preview.' >&2
+    exit 1
+fi
+if ! "$YSH_BINARY" --preserve-only -i "$owned_query" "$INPUT" >/dev/null 2>&1 ||
+    ! cmp -s "$INPUT" "$EXPECTED" ||
+    [ "$("$YSH_BINARY" --json '.' "$INPUT")" != '{"meta":{"enabled":true,"labels":["one","two","three"]},"settings":{"a":2,"z":1},"items":[{"name":"two","score":2}],"note":"new line","tail":"kept"}' ]; then
+    printf '%s\n' 'Source-owned flow, block scalar, reorder, or deletion edit diverged.' >&2
+    exit 1
+fi
+
+printf 'Presentation mutation matrix: %s scalar cases + source-owned flow, block, reorder, and record spans pass\n' "$passed"

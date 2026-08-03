@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.12.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.13.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -87,7 +87,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.12.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.13.0</span></div>
       <article>
           <h1 id="output-metadata">Output &amp; metadata</h1>
           <p>The same query can return a value, JSON, YAML, a node type, its expanded tag, or its source line.</p>
@@ -132,7 +132,36 @@
           <p>Multiple results are separated with <code>---</code>, producing a valid YAML stream. Anchors, aliases, tags, and merge edges are emitted when they still exist in the selected graph.</p>
           <p>Set YAML indentation from one through nine spaces with <code>-I N</code> or <code>--indent=N</code>. Use <code>--unwrap-scalar=false</code> when default value output should retain a scalar's YAML quoting, tag, and line comment.</p>
           <p>The emitter is semantic. It uses a stable layout while retaining recorded line comments and supported scalar/collection styles. Blank lines, spacing, head/foot comments, directive spelling, and exact scalar formatting are not reconstructed.</p>
-          <p>The <code>-i</code> presentation layer patches the original source for common replacements, direct block inserts/deletes, presentation-property edits, and pure sequence reorders. Other structural changes use the semantic emitter.</p>
+          <p>For edits, evaluation finishes before YAML.sh compiles a source plan. The plan must contain non-overlapping owned spans; only then is a candidate emitted.</p>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Edit</th>
+              <th>Source behavior</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td>Scalar replacement</td>
+                <td>Keeps surrounding spacing, quote style, properties, and line comment</td>
+              </tr>
+              <tr>
+                <td>Flow mapping or sequence</td>
+                <td>Rewrites the changed collection span; keeps bytes and closing comments outside it</td>
+              </tr>
+              <tr>
+                <td>Literal/folded scalar</td>
+                <td>Keeps block style, indentation, and header comment while replacing content</td>
+              </tr>
+              <tr>
+                <td>Block insert, append, delete, or reorder</td>
+                <td>Moves or removes the complete record span with its attached comments</td>
+              </tr>
+              <tr>
+                <td>Alias or merged value</td>
+                <td>Updates the owned anchor source; alias and merge occurrences stay intact</td>
+              </tr>
+            </tbody>
+          </table></div>
+          <p>Stable flow formatting may normalize whitespace and key quoting inside a changed flow span. Multiline flow spans with internal comments are refused in strict mode because compacting them would discard comment ownership. A structural change without a safe source plan uses the semantic emitter, or fails before candidate output under <code>--preserve-only</code>.</p>
           <p>With several inputs, source snapshots are evaluated and every changed candidate is built before the first replacement. Live files must still match those snapshots before reporting or commit, and each changed target is checked again immediately before replacement. No-op files are not replaced. The snapshots allow rollback if a later commit fails or the process is interrupted. Permission bits survive; symlinks, duplicate paths, and newline-containing names are refused.</p>
           <h2 id="type"><a href="#type">Type<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
@@ -199,7 +228,7 @@
             <pre><code class="language-sh">ysh --explain -i '.image.tag = &quot;stable&quot;' deploy.yml
 </code></pre>
           </div>
-          <p>The report includes parsed/generated node counts, result and mutation counts, mutation paths, whether presentation was preserved or regenerated, and the final plan's <code>changed</code> boolean. Values are intentionally omitted. A mutate-then-revert expression may record operations while <code>changed</code> remains false.</p>
+          <p>The report includes parsed/generated node counts, result and mutation counts, mutation paths, whether presentation was preserved or regenerated, the compiled <code>source_edits</code> count, and the final plan's <code>changed</code> boolean. Values are intentionally omitted. A mutate-then-revert expression may record operations while <code>changed</code> remains false.</p>
           <p>For <code>eval-all</code>, <code>parsed_nodes</code>, results, and mutations belong to each input; <code>generated_nodes</code> is transaction-wide because the query is evaluated once across the combined stream.</p>
           <p>Use <code>--explain=json</code> for JSON Lines, with one value-free audit record per input:</p>
           <div class="code-block">

@@ -15,7 +15,7 @@ expression parser
     ↓
 node-stream evaluator
     ↓
-presentation patcher or value / JSON / YAML / metadata / AST / events
+source-edit compiler or value / JSON / YAML / metadata / AST / events
 ```
 
 ## The shell layer
@@ -64,7 +64,9 @@ The expression parser builds an operator tree with explicit precedence for strea
 
 Because streams contain node IDs rather than copied values, type, tag, source line, alias identity, parentage, and merge behavior survive a pipeline. Assignments replace the selected graph nodes; missing mapping paths use attachable placeholders. Computed booleans, strings, numbers, constructed collections, and key lists are represented as temporary graph nodes and use the same output path as parsed YAML.
 
-The semantic emitter walks the graph and produces stable block YAML. Separately, the presentation tracker patches common replacements, block inserts/deletes, block appends, and sequence reorders into original source spans while retaining properties and attached comments. Other mutations use the semantic emitter, or fail before candidate output when `--preserve-only` is active.
+The semantic emitter walks the graph and produces stable block YAML. The source layer separately records node ownership and spans. After the query finishes, it compiles replacements, insertions, deletions, and moves into a non-overlapping plan. This covers scalar tokens, single- and multiline flow collections, block scalars, block records, and mapping or sequence reorders while retaining properties and attached comments. Other mutations use the semantic emitter, or fail before candidate output when `--preserve-only` is active.
+
+The compiler is intentionally late. A query can touch the same node several times; only the final graph and the final source plan determine candidate bytes. `--diff`, `--check`, and `-i` then consume that same candidate.
 
 ## Diagnostics
 

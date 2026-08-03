@@ -298,13 +298,13 @@ ysh --diff '.image.tag = "stable"' services/*.yml
 ysh -i '.image.tag = "stable"' services/*.yml
 ```
 
-Safe scalar edits, direct block inserts/deletes, block mapping and sequence appends, and pure sequence reorders preserve presentation. Other structural edits use stable semantic YAML. Add `--preserve-only` when regeneration should be an error:
+Scalar edits, owned flow and block-scalar spans, direct block inserts/appends/deletes, and pure mapping or sequence reorders preserve source outside the compiled edit spans. Add `--preserve-only` when semantic regeneration should be an error:
 
 ```sh
 ysh --preserve-only --diff '.items += ["release"]' config.yml
 ```
 
-Strict mode can reject a semantically valid transform—for example, a flow-layout rewrite or a mapping append that would materialize an alias. That refusal is the contract, not a parser failure.
+Changed flow collections use stable flow formatting inside their owned span. Strict mode can still reject a semantically valid transform when spans overlap, key-node metadata would be required, or shared aliases would need to be materialized. That refusal is the contract, not a parser failure.
 
 ## Merged and aliased nodes
 

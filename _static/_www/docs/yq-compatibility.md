@@ -15,7 +15,7 @@ YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell
 | Files and documents | Strong | one-process multi-file evaluation; all-document mode; writable cross-file `eval-all`; exact no-write diffs; snapshot-guarded transactions |
 | Strings | Focused | interpolation, split/join, case, contains/prefix/suffix, POSIX `test` and `sub` |
 | YAML graph | Strong | anchors and aliases retain identity; `tag`, `anchor`, and `alias` are writable; `explode` materializes relationships |
-| YAML presentation | Focused | comments and styles survive common edits; line comments and scalar/collection styles are writable |
+| YAML presentation | Focused | compiled scalar, flow, block-scalar, record, and reorder spans; writable line comments and styles |
 
 “Strong” means the common forms documented and tested here. It does not mean every polymorphic combination accepted by yq.
 
@@ -29,6 +29,7 @@ YAML.sh is not trying to outgrow yq. It is optimized for a different boundary:
 - `--ast` and `--events` expose the parser directly when a strange document needs explaining.
 - `--check`, `--diff`, and `-i` share one prepared edit plan. Previewed bytes are committed bytes; net-zero updates are no-ops.
 - `--preserve-only` turns source fidelity into an enforceable precondition instead of a best-effort promise.
+- Source plans preserve bytes outside changed spans and carry record comments through mapping and sequence moves—useful behavior that ordinary semantic serialization cannot promise.
 - Multi-file queries compile once. Writable `eval-all` can read one file, mutate several others, refuse detected source drift, skip no-ops, and roll back commit failures from the evaluated snapshots.
 - `--explain=json` produces one value-free audit record per input for CI.
 - Parser outcomes, invalid input, yq comparisons, presentation edits, and useful scale are covered by repeatable tests.

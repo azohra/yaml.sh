@@ -47,7 +47,7 @@
         <span aria-hidden="true">◆</span>
         <span>6 minute read</span>
         <span aria-hidden="true">◆</span>
-        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.12.0">YAML.sh v1.12</a>
+        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.13.0">YAML.sh v1.13</a>
       </div>
     </header>
 
@@ -95,6 +95,7 @@
             <li><strong>v1.10</strong><span>Make the repository the unit of work: one query, one process, one preflight.</span></li>
             <li><strong>v1.11</strong><span>Make prepared edits exact, reviewable, and strict about source fidelity.</span></li>
             <li><strong>v1.12</strong><span>Refuse stale writes by committing only the source bytes the query actually read.</span></li>
+            <li><strong>v1.13</strong><span>Compile flow, block, record, and reorder changes into owned source spans.</span></li>
           </ol>
         </section>
 
@@ -103,7 +104,7 @@
           <p>The hard part was not producing more code. The hard part was deciding what evidence would let us believe it.</p>
           <p>We compared YAML.sh with the official YAML Test Suite and with yq itself. We added real configuration workflows from Kubernetes, Docker Compose, GitHub Actions, GitLab CI, and deployment overlays. We generated expressions, hostile inputs, large documents, deep collections, and presentation-preserving mutations. A supported behaviour needed a test; nearby unsupported behaviour needed an explicit error instead of a confident misparse.</p>
           <p>That distinction matters. A large generated comparison corpus does not mean YAML.sh contains all of yq. Passing the expected YAML Test Suite outcomes does not mean every corner of the YAML specification is implemented. Evidence describes the tested contract; it does not dissolve the boundary around it.</p>
-          <p>By v1.12, that contract was large enough to be useful and specific enough to be trusted. One command can preview the exact repository transaction, refuse presentation loss, bind data across files, skip files that are already correct, abort if a source changes under it, roll back a broken commit, and leave a JSON audit trail containing paths but not values.</p>
+          <p>By v1.13, that contract was large enough to be useful and specific enough to be trusted. One command can preview the exact repository transaction, compile flow and block changes into owned source spans, refuse presentation loss, bind data across files, abort if a source changes under it, roll back a broken commit, and leave a JSON audit trail containing paths but not values.</p>
           <dl class="story-evidence">
             <div><dt>YAML outcomes</dt><dd>282 / 282</dd><dd>expected YAML Test Suite cases</dd></div>
             <div><dt>invalid outcomes</dt><dd>91 / 91</dd><dd>strict-invalid cases rejected</dd></div>

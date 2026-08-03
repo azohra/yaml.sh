@@ -70,7 +70,7 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Tags and anchors before scalar keys are accepted, but mapping keys remain text in the graph.
 - Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.
 - Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded line comments, and supported scalar/collection styles where representable. It does not reconstruct original spacing or head/foot comments.
-- Common in-place replacements, direct block inserts/deletes, block mapping and sequence appends, and pure sequence reorders preserve comments, whitespace, quoting, block/flow style, anchors, tags, and directives. Other structural changes fall back to semantic YAML.
+- In-place source plans cover scalar replacements, single- and multiline flow collections, block scalars, direct block inserts/appends/deletes, and pure mapping or sequence reorders. Untouched spans remain byte-identical; changed flow spans use stable flow formatting.
 - Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
 - Sequence slices, scalar interpolation, grouping, `ireduce`, computed object keys, `setpath`/`delpaths`, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
 - `style` can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. `line_comment` can inspect and set line comments. Head/foot comments and key-node presentation remain outside the graph.
@@ -92,7 +92,7 @@ The current suite checks:
 | yq v4.53.3 differential | 2,630 categorized programs plus YAML metadata and cross-file programs |
 | Configuration workflows | Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays |
 | Grammar/property matrix | 6 layouts × 7 collection sizes × 2 states × 8 parser/query/mutation properties, including non-writing mutation previews |
-| Presentation matrix | Strict preview and commit across 3 scalar styles × 3 value/comment variants |
+| Source-edit matrix | Strict preview and commit across scalar styles, flow and block-scalar spans, mapping reorders, sequence records, aliases, merges, and attached comments |
 | Repository transaction suite | Exact diffs, strict refusal, source-drift races, no-op, cross-file binding, rollback, interruption, empty files, and JSON audit behavior |
 | Scale | 125,000 payload nodes with strict diff; 1,500 documents; at most 224 MiB RSS |
 | Runtime portability | macOS AWK, mawk, original AWK, POSIX gawk, BusyBox AWK, and multiple POSIX shells |
