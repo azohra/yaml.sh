@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.16.0" "$(./ysh --version)"
+    assertEquals "v1.17.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -13,6 +13,8 @@ testHelp() {
     assertContains "$result" "transactionally"
     assertContains "$result" "preview the exact transaction"
     assertContains "$result" "refuse edits that would regenerate"
+    assertContains "$result" "disable eval()"
+    assertContains "$(PATH=/nonexistent ./ysh --help)" "YAML.sh"
 }
 
 testYqStyleFileQuery() {
@@ -384,6 +386,9 @@ testExpressionPortableUtilities() {
     assertEquals '[{"name":"alice","age":3}]' "$(printf 'data: |-\n  name\tage\n  alice\t3\n' | ./ysh --json '.data | @tsvd')"
     assertEquals '"thing"' "$(printf '%s\n' "$input" | ./ysh --json 'eval(.pathExp)')"
     assertContains "$(printf '%s\n' "$input" | ./ysh --json 'eval(".a.cool") = "changed"')" '"cool":"changed"'
+    result=$(printf '%s\n' "$input" | ./ysh --security-disable-eval 'eval(.pathExp)' 2>&1)
+    assertNotEquals 0 $?
+    assertContains "$result" "dynamic eval is disabled"
 
     assertEquals '{"service":{"name":"loaded","ports":[80,443]}}' "$(./ysh -n --json "load(\"$load_yaml\")")"
     assertEquals '"plain text\nwith two lines\n"' "$(./ysh -n --json "load_str(\"$load_text\")")"
@@ -1647,6 +1652,9 @@ testCliErrors() {
     assertEquals 2 $?
     ./ysh -i -n '.key = "value"' test/test.yml >/dev/null 2>&1
     assertEquals 2 $?
+    result=$(PATH=/nonexistent ./ysh --check '.key = "value"' test/test.yml 2>&1)
+    assertEquals 2 $?
+    assertContains "$result" "edit transactions require command: mktemp"
 }
 
 testRunsWithPosixShell() {
@@ -1668,11 +1676,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.16.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.17.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.16.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.16"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.17"
     assertContains "$(cat _static/_www/story/index.html)" "<strong>v1.8</strong>"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
@@ -1692,7 +1700,7 @@ testReleaseArtifactsStayInSync() {
     assertContains "$(cat _static/_www/docs/contracts.md)" "205 official valid fixtures"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "parser-boundary matrix"
     assertContains "$(cat _static/_www/docs/supported_yml.md)" "fail before producing a graph"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "Kubernetes, Compose, GitHub Actions, GitLab CI"
+    assertContains "$(cat _static/_www/docs/supported_yml.md)" "common configuration shapes"
     assertNotContains "$(cat _static/_www/index.html)" "35/35"
     assertNotContains "$(cat README.md)" "35/35"
 }

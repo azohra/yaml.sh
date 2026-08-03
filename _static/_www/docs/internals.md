@@ -31,12 +31,14 @@ Embedded AWK programs arrive through here-documents, avoiding small `ARG_MAX` li
 The development sources remain separate:
 
 ```text
-src/ysh.sh   portable CLI launcher
-src/ysh.awk  parser, graph, resolver, queries, emitters
-src/diff.awk bounded unified-diff renderer
+src/ysh.sh       portable CLI launcher and repository transaction
+src/awk/*.awk    ordered parser, graph, query, contract, and source modules
+src/diff.awk     bounded unified-diff renderer
 ```
 
-The build combines them into the released `ysh` file.
+The build concatenates the ordered AWK modules into the released `ysh` file.
+The module boundaries are for development; the artifact still starts one AWK
+process with one shared graph.
 
 ## The node graph
 

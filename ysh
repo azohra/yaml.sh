@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.16.0
+YSH_VERSION=1.17.0
 
 # Replaced by the build with the embedded AWK engine.
 ysh_awk_program() {
@@ -2388,7 +2388,7 @@ function create_empty_document(source_line,    root) {
     return root
 }
 
-function add_mapping(parent, key, child, source_line, is_merge,    seen_key, entry) {
+function add_mapping(parent, key, child, source_line, is_merge,    seen_key, entry, depth) {
     ensure_container(parent, "mapping", source_line)
     seen_key = parent SUBSEP key
     if (seen_key in mapping_seen) {
@@ -2398,23 +2398,31 @@ function add_mapping(parent, key, child, source_line, is_merge,    seen_key, ent
     entry = ++mapping_count[parent]
     mapping_key[parent, entry] = key
     mapping_child[parent, entry] = child
-    mapping_merge[parent, entry] = is_merge
+    if (is_merge) {
+        mapping_merge[parent, entry] = 1
+    }
     node_parent[child] = parent
     node_parent_edge[child] = "key " key
-    node_depth[child] = node_depth[parent] + 1
-    if (max_depth > 0 && node_depth[child] > max_depth) {
+    depth = node_depth[parent] + 1
+    if (node_kind[child] == "mapping" || node_kind[child] == "sequence" || node_kind[child] == "pending") {
+        node_depth[child] = depth
+    }
+    if (max_depth > 0 && depth > max_depth) {
         fail("collection depth limit exceeded (max " max_depth ")")
     }
 }
 
-function add_sequence(parent, child, source_line,    entry) {
+function add_sequence(parent, child, source_line,    entry, depth) {
     ensure_container(parent, "sequence", source_line)
     entry = ++sequence_count[parent]
     sequence_child[parent, entry] = child
     node_parent[child] = parent
     node_parent_edge[child] = "index " (entry - 1)
-    node_depth[child] = node_depth[parent] + 1
-    if (max_depth > 0 && node_depth[child] > max_depth) {
+    depth = node_depth[parent] + 1
+    if (node_kind[child] == "mapping" || node_kind[child] == "sequence" || node_kind[child] == "pending") {
+        node_depth[child] = depth
+    }
+    if (max_depth > 0 && depth > max_depth) {
         fail("collection depth limit exceeded (max " max_depth ")")
     }
 }
@@ -2447,7 +2455,6 @@ function parse_scalar_key(value, source_line,    remainder, tag, anchor, node, r
     parsed_key_is_merge = remainder == "<<" && tag == ""
     return node_value[resolved]
 }
-
 function parse_core(value, source_line, tag, anchor, column_base,    node, inner, count, i, separator, raw_key, raw_value, leading, key, child, alias_name, flow_serial, piece, piece_offset, is_merge) {
     if (substr(value, 1, 1) == "*" && valid_anchor_name(substr(value, 2))) {
         if (tag != "" || anchor != "") {
@@ -6042,7 +6049,11 @@ function expression_delete_node(target,    parent, i, j, key, child) {
             for (j = i; j < mapping_count[parent]; j++) {
                 mapping_key[parent, j] = mapping_key[parent, j + 1]
                 mapping_child[parent, j] = mapping_child[parent, j + 1]
-                mapping_merge[parent, j] = mapping_merge[parent, j + 1]
+                if (mapping_merge[parent, j + 1]) {
+                    mapping_merge[parent, j] = 1
+                } else {
+                    delete mapping_merge[parent, j]
+                }
                 child = mapping_child[parent, j]
                 node_parent_edge[child] = "key " mapping_key[parent, j]
             }
@@ -7099,6 +7110,7 @@ function expression_evaluate_schema(kind, expression, input,    output, i, node,
 function expression_evaluate_utility(kind, expression, input,    output, i, j, node, resolved, single, argument_stream, argument_node, value, result_node, dynamic_expression, dynamic_results, step) {
     output = expression_stream_new()
     if (kind == "eval") {
+        if (disable_eval) fail("dynamic eval is disabled")
         if (++dynamic_eval_depth > 32) fail("dynamic eval depth limit exceeded")
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = expression_stream_node[input, i]
@@ -7185,27 +7197,51 @@ function expression_evaluate_utility(kind, expression, input,    output, i, j, n
     return output
 }
 
-function expression_evaluate(expression, input,    output, middle, left_stream, right_stream, single, kind, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
-    output = expression_stream_new()
+function expression_dispatch_register(family, kinds,    item, count, i) {
+    count = split(kinds, item, /[[:space:]]+/)
+    for (i = 1; i <= count; i++) expression_dispatch_family[item[i]] = family
+}
+
+function expression_dispatch_initialize() {
+    expression_dispatch_register("patch", "pointer apply_patch merge_patch diff_patch")
+    expression_dispatch_register("schema", "validate schema_valid schema_errors")
+    expression_dispatch_register("utility",
+        "eval load load_str load_base64 load_props to_json from_json to_yaml from_yaml " \
+        "to_props from_props to_csv from_csv to_tsv from_tsv to_toml from_toml " \
+        "to_ini from_ini to_xml from_xml codec_base64 codec_base64d codec_uri codec_urid codec_sh shuffle")
+    expression_dispatch_register("context",
+        "filename fileindex documentindex path parent root node_property node_line node_column node_key " \
+        "node_tag node_anchor node_alias node_style node_line_comment node_head_comment node_foot_comment")
+    expression_dispatch_register("base",
+        "identity split_doc empty error env strenv to_number envsubst literal interpolate variable array object " \
+        "recursive negate arithmetic pipe bind reduce with explode")
+    expression_dispatch_register("navigation",
+        "first filter pick omit pivot comma slice key index each dynamic setpath delpaths assign update del " \
+        "select compare and or not alternative")
+    expression_dispatch_register("collections",
+        "map map_values to_entries from_entries with_entries array_to_map sort unique reverse flatten sort_keys " \
+        "min_by max_by sort_by group_by unique_by add min max any all any_c all_c length keys kind type has")
+    expression_dispatch_register("string",
+        "upcase downcase trim to_string regex_test regex_sub contains startswith endswith split join")
+}
+
+function expression_evaluate(expression, input,    kind, family) {
     kind = expression_kind[expression]
+    family = expression_dispatch_family[kind]
 
-    if (kind == "pointer" || kind == "apply_patch" || kind == "merge_patch" || kind == "diff_patch") {
-        return expression_evaluate_patch(kind, expression, input)
-    }
-    if (kind == "validate" || kind == "schema_valid" || kind == "schema_errors") {
-        return expression_evaluate_schema(kind, expression, input)
-    }
+    if (family == "patch") return expression_evaluate_patch(kind, expression, input)
+    if (family == "schema") return expression_evaluate_schema(kind, expression, input)
+    if (family == "utility") return expression_evaluate_utility(kind, expression, input)
+    if (family == "context") return expression_evaluate_context(kind, expression, input)
+    if (family == "base") return expression_evaluate_base(kind, expression, input)
+    if (family == "navigation") return expression_evaluate_navigation(kind, expression, input)
+    if (family == "collections") return expression_evaluate_collections(kind, expression, input)
+    if (family == "string") return expression_evaluate_string(kind, expression, input)
 
-    if (kind == "eval" || kind == "load" || kind == "load_str" || kind == "load_base64" || kind == "load_props" ||
-        kind == "to_json" || kind == "from_json" || kind == "to_yaml" || kind == "from_yaml" ||
-        kind == "to_props" || kind == "from_props" || kind == "to_csv" || kind == "from_csv" ||
-        kind == "to_tsv" || kind == "from_tsv" || kind == "to_toml" || kind == "from_toml" ||
-        kind == "to_ini" || kind == "from_ini" || kind == "to_xml" || kind == "from_xml" ||
-        kind == "codec_base64" || kind == "codec_base64d" || kind == "codec_uri" || kind == "codec_urid" ||
-        kind == "codec_sh" || kind == "shuffle") {
-        return expression_evaluate_utility(kind, expression, input)
-    }
-
+    fail("cannot evaluate expression kind " kind)
+}
+function expression_evaluate_base(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+    output = expression_stream_new()
     if (kind == "identity") {
         expression_stream_append(output, input)
         return output
@@ -7502,6 +7538,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
+    fail("expression kind reached the wrong evaluator family: " kind)
+}
+
+function expression_evaluate_navigation(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+    output = expression_stream_new()
     if (kind == "first" || kind == "filter") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = resolve_alias(expression_stream_node[input, i])
@@ -7996,6 +8037,11 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
+    fail("expression kind reached the wrong evaluator family: " kind)
+}
+
+function expression_evaluate_collections(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+    output = expression_stream_new()
     if (kind == "map" || kind == "map_values") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             node = expression_stream_node[input, i]
@@ -8384,7 +8430,7 @@ function expression_evaluate(expression, input,    output, middle, left_stream, 
         }
         return output
     }
-    fail("cannot evaluate expression kind " kind)
+    fail("expression kind reached the wrong evaluator family: " kind)
 }
 
 function base_integer(value, base,    result, i, char, digit) {
@@ -10069,6 +10115,7 @@ function output_batch_files(query, output_mode,    file, last_file, document, fo
 BEGIN {
     document_index = 0
     codec_initialize()
+    expression_dispatch_initialize()
     query = ENVIRON["YSH_QUERY_TEXT"]
     if (query == "") {
         query = "."
@@ -10530,7 +10577,9 @@ ysh_error() {
 }
 
 ysh_usage() {
-    cat <<EOF
+    while IFS= read -r YSH_USAGE_LINE; do
+        printf '%s\n' "$YSH_USAGE_LINE"
+    done <<EOF
 YAML.sh v${YSH_VERSION}
 
 Usage:
@@ -10588,6 +10637,8 @@ Evaluation:
                           disable env(), strenv(), and envsubst
       --security-disable-file-ops
                           disable load(), load_str(), load_base64(), and load_props()
+      --security-disable-eval
+                          disable eval() of dynamically supplied expressions
       --shuffle-seed N    make shuffle reproducible with an integer seed
       --schema FILE       validate query results against a local JSON/YAML schema
       --apply-patch FILE  apply a local RFC 6902 JSON Patch after the query
@@ -10658,6 +10709,7 @@ ysh_invoke_awk() {
         -v unwrap_scalar_mode="$YSH_UNWRAP_SCALAR" \
         -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
         -v disable_file_ops="$YSH_DISABLE_FILE_OPS" \
+        -v disable_eval="$YSH_DISABLE_EVAL" \
         -v shuffle_seed="$YSH_SHUFFLE_SEED" \
         -v input_filename="$YSH_INPUT_FILENAME" \
         -v input_file_index="$YSH_FILE_INDEX" \
@@ -10983,6 +11035,15 @@ ysh_finalize_edit_plan() {
     cp "$YSH_TRANSACTION_FINAL_CHANGE_LIST" "$YSH_TRANSACTION_CHANGE_LIST"
 }
 
+ysh_require_edit_commands() {
+    for YSH_REQUIRED_COMMAND in mktemp cp cmp mv rm wc; do
+        if ! command -v "$YSH_REQUIRED_COMMAND" >/dev/null 2>&1; then
+            ysh_error "edit transactions require command: $YSH_REQUIRED_COMMAND"
+            return 2
+        fi
+    done
+}
+
 ysh_run_edit_transaction() {
     YSH_TRANSACTION_INPUT_LIST=
     YSH_TRANSACTION_NEW_LIST=
@@ -11218,6 +11279,7 @@ ysh_main() {
     YSH_UNWRAP_SCALAR=1
     YSH_DISABLE_ENV_OPS=0
     YSH_DISABLE_FILE_OPS=0
+    YSH_DISABLE_EVAL=0
     YSH_SHUFFLE_SEED=${YSH_SHUFFLE_SEED:-$$}
     YSH_INPUT_FILENAME=-
     YSH_FILE_INDEX=0
@@ -11387,6 +11449,10 @@ ysh_main() {
             ;;
         --security-disable-file-ops)
             YSH_DISABLE_FILE_OPS=1
+            shift
+            ;;
+        --security-disable-eval)
+            YSH_DISABLE_EVAL=1
             shift
             ;;
         --schema|--apply-patch|--merge-patch|--generate-patch)
@@ -11657,6 +11723,7 @@ ${YSH_POSITIONAL_REST}"
         if [ -z "$YSH_INPUT_FILES" ]; then
             YSH_INPUT_FILES=$YSH_INPUT_FILE
         fi
+        ysh_require_edit_commands || return $?
         ysh_run_edit_transaction
         YSH_TRANSACTION_RESULT=$?
         if { [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; } &&

@@ -72,6 +72,7 @@ jobs:
         run: |
           make fuzz
           make presentation
+          make public-contract
           make operator-manifest
           make parser-boundaries
           make adversarial

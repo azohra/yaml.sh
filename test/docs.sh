@@ -68,9 +68,16 @@ if grep -En 'scroll-behavior:[[:space:]]*smooth' "$PUBLISHED/docs.css" >/dev/nul
     exit 1
 fi
 
-for asset in "$ROOT/_static/_www/brand/hero.svg" "$ROOT/_static/_www/og.png" "$STORY/story.css" "$PUBLISHED/docs.css" "$PUBLISHED/docs.js"; do
+for asset in "$ROOT/_static/_www/brand/hero.svg" "$ROOT/_static/_www/brand/og.svg" "$ROOT/_static/_www/og.png" "$STORY/story.css" "$PUBLISHED/docs.css" "$PUBLISHED/docs.js"; do
     if [ ! -s "$asset" ]; then
         printf 'Missing documentation asset: %s\n' "$asset" >&2
+        exit 1
+    fi
+done
+
+for brand_source in "$ROOT/_static/_www/brand/hero.svg" "$ROOT/_static/_www/brand/og.svg"; do
+    if ! grep -Fq 'YAML in shell' "$brand_source" || grep -Eqi 'yq energy|v[0-9]+\.[0-9]+' "$brand_source"; then
+        printf 'Brand source is stale or release-specific: %s\n' "$brand_source" >&2
         exit 1
     fi
 done

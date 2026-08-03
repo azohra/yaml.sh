@@ -1,24 +1,26 @@
-BUILDERS = $(shell find build/*)
+BUILDERS := $(wildcard build/*)
+AWK_MODULES := $(sort $(wildcard src/awk/*.awk))
 INSTALL_DIR=/usr/local/bin
 
-.PHONY: lint test docs-check operator-manifest conformance toml-conformance schema-conformance json-patch-conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
+.PHONY: lint test docs-check public-contract operator-manifest conformance toml-conformance schema-conformance json-patch-conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
 
 all: ysh lint test docs-check
 
-ysh: src/ysh.sh src/ysh.awk src/diff.awk Makefile $(BUILDERS)
+ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile $(BUILDERS)
 	@echo "👷 Building"
-	@awk -f build/shbuilder.awk src/ysh.sh > ysh
+	@awk -v awk_modules="$(AWK_MODULES)" -f build/shbuilder.awk src/ysh.sh > ysh
 	@chmod 755 ysh
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/public-contract.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
 	@./test/test.sh
 	@./test/workflows.sh
 	@./test/parser-boundaries.sh
+	@./test/public-contract.sh
 
 docs-check: ysh
 	@echo "📚 Checking static documentation"
@@ -28,6 +30,10 @@ docs-check: ysh
 operator-manifest: ysh
 	@echo "🧾 Auditing the operator surface"
 	@./test/operator-manifest.sh
+
+public-contract: ysh
+	@echo "📜 Auditing the public contract"
+	@./test/public-contract.sh
 
 conformance: ysh
 	@echo "🧭 Measuring YAML conformance"

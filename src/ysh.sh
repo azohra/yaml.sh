@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.16.0
+YSH_VERSION=1.17.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -13,7 +13,9 @@ ysh_error() {
 }
 
 ysh_usage() {
-    cat <<EOF
+    while IFS= read -r YSH_USAGE_LINE; do
+        printf '%s\n' "$YSH_USAGE_LINE"
+    done <<EOF
 YAML.sh v${YSH_VERSION}
 
 Usage:
@@ -71,6 +73,8 @@ Evaluation:
                           disable env(), strenv(), and envsubst
       --security-disable-file-ops
                           disable load(), load_str(), load_base64(), and load_props()
+      --security-disable-eval
+                          disable eval() of dynamically supplied expressions
       --shuffle-seed N    make shuffle reproducible with an integer seed
       --schema FILE       validate query results against a local JSON/YAML schema
       --apply-patch FILE  apply a local RFC 6902 JSON Patch after the query
@@ -141,6 +145,7 @@ ysh_invoke_awk() {
         -v unwrap_scalar_mode="$YSH_UNWRAP_SCALAR" \
         -v disable_env_ops="$YSH_DISABLE_ENV_OPS" \
         -v disable_file_ops="$YSH_DISABLE_FILE_OPS" \
+        -v disable_eval="$YSH_DISABLE_EVAL" \
         -v shuffle_seed="$YSH_SHUFFLE_SEED" \
         -v input_filename="$YSH_INPUT_FILENAME" \
         -v input_file_index="$YSH_FILE_INDEX" \
@@ -466,6 +471,15 @@ ysh_finalize_edit_plan() {
     cp "$YSH_TRANSACTION_FINAL_CHANGE_LIST" "$YSH_TRANSACTION_CHANGE_LIST"
 }
 
+ysh_require_edit_commands() {
+    for YSH_REQUIRED_COMMAND in mktemp cp cmp mv rm wc; do
+        if ! command -v "$YSH_REQUIRED_COMMAND" >/dev/null 2>&1; then
+            ysh_error "edit transactions require command: $YSH_REQUIRED_COMMAND"
+            return 2
+        fi
+    done
+}
+
 ysh_run_edit_transaction() {
     YSH_TRANSACTION_INPUT_LIST=
     YSH_TRANSACTION_NEW_LIST=
@@ -701,6 +715,7 @@ ysh_main() {
     YSH_UNWRAP_SCALAR=1
     YSH_DISABLE_ENV_OPS=0
     YSH_DISABLE_FILE_OPS=0
+    YSH_DISABLE_EVAL=0
     YSH_SHUFFLE_SEED=${YSH_SHUFFLE_SEED:-$$}
     YSH_INPUT_FILENAME=-
     YSH_FILE_INDEX=0
@@ -870,6 +885,10 @@ ysh_main() {
             ;;
         --security-disable-file-ops)
             YSH_DISABLE_FILE_OPS=1
+            shift
+            ;;
+        --security-disable-eval)
+            YSH_DISABLE_EVAL=1
             shift
             ;;
         --schema|--apply-patch|--merge-patch|--generate-patch)
@@ -1140,6 +1159,7 @@ ${YSH_POSITIONAL_REST}"
         if [ -z "$YSH_INPUT_FILES" ]; then
             YSH_INPUT_FILES=$YSH_INPUT_FILE
         fi
+        ysh_require_edit_commands || return $?
         ysh_run_edit_transaction
         YSH_TRANSACTION_RESULT=$?
         if { [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; } &&
