@@ -684,6 +684,7 @@ testPreserveOnlyRefusesRegeneration() {
     preserve_output=test/.tmp-preserve-only-output-$$
     preserve_error=test/.tmp-preserve-only-error-$$
     alias_file=test/.tmp-preserve-only-alias-$$.yml
+    flow_file=test/.tmp-preserve-only-flow-$$.yml
     printf '%s\n' 'service:' '  name: api # keep' '  labels:' '    tier: web' 'items: # keep order' '  - one' 'tail: kept' > "$preserve_file"
     cp "$preserve_file" "$preserve_backup"
 
@@ -713,10 +714,20 @@ testPreserveOnlyRefusesRegeneration() {
     assertContains "$(cat "$preserve_error")" 'preserve-only edit would regenerate YAML presentation'
     assertContains "$(cat "$alias_file")" 'inherited: *defaults'
 
+    printf '%s\n' 'meta: {enabled: false}' 'items: [{name: one, score: 4}]' 'tail: kept' > "$flow_file"
+    ./ysh --preserve-only --diff '.meta.checked = true | .items |= map(.score += 1)' "$flow_file" > "$preserve_output" 2> "$preserve_error"
+    assertEquals 2 $?
+    assertContains "$(cat "$preserve_error")" 'preserve-only edit would regenerate YAML presentation'
+    ./ysh -i '.meta.checked = true | .items |= map(.score += 1)' "$flow_file"
+    assertEquals 0 $?
+    assertEquals '{"enabled":false,"checked":true}' "$(./ysh --json '.meta' "$flow_file")"
+    assertEquals '[{"name":"one","score":5}]' "$(./ysh --json '.items' "$flow_file")"
+    assertEquals kept "$(./ysh '.tail' "$flow_file")"
+
     ./ysh --preserve-only '.service.name = "worker"' "$preserve_file" >/dev/null 2>&1
     assertEquals 2 $?
 
-    rm -f "$alias_file" "$preserve_error" "$preserve_output" "$preserve_backup" "$preserve_file"
+    rm -f "$flow_file" "$alias_file" "$preserve_error" "$preserve_output" "$preserve_backup" "$preserve_file"
 }
 
 testInplaceTransactionRollsBackCommitFailure() {
