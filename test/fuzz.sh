@@ -193,7 +193,12 @@ preserve_failure() {
     failure_dir=$FAILURE_ROOT/ysh-fuzz-failure-$failed_case
     mkdir -p "$failure_dir"
     cp "$INPUT" "$failure_dir/input.yml"
+    cp "$INPUT" "$failure_dir/input-original.yml"
     cp "$ORACLE" "$failure_dir/oracle.json"
+    cp "$EDIT" "$failure_dir/committed.yml"
+    cp "$PREVIEW" "$failure_dir/preview.diff"
+    cp "$ACTUAL" "$failure_dir/actual.json"
+    cp "$EXPECTED" "$failure_dir/expected.json"
     level=1
     while [ "$level" -le 2 ]; do
         generate_case "$failed_case" "$level" "$CANDIDATE" "$CANDIDATE_ORACLE" "$CASE_MODE" "$CASE_COUNT" "$CASE_ENABLED"
@@ -207,6 +212,14 @@ preserve_failure() {
     chmod 755 "$failure_dir/replay.sh"
     printf 'Grammar-guided %s property failed for case %s: %s; minimized replay saved in %s\n' \
         "$PROPERTY" "$failed_case" "$failure_reason" "$failure_dir" >&2
+    printf '%s\n' '--- generated input' >&2
+    sed -n '1,80p' "$failure_dir/input-original.yml" >&2
+    printf '%s\n' '--- committed YAML' >&2
+    sed -n '1,80p' "$failure_dir/committed.yml" >&2
+    printf '%s\n' '--- actual canonical JSON' >&2
+    sed -n '1,10p' "$failure_dir/actual.json" >&2
+    printf '%s\n' '--- expected canonical JSON' >&2
+    sed -n '1,10p' "$failure_dir/expected.json" >&2
 }
 
 if [ -n "$FUZZ_REPLAY" ]; then
