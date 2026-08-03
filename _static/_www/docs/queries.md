@@ -395,4 +395,4 @@ Scalar styles can be reset or set to plain, single, double, literal, or folded. 
 
 This is a useful yq-shaped language, not the complete yq language. Date/time, XML, system execution, regex flags/captures, and yq's complete format/flag surface remain outside it. Slices target sequences; interpolation is intentionally scalar-oriented. See the [operator manifest](operators.md) for the audited form-by-form boundary.
 
-Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.
+Supported transformations are tested against their expected graph behavior. For arbitrary yq programs, use yq. Choose YAML.sh when the one-file runtime, source-aware edits, guarded repository transaction, or inspectable execution model is the point.

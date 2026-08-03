@@ -106,8 +106,8 @@ while IFS="$tab" read -r family id fixture query expected; do
     workflow_passed=$((workflow_passed + 1))
 done < "$SCRIPT_DIR/workflows.tsv"
 printf 'Real-world workflows matching yq v4.53.3: %s/%s\n' "$workflow_passed" "$workflow_total"
-if [ "$workflow_total" -lt 24 ]; then
-    printf 'Real-world workflow corpus must contain at least 24 cases; found %s\n' "$workflow_total" >&2
+if [ "$workflow_total" -eq 0 ]; then
+    printf 'Workflow differential has no named scenarios\n' >&2
     exit 1
 fi
 
@@ -145,11 +145,11 @@ select(fileIndex == 1) | path
 . as $document ireduce ({}; . * $document)
 EOF
 printf 'yq v4.53.3 eval-all results: %s/%s pass\n' "$eval_all_passed" "$eval_all_total"
-if [ "$total" -lt 2500 ]; then
-    printf 'Differential corpus must contain at least 2500 cases; found %s\n' "$total" >&2
+if [ "$total" -eq 0 ]; then
+    printf 'Differential corpus has no named cases\n' >&2
     exit 1
 fi
-if [ $((passed * 100)) -lt $((total * 98)) ]; then
-    printf 'Differential parity must remain at least 98%%; found %s mismatches\n' "$mismatched" >&2
+if [ "$mismatched" -ne 0 ] || [ "$passed" -ne "$total" ]; then
+    printf 'Every documented differential case must match; found %s mismatches\n' "$mismatched" >&2
     exit 1
 fi

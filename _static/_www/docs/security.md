@@ -8,7 +8,7 @@ YAML.sh parses data and runs an explicit query program. It never evaluates YAML 
 - No application-specific object construction from YAML tags.
 - Environment access is limited to explicit `env`, `strenv`, and `envsubst` operators.
 - File access is limited to explicit `load`, `load_str`, `load_base64`, and `load_props`; every read shares the input-byte ceiling.
-- Dynamic `eval` compiles only YAML.sh expressions and has expression-node and nesting ceilings.
+- Dynamic `eval` compiles only YAML.sh expressions, has expression-node and nesting ceilings, and can be disabled independently.
 - Check, diff, and in-place writes reject symlinks and duplicate inputs, evaluate source snapshots, then refuse detected live-file drift.
 - Input bytes, graph nodes, and nesting depth have hard configurable ceilings.
 
@@ -56,7 +56,7 @@ USER_NAME="$UNTRUSTED_NAME" ysh '.users[strenv(USER_NAME)]' config.yml
 
 Use `--security-disable-env-ops` when even that environment read is inappropriate.
 
-## Disable file access
+## Disable file access and dynamic evaluation
 
 Loads are useful for bootstrapping configuration, but they follow paths supplied by the query. Disable the entire class when a query crosses a trust boundary:
 
@@ -66,7 +66,23 @@ ysh --security-disable-file-ops "$UNTRUSTED_QUERY" config.yml
 
 The flag makes every `load*` operator fail. It does not affect the input files named on the command line. `load` parses YAML, `load_props` parses properties, `load_str` returns text, and `load_base64` decodes RFC 4648 text. Loaded content is subject to `--max-input-bytes`.
 
-`eval(EXPR)` treats its string as code in YAML.sh's expression language. Do not pass untrusted expression text to it merely because shell execution is absent.
+`eval(EXPR)` treats its string as code in YAML.sh's expression language. Disable it when expressions or data may cross a trust boundary:
+
+```sh
+ysh --security-disable-eval "$QUERY" config.yml
+```
+
+For a restricted query runner, combine all three switches:
+
+```sh
+ysh \
+  --security-disable-env-ops \
+  --security-disable-file-ops \
+  --security-disable-eval \
+  "$QUERY" config.yml
+```
+
+This removes the explicit ambient-read and dynamic-code capabilities. It does not turn the remaining query language into a hardened sandbox.
 
 ## In-place writes
 

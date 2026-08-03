@@ -6,8 +6,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 SUITE_DIR=${YAML_TEST_SUITE_DIR:-${1:-}}
 YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
-KNOWN_PASSES=${YAML_CONFORMANCE_PASSES:-$SCRIPT_DIR/conformance-pass.txt}
-KNOWN_REJECTIONS=${YAML_REJECTION_PASSES:-$SCRIPT_DIR/rejection-pass.txt}
+KNOWN_OUTCOMES=${YAML_CONFORMANCE_OUTCOMES:-$SCRIPT_DIR/conformance-outcomes.tsv}
 
 if [ -z "$SUITE_DIR" ] || [ ! -d "$SUITE_DIR" ]; then
     printf '%s\n' "Set YAML_TEST_SUITE_DIR to the YAML Test Suite data-2022-01-17 checkout." >&2
@@ -26,7 +25,8 @@ fi
 
 RESULTS_FILE=$(mktemp "${TMPDIR:-/tmp}/ysh-conformance.XXXXXX")
 REJECTIONS_FILE=$(mktemp "${TMPDIR:-/tmp}/ysh-rejections.XXXXXX")
-trap 'rm -f "$RESULTS_FILE" "$REJECTIONS_FILE"' 0 1 2 3 15
+OUTCOMES_FILE=$(mktemp "${TMPDIR:-/tmp}/ysh-conformance-outcomes.XXXXXX")
+trap 'rm -f "$RESULTS_FILE" "$REJECTIONS_FILE" "$OUTCOMES_FILE"' 0 1 2 3 15
 
 find "$SUITE_DIR" -name in.json -type f | sort | while IFS= read -r expected_file; do
     case_dir=${expected_file%/in.json}
@@ -97,21 +97,6 @@ elif [ "${YAML_CONFORMANCE_VERBOSE:-0}" = passes ]; then
     awk -F '\t' '$1 == "pass" {print $2}' "$RESULTS_FILE"
 fi
 
-regressions=0
-while IFS= read -r case_id; do
-    case "$case_id" in
-    ''|'#'*) continue ;;
-    esac
-    if ! awk -F '\t' -v wanted="$case_id" '$1 == "pass" && $2 == wanted {found=1} END {exit !found}' "$RESULTS_FILE"; then
-        printf 'Conformance regression: previously passing case %s no longer passes\n' "$case_id" >&2
-        regressions=$((regressions + 1))
-    fi
-done < "$KNOWN_PASSES"
-
-if [ "$regressions" -ne 0 ]; then
-    exit 1
-fi
-
 find "$SUITE_DIR" -name error -type f | sort | while IFS= read -r error_file; do
     case_dir=${error_file%/error}
     case_id=${case_dir#"$SUITE_DIR"/}
@@ -130,17 +115,22 @@ accept_count=$(awk -F '\t' '$1 == "accept" {count++} END {print count + 0}' "$RE
 rejection_total=$((reject_count + accept_count))
 printf 'YAML Test Suite strict rejection results: %s/%s reject invalid input\n' "$reject_count" "$rejection_total"
 
-rejection_regressions=0
-while IFS= read -r case_id; do
-    case "$case_id" in
-    ''|'#'*) continue ;;
-    esac
-    if ! awk -F '\t' -v wanted="$case_id" '$1 == "reject" && $2 == wanted {found=1} END {exit !found}' "$REJECTIONS_FILE"; then
-        printf 'Rejection regression: invalid case %s is now accepted\n' "$case_id" >&2
-        rejection_regressions=$((rejection_regressions + 1))
-    fi
-done < "$KNOWN_REJECTIONS"
+{
+    awk -F '\t' '{print "semantic\t" $2 "\t" $1}' "$RESULTS_FILE"
+    awk -F '\t' '{print "invalid\t" $2 "\t" $1}' "$REJECTIONS_FILE"
+} | sort > "$OUTCOMES_FILE"
 
-if [ "$rejection_regressions" -ne 0 ]; then
+if [ -n "${YAML_CONFORMANCE_RECORD:-}" ]; then
+    cp "$OUTCOMES_FILE" "$YAML_CONFORMANCE_RECORD"
+    printf 'Recorded %s exact YAML Test Suite outcomes in %s\n' \
+        "$(wc -l < "$OUTCOMES_FILE")" "$YAML_CONFORMANCE_RECORD"
+elif [ ! -s "$KNOWN_OUTCOMES" ]; then
+    printf 'Exact conformance manifest not found: %s\n' "$KNOWN_OUTCOMES" >&2
     exit 1
+elif ! cmp -s "$KNOWN_OUTCOMES" "$OUTCOMES_FILE"; then
+    printf 'YAML Test Suite outcomes differ from %s:\n' "$KNOWN_OUTCOMES" >&2
+    diff -u "$KNOWN_OUTCOMES" "$OUTCOMES_FILE" >&2 || :
+    exit 1
+else
+    printf 'YAML Test Suite exact outcome manifest: %s cases unchanged\n' "$(wc -l < "$OUTCOMES_FILE")"
 fi

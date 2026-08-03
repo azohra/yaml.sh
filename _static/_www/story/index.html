@@ -47,7 +47,7 @@
         <span aria-hidden="true">◆</span>
         <span>7 minute read</span>
         <span aria-hidden="true">◆</span>
-        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.16.0">YAML.sh v1.16</a>
+        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.17.0">YAML.sh v1.17</a>
       </div>
     </header>
 
@@ -75,7 +75,7 @@
           <h2>Permission to break it</h2>
           <p>That change broke the old CLI. I decided that was fine. Compatibility with a clever limitation was less valuable than making the premise useful.</p>
           <p>We also stopped requiring Bash. The released program is one POSIX shell file with its AWK parser and evaluator embedded. The <code>.sh</code> name still fits: the shell owns the executable, arguments, files, and process behaviour; AWK does the work it is unusually good at. Calling it <code>yaml.awk</code> would describe an implementation detail while hiding the way people actually use it.</p>
-          <p>The goal became precise: yq-shaped configuration work with no runtime dependencies beyond <code>/bin/sh</code> and AWK. Not a miniature clone of every yq feature. Not a standards-compliance trophy. A useful tool for bootstrap scripts, tiny containers, old machines, and the mildly cursed recovery shell where installing the better tool is the problem you are trying to solve.</p>
+          <p>The goal became precise: make a genuinely useful YAML tool in one readable shell executable. A real graph, a compact language, and source-aware changes—without acquiring a language runtime, package manager, YAML library, or plugin system. Familiar yq-shaped syntax made the language approachable, but the delightful constraint remained the reason to build it.</p>
           <p>Once that premise was clear, breaking the interface was not reckless. It was the cost of making the product coherent.</p>
           <blockquote>
             <p>“The point is to have fun.”</p>
@@ -104,13 +104,14 @@
             <li><strong>v1.14</strong><span>Audit the useful yq surface, close portable gaps, and optimize measured parser work.</span></li>
             <li><strong>v1.15</strong><span>Close the portable utility layer: codecs, guarded loads, dynamic expressions, reproducible shuffle, and complete source metadata.</span></li>
             <li><strong>v1.16</strong><span>Turn the graph into a configuration contract engine: standard patches, schema gates, and semantic TOML, INI, and XML.</span></li>
+            <li><strong>v1.17</strong><span>Refound the product around its own graph, source compiler, transaction model, and exact public contract.</span></li>
           </ol>
         </section>
 
         <section id="make-it-real">
           <h2>Make it real</h2>
           <p>The hard part was not producing more code. The hard part was deciding what evidence would let us believe it.</p>
-          <p>We compared YAML.sh with the official YAML Test Suite and with yq itself. We added real configuration workflows from Kubernetes, Docker Compose, GitHub Actions, GitLab CI, and deployment overlays. We generated expressions, hostile inputs, large documents, deep collections, and presentation-preserving mutations. A supported behaviour needed a test; nearby unsupported behaviour needed an explicit error instead of a confident misparse.</p>
+          <p>We compared YAML.sh with the official YAML Test Suite and with yq itself. We exercised common configuration shapes, generated expressions, hostile inputs, large documents, deep collections, and presentation-preserving mutations. A supported behaviour needed a test; nearby unsupported behaviour needed an explicit error instead of a confident misparse.</p>
           <p>That distinction matters. A large generated comparison corpus does not mean YAML.sh contains all of yq. Passing the expected YAML Test Suite outcomes does not mean every corner of the YAML specification is implemented. Evidence describes the tested contract; it does not dissolve the boundary around it.</p>
           <p>By v1.16, that contract was large enough to be useful and specific enough to audit. One command can validate a document, apply a standard patch, preview the exact repository transaction, preserve comments, refuse presentation loss, abort on source drift, roll back a broken commit, and leave a value-free audit trail.</p>
           <p>The capability audit stopped treating corpus size as the feature. We walked yq’s YAML-oriented catalog, attached evidence to every area, and followed approachable gaps. The tool grew from collection helpers into source-aware repository work, guarded local composition, JSON Pointer and Patch, Merge Patch, a JSON Schema profile, and semantic TOML, INI, and XML codecs. The runtime stayed one POSIX shell file with AWK inside.</p>
@@ -120,7 +121,7 @@
             <div><dt>TOML 1.0</dt><dd>205 / 205</dd><dd>decoder and encoder fixtures</dd></div>
             <div><dt>schema profile</dt><dd>701</dd><dd>official 2020-12 assertions</dd></div>
             <div><dt>write faults</dt><dd>guarded</dd><dd>drift, failure, and interruption</dd></div>
-            <div><dt>extra dependencies</dt><dd>0</dd><dd>the runtime is POSIX sh + AWK</dd></div>
+            <div><dt>language runtimes</dt><dd>0</dd><dd>the reader is POSIX sh + AWK</dd></div>
           </dl>
         </section>
 
@@ -133,15 +134,15 @@
 
         <section id="where-it-fits">
           <h2>Where it fits</h2>
-          <p>YAML.sh is not yq in disguise. yq remains the right answer when you want date arithmetic, broad XML controls, its ecosystem, and mature performance envelope. YAML.sh now carries far more of the useful expression and configuration surface than I expected, while keeping system execution, networking, plugins, and application tag constructors out of the runtime.</p>
-          <p>It is better at a different thing: arriving as one readable text file in an environment that already has a shell and AWK. There is no package manager, language runtime, YAML library, or mystery binary. Environment and file reads can be disabled separately. Its repository mode can preview exact candidates, require source preservation, update several files from shared data, roll back a partial commit, and explain changed paths without recording values.</p>
-          <p>That is enough of a difference to be a product, not just a stunt. Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.</p>
+          <p>By v1.17, the comparison with yq had done its job. It gave the language a familiar shape and supplied a demanding oracle, but it was too small a frame for the result.</p>
+          <p>YAML.sh is a serious YAML tool in a mischievous medium. It arrives as readable source, retains YAML identity and presentation, previews exact changes, refuses fidelity loss on demand, updates several files from shared data, rolls back partial commits, and explains changed paths without recording values. Those properties grew naturally from taking the one-file shell constraint further than seemed sensible.</p>
+          <p>Yq remains broader and faster for many semantic transformations. YAML.sh has its own answer for work where runtime reach, source ownership, reviewable writes, and inspectability matter at the same time.</p>
         </section>
 
         <section id="constraint">
           <h2>The constraint is the fun part</h2>
           <p>YAML in shell still sounds like a bad idea. I like that. Good constraints create a shape you would not reach by chasing generality, and a little absurdity can provide enough energy to stay with the boring work that makes an idea dependable.</p>
-          <p>The premise survived the rewrite: one file, no dependencies, real YAML work. Everything else was allowed to change.</p>
+          <p>The premise survived the rewrite: one readable file, no acquired language runtime, real configuration work. Everything else was allowed to change.</p>
           <p>The point was to have fun. The trick was refusing to use fun as an excuse to be sloppy.</p>
         </section>
 

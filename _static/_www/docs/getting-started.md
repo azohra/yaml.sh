@@ -26,10 +26,10 @@ curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR="$HOME/.local/bin" 
 
 ## Requirements
 
-- A POSIX-style `/bin/sh`.
-- A compatible AWK implementation.
+- Read-only commands: a POSIX-style `/bin/sh` and a compatible AWK.
+- Source-aware `--check`, `--diff`, and `-i`: `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc` from the host.
 
-The release suite covers macOS AWK, mawk, original AWK, POSIX-mode gawk, and BusyBox AWK across several POSIX shells. Bash, Python, Ruby, Node.js, Go, `jq`, and a package manager are not runtime requirements.
+The release suite covers macOS AWK, mawk, original AWK, POSIX-mode gawk, and BusyBox AWK across several POSIX shells. Bash, Python, Ruby, Node.js, Go, `jq`, and a package manager are not required. Edit mode checks its host utilities before preparing a transaction.
 
 ## First query
 

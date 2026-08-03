@@ -1,14 +1,13 @@
 <p align="center">
-  <img src="_static/_www/brand/hero.svg" alt="YAML.sh — yq energy, zero baggage" width="900">
+  <img src="_static/_www/brand/hero.svg" alt="YAML.sh — YAML in shell, no really" width="900">
 </p>
 
 <p align="center">
-  <strong>A useful YAML tool for the moment before you can install tools.</strong>
+  <strong>A serious YAML tool in one delightfully questionable medium.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/azohra/yaml.sh/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/azohra/yaml.sh?style=for-the-badge&labelColor=101410&color=d8ff45"></a>
-  <a href="https://github.com/azohra/yaml.sh/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/azohra/yaml.sh/ci.yml?style=for-the-badge&label=tests&labelColor=101410"></a>
   <img alt="POSIX shell plus AWK" src="https://img.shields.io/badge/runtime-sh_+_awk-f5f1e8?style=for-the-badge&labelColor=101410">
 </p>
 
@@ -16,110 +15,72 @@
   <a href="https://yaml.azohra.com">Website</a> ·
   <a href="https://yaml.azohra.com/docs/">Docs</a> ·
   <a href="https://yaml.azohra.com/docs/recipes/">Recipes</a> ·
-  <a href="https://yaml.azohra.com/docs/operators/">Operator manifest</a>
+  <a href="https://yaml.azohra.com/docs/supported_yml/">YAML support</a>
 </p>
 
 ---
 
-YAML.sh brings a focused, yq-shaped query language to bootstrap scripts, tiny containers, old machines, and mildly cursed recovery shells. The released `ysh` is one readable text file: a POSIX `/bin/sh` launcher with its AWK parser and evaluator embedded.
-
-No package manager. No language runtime. No YAML library. No mystery binary.
+YAML.sh reads YAML as a graph, runs a compact expression language over it, and can compile changes back into the original source. The released `ysh` is one POSIX shell executable with its portable AWK engine embedded.
 
 ```console
 $ ysh '.services[] | select(.enabled) | .name' config.yml
 api
 web
 
-$ ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
-
-$ ysh --preserve-only --diff '.image.tag = "stable"' deploy/*.yml
---- a/deploy/api.yml
-+++ b/deploy/api.yml
-@@ -1,2 +1,2 @@
--image: app:old # promoted by CI
-+image: app:stable # promoted by CI
-
-$ ysh --schema deploy.schema.json --apply-patch promote.json --diff deploy.yml
+$ ysh --preserve-only --diff '.image.tag = "stable"' deploy.yml
+--- a/deploy.yml
++++ b/deploy.yml
+@@ -2 +2 @@
+-  tag: old # keep this comment
++  tag: stable # keep this comment
 ```
 
-## Install one file
+No package manager, language runtime, YAML library, plugin host, or opaque binary. The constraint is the fun part.
 
-With Homebrew:
+## Install
 
 ```sh
 brew install azohra/tools/ysh
 ```
 
-Or install the release directly. The hosted installer downloads the artifact, verifies its pinned SHA-256 digest, then writes it to `/usr/local/bin`:
+Or install the checksum-pinned release artifact:
 
 ```sh
 curl -fsSL https://yaml.azohra.com/install | sh
 ```
 
-Install without `sudo`:
+Choose another directory with `YSH_INSTALL_DIR="$HOME/.local/bin"`.
+
+Read-only queries require `/bin/sh` and AWK. Source-aware `--check`, `--diff`, and `-i` also use `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc` from the host.
+
+## What makes it useful
+
+### Program the structure
+
+Paths, streams, filters, reducers, construction, updates, aliases, merges, metadata, and multi-document input share one node graph.
 
 ```sh
-curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR="$HOME/.local/bin" sh
+ysh '.services | map(select(.port >= 8000)) | map(.name)' config.yml
+ysh -n -o yaml '{name: "api", enabled: true, ports: [8080, 8443]}'
+ysh -o yaml '.replicas += 1 | del(.metadata.internal)' deploy.yml
+ysh eval-all '. as $doc ireduce ({}; . * $doc)' defaults.yml production.yml
 ```
 
-Requirements: `/bin/sh` and AWK. That is the whole runtime dependency graph.
+The syntax is intentionally familiar to yq users, but YAML.sh's product is the portable graph, source compiler, and repository transaction—not imitation for its own sake.
 
-## Why this exists
-
-Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.
-
-YAML.sh is for that second moment. It keeps useful paths, streams, filters, construction, source-aware updates, environment composition, multi-file transactions, configuration codecs, standard patches, and schema gates. It still does not execute commands, access the network, or hide a second runtime.
-
-The constraint is the fun part.
-
-## Do real configuration work
-
-Read and filter:
+### Edit YAML without eating the comments
 
 ```sh
-ysh '.server.ports[1]' config.yml
-ysh '.services[] | select(.enabled) | .name' config.yml
-ysh '.services | filter(.port >= 8000) | map(.name)' config.yml
-ysh '.owner | trim' config.yml
+ysh --check '.image.tag = "stable"' services/*.yml
+ysh --diff '.image.tag = "stable"' services/*.yml
+ysh --preserve-only -i '.image.tag = "stable"' services/*.yml
 ```
 
-Build and update:
+Scalar, flow, block-scalar, insert, delete, comment, and reorder changes compile into owned source spans. Bytes outside those spans stay intact. `--preserve-only` refuses a transform that would require semantic regeneration.
 
-```sh
-ysh -n -o=yaml '{name: "api", enabled: true, ports: [8080, 8443]}'
-ysh -o=yaml '.replicas += 1 | del(.metadata.internal)' deploy.yml
-ysh -i '.image.tag = "stable"' deploy.yml
-ysh -i 'setpath(["jobs", "deploy", "runs-on"]; "ubuntu-latest")' workflow.yml
-ysh -i '.metadata.release = "2026-08"' services/*.yml
-ysh -o=yaml 'sort_keys(..)' config.yml
-```
+`--check` and `--diff` write nothing and return `0` when clean, `1` when files would change, and `2` on error. The exact prepared candidates flow into `-i`. Multi-file writes work from snapshots, detect drift, skip no-ops, and retain rollback material.
 
-Compose files and environment:
-
-```sh
-IMAGE_TAG=stable ysh -i '.image.tag = strenv(IMAGE_TAG)' deploy.yml
-ysh eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' defaults.yml production.yml
-ysh eval-all '. as $doc ireduce ({}; . * $doc)' defaults.yml region.yml secrets.yml
-ysh eval-all -i 'select(fileIndex == 0).tag as $tag | select(fileIndex > 0).image.tag = $tag' release.yml services/*.yml
-```
-
-Decode embedded configuration or load a local default:
-
-```sh
-ysh '.payload | from_json | .services[] | select(.enabled)' config.yml
-ysh -n 'load("defaults.yml") * load("production.yml")'
-ysh '.object | @yaml | @base64' config.yml
-```
-
-Read another configuration format directly:
-
-```sh
-ysh '.database.port' config.toml
-ysh -p ini -o yaml '.' app.ini
-ysh -p xml --json '.catalog.item' catalog.xml
-```
-
-Validate, patch, or produce a standard change set:
+### Work with configuration contracts
 
 ```sh
 ysh --schema service.schema.json '.' service.yml
@@ -128,73 +89,23 @@ ysh --merge-patch production.json -i service.yml
 ysh --json --generate-patch desired.yml '.' current.yml > change.json
 ```
 
-JSON, YAML, TOML, INI, XML, properties, CSV, TSV, Base64, URI, and shell codecs run inside the same file. `eval(EXPR)` handles data-driven YAML.sh expressions. Disable query-selected local reads with `--security-disable-file-ops`; use `--shuffle-seed N` for reproducible shuffle.
+JSON Pointer, JSON Patch, Merge Patch, and a documented JSON Schema profile operate directly on the graph. JSON, YAML, TOML, INI, XML, properties, CSV, TSV, Base64, URI, and shell-text codecs are built in.
 
-Guard an update with a useful failure:
-
-```sh
-ysh -i 'with(.kind; select(. == "Deployment") or error("expected Deployment")) | .spec.replicas = 3' deploy.yml
-```
-
-Preview and commit a repository with the same query:
-
-```sh
-ysh --check '.image.tag = "stable"' services/*.yml
-ysh --diff '.image.tag = "stable"' services/*.yml
-ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
-ysh -i '.image.tag = "stable"' services/*.yml
-```
-
-`--check` and `--diff` write nothing and exit `0` when clean, `1` for drift, and `2` on error. Diff mode prints the exact candidates that `-i` would commit. Add `--preserve-only` to reject any edit that would regenerate YAML presentation.
-
-Inspect the parser:
+### Inspect what happened
 
 ```sh
 ysh --type '.release.created' config.yml
-ysh --line '.services[0].port' config.yml
 ysh '[.services[0].port | line, .services[0].port | column]' config.yml
 ysh --events config.yml
 ysh --ast config.yml
-ysh --explain -i '.image.tag = "stable"' deploy.yml
-ysh --explain=json -i '.image.tag = "stable"' deploy/*.yml 2>changes.jsonl
+ysh --explain=json --diff '.image.tag = "stable"' deploy.yml 2>changes.jsonl
 ```
 
-`--explain` writes mutation paths, the presentation decision, and the prepared source-edit count to stderr without echoing values. Its JSON form emits one audit record per input, including whether the final candidate actually differs.
+Events and AST output expose the parser. Explain mode reports selection paths, mutations, and presentation decisions without logging values.
 
-The [recipe book](https://yaml.azohra.com/docs/recipes/) starts with tasks. The [query guide](https://yaml.azohra.com/docs/queries/) covers the language.
+## Trust model
 
-## One file, real structure
-
-YAML.sh parses YAML into a node graph:
-
-```text
-YAML stream → node graph → aliases + merges → expression stream → values / YAML
-```
-
-Mappings remain mappings. Empty collections survive. Tags and source lines stay attached. Anchors and aliases retain shared identity. Updates operate on selected nodes rather than reconstructed strings.
-
-After evaluation, YAML.sh compiles a non-overlapping edit plan against the original source. Scalar replacements, flow collections, block scalars, block inserts/appends, comment edits, record deletions, and mapping or sequence reorders keep untouched bytes intact. Attached comments move with their records; edits through aliases or merges update the owned anchor source. Changed flow spans use stable flow formatting. Unsupported structural edits fall back to deterministic semantic YAML unless `--preserve-only` is set.
-
-Multi-file `-i` evaluates preserved source snapshots, then verifies the live inputs still match before replacing anything. Each changed file is checked again immediately before its atomic sibling rename. Drift aborts the transaction; a commit failure or interrupt restores the evaluated snapshots. Writable `eval-all` can read one file and update another under the same guarded transaction.
-
-## Know what you can rely on
-
-Every public claim has an owner:
-
-| Guarantee | Evidence |
-| --- | --- |
-| Parsed YAML has the documented graph semantics | Pinned YAML Test Suite outcomes plus a fail-closed boundary matrix |
-| Listed yq-shaped forms agree with yq | A form-by-form manifest, differential oracle, and configuration workflows |
-| Standard configuration contracts behave as documented | 108 external JSON Patch assertions, 205/205 TOML 1.0 decoder and encoder fixtures, 462 invalid TOML rejections, and 701 focused JSON Schema 2020-12 assertions |
-| A preview is the candidate that will be committed | Shared check/diff/write plans, drift races, injected failures, and rollback tests |
-| Strict edits keep bytes outside owned spans | Exact source-preservation properties across scalar, flow, block, record, alias, and reorder edits |
-| The one-file runtime stays portable and bounded | Cross-AWK/shell CI plus time, node, depth, document, and memory limits |
-
-The [operator manifest](https://yaml.azohra.com/docs/operators/) says supported, focused, or excluded for every YAML-oriented yq area. [YAML support](https://yaml.azohra.com/docs/supported_yml/) does the same for syntax. Nearby unsupported input gets an explicit error instead of a confident misparse.
-
-## A controllable security model
-
-YAML.sh does not run YAML as shell code, execute commands, access the network, or construct application objects from tags. Explicit environment and file operators have separate disable switches. Input, loaded bytes, embedded parses, dynamic expressions, graph nodes, and collection depth share configurable ceilings.
+Documents are data. Queries are programs. YAML.sh does not spawn commands, open network connections, load plugins, or construct application objects from tags. Environment reads, query-selected local-file reads, and dynamic expression evaluation can be disabled independently:
 
 ```sh
 ysh \
@@ -203,52 +114,30 @@ ysh \
   --max-depth 80 \
   --security-disable-env-ops \
   --security-disable-file-ops \
-  '.metadata.name' untrusted.yml
+  --security-disable-eval \
+  "$QUERY" input.yml
 ```
 
-See [security and limits](https://yaml.azohra.com/docs/security/) for the trust boundary.
+Those controls narrow capability; they do not make an untrusted query a sandbox. Read [security and limits](https://yaml.azohra.com/docs/security/) before crossing a trust boundary.
 
-## CLI at a glance
+## Know the boundary
 
-```text
-ysh [OPTIONS] QUERY [FILE...]
-ysh eval-all QUERY FILE...
-```
+YAML.sh names support instead of implying it:
 
-| Option | Purpose |
-| --- | --- |
-| `-p yaml|json|toml|ini|xml` | Select input format; filenames are detected automatically |
-| `-o value|raw|json|yaml|toml|ini|xml` | Select output form |
-| `-r`, `--json`, `-y` | Raw scalar, JSON, or YAML shortcuts |
-| `-i` | Transactionally update one or more real files |
-| `--check` | Report whether the same update would change files: clean `0`, drift `1`, error `2` |
-| `--diff` | Print the prepared transaction as unified diffs: clean `0`, drift `1`, error `2` |
-| `--preserve-only` | Refuse an edit that would regenerate source presentation |
-| `-n` | Build output without reading input |
-| `-e` | Fail on empty, null, or false output |
-| `-I N`, `--unwrap-scalar=false` | Control YAML indentation or retain scalar presentation |
-| `-d N`, `--all-documents` | Select one or every YAML document |
-| `--type`, `--tag`, `--line` | Inspect selected node metadata |
-| `--ast`, `--events` | Inspect parser structure |
-| `--explain`, `--explain=json` | Report value-free mutations and presentation behavior |
-| `--security-disable-env-ops`, `--security-disable-file-ops` | Disable explicit environment or local-file reads |
-| `--shuffle-seed N` | Make portable shuffle reproducible |
-| `--schema FILE` | Validate results with the documented JSON Schema 2020-12 profile |
-| `--apply-patch`, `--merge-patch` | Apply RFC 6902 or RFC 7396 after the query |
-| `--generate-patch FILE` | Generate deterministic RFC 6902 operations to a target document |
-| `--max-input-bytes`, `--max-nodes`, `--max-depth` | Bound hostile input |
+- [YAML support](https://yaml.azohra.com/docs/supported_yml/) records accepted and rejected syntax.
+- [Query guide](https://yaml.azohra.com/docs/queries/) defines the expression language.
+- [Operator manifest](https://yaml.azohra.com/docs/operators/) audits the yq-shaped surface with evidence for every row.
+- [Configuration contracts](https://yaml.azohra.com/docs/contracts/) define patches, schemas, and non-YAML codecs.
 
-Run `ysh --help` for the complete interface.
+Unsupported neighboring syntax should fail clearly rather than return a plausible lie. The release suite checks pinned parser outcomes, cross-AWK and cross-shell behavior, differential semantics, source-preservation properties, transaction races and faults, adversarial limits, and useful scale.
 
-## Hack on it
+## Build and contribute
 
 ```sh
 make all
 ```
 
-That builds the standalone file, runs ShellCheck, and executes the behavioral suite. The portability matrix covers macOS AWK, mawk, original AWK, POSIX-mode gawk, BusyBox AWK, and several POSIX shells. Release evidence adds YAML, TOML, and JSON Schema conformance; the operator manifest; parser boundaries; yq differential; preservation properties; fault injection; and scale.
-
-The implementation is intentionally inspectable. Start with the [internals guide](https://yaml.azohra.com/docs/internals/) or [development guide](https://yaml.azohra.com/docs/development/).
+Development source is modular under `src/awk/`; the build assembles the single `ysh` artifact. Start with [DESIGN.md](DESIGN.md), then read the [internals](https://yaml.azohra.com/docs/internals/) and [development](https://yaml.azohra.com/docs/development/) guides.
 
 ## License
 
