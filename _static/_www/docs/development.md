@@ -13,6 +13,7 @@ The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, ru
 ```text
 src/ysh.sh              POSIX shell CLI
 src/ysh.awk             YAML engine
+src/diff.awk            bounded unified-diff renderer
 test/test.sh            behavioral suite
 test/conformance.sh     pinned YAML Test Suite gate
 test/differential.sh    pinned yq comparison gate

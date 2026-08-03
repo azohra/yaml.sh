@@ -11,7 +11,10 @@ FAILURE_ROOT=${YSH_PRESENTATION_FAILURE_DIR:-${TMPDIR:-/tmp}}
 
 INPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-input.XXXXXX")
 EXPECTED=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-expected.XXXXXX")
-trap 'rm -f "$INPUT" "$EXPECTED"' 0 1 2 3 15
+EXPECTED_APPEND=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-append.XXXXXX")
+BEFORE=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-before.XXXXXX")
+DIFF_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-diff.XXXXXX")
+trap 'rm -f "$INPUT" "$EXPECTED" "$EXPECTED_APPEND" "$BEFORE" "$DIFF_OUTPUT"' 0 1 2 3 15
 
 generate_case() {
     generated_case=$1
@@ -36,6 +39,9 @@ generate_case() {
         print "---"
         print "# deployment case " seed
         print "defaults: &defaults {retries: " retries ", mode: safe} # flow stays " seed
+        print "metadata: # labels " seed
+        print "  owner: platform"
+        print "  environment: test"
         print "service: !e!app"
         print "  name: " name "       # public name " seed
         print "  owner: '\''" owner "'\''"
@@ -56,6 +62,10 @@ generate_case() {
         print "---" > expected
         print "# deployment case " seed > expected
         print "defaults: &defaults {retries: " retries ", mode: safe} # flow stays " seed > expected
+        print "metadata: # labels " seed > expected
+        print "  owner: platform" > expected
+        print "  environment: test" > expected
+        print "  region: \"west\"" > expected
         print "service: !e!app" > expected
         print "  name: " changed_name "       # public name " seed > expected
         print "  owner: '\''" owner "'\''" > expected
@@ -63,7 +73,6 @@ generate_case() {
         print "    keep case " seed > expected
         print "    exactly" > expected
         print "  inherited: *defaults" > expected
-        print "  region: \"west\"" > expected
         print "items: # order " seed > expected
         print "  # second item " seed > expected
         print "  - !e!item '\''" second "'\''" > expected
@@ -96,7 +105,7 @@ while [ "$case_id" -le "$last_case" ]; do
     case_mode=$((matrix_case % 3))
     case_variant=$((matrix_case / 3))
     generate_case "$case_id" "$case_mode" "$case_variant"
-    if ! "$YSH_BINARY" -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .service.region = "west"' "$INPUT" >/dev/null 2>&1 ||
+    if ! "$YSH_BINARY" --preserve-only -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .metadata += {region:"west"}' "$INPUT" >/dev/null 2>&1 ||
         ! cmp -s "$INPUT" "$EXPECTED"; then
         failure_dir=$FAILURE_ROOT/ysh-presentation-failure-$case_id
         mkdir -p "$failure_dir"
@@ -105,6 +114,24 @@ while [ "$case_id" -le "$last_case" ]; do
         printf '%s\n' "YSH_PRESENTATION_REPLAY=$case_id ./test/presentation-matrix.sh" > "$failure_dir/replay.sh"
         chmod 755 "$failure_dir/replay.sh"
         printf 'Presentation mutation case %s failed; replay saved in %s\n' "$case_id" "$failure_dir" >&2
+        exit 1
+    fi
+
+    awk '/^footer:/ { print "  - \"added\"" } { print }' "$EXPECTED" > "$EXPECTED_APPEND"
+    cp "$INPUT" "$BEFORE"
+    if "$YSH_BINARY" --preserve-only --diff '.items += ["added"]' "$INPUT" > "$DIFF_OUTPUT" 2>/dev/null; then
+        diff_status=0
+    else
+        diff_status=$?
+    fi
+    if [ "$diff_status" -ne 1 ] || ! cmp -s "$INPUT" "$BEFORE" ||
+        ! grep -Fq '+  - "added"' "$DIFF_OUTPUT"; then
+        printf 'Strict diff case %s did not preview its exact non-writing edit.\n' "$case_id" >&2
+        exit 1
+    fi
+    if ! "$YSH_BINARY" --preserve-only -i '.items += ["added"]' "$INPUT" >/dev/null 2>&1 ||
+        ! cmp -s "$INPUT" "$EXPECTED_APPEND"; then
+        printf 'Strict sequence append case %s did not match its preview.\n' "$case_id" >&2
         exit 1
     fi
     passed=$((passed + 1))

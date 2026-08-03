@@ -1,9 +1,12 @@
 #!/bin/sh
 
-YSH_VERSION=1.10.0
+YSH_VERSION=1.11.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
+
+# Replaced by the build with the embedded unified-diff renderer.
+# YSH_DIFF_PROGRAM
 
 ysh_error() {
     printf "Error: %s\n" "$*" >&2
@@ -25,6 +28,7 @@ Examples:
   ysh -o yaml '.release.channel = "stable"' config.yml
   ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
   ysh --check '.image.tag = "stable"' services/*.yml
+  ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
   ysh eval-all -i 'select(fileIndex == 0).tag as \$tag | select(fileIndex > 0).image.tag = \$tag' release.yml services/*.yml
   ysh -n -o yaml '{name: "api", enabled: true}'
   ysh '.services | map(.name) | unique' config.yml
@@ -53,6 +57,8 @@ Documents:
   -n, --null-input        build output without reading input
   -i, --inplace           transactionally update YAML files in place
       --check             preflight changes without writing (0 clean, 1 drift, 2 error)
+      --diff              preview the exact transaction as a unified diff
+      --preserve-only     refuse edits that would regenerate YAML presentation
 
 Evaluation:
   -e, --exit-status       fail on no result, null, or false
@@ -73,7 +79,7 @@ Other:
 QUERY supports yq-style paths, streams, variables, slices, interpolation,
 portable regexes, maps, reducers, sorting, arithmetic, construction,
 assignment, deletion, and deep merge policies. Collections emit JSON by default.
-Safe in-place edits preserve comments; other edits emit stable YAML.
+Common edits preserve comments; other edits emit stable YAML unless --preserve-only is set.
 EOF
 }
 
@@ -100,6 +106,7 @@ ysh_invoke_awk() {
         -v combined_files_mode="$YSH_COMBINED_FILES" \
         -v null_input_mode="$YSH_NULL_INPUT" \
         -v inplace_mode="$YSH_INPLACE" \
+        -v preserve_only_mode="$YSH_PRESERVE_ONLY" \
         -v exit_status_mode="$YSH_EXIT_STATUS" \
         -v explain_mode="$YSH_EXPLAIN" \
         -v yaml_indent="$YSH_INDENT" \
@@ -187,12 +194,28 @@ ysh_cleanup_transaction() {
     done
     for YSH_CLEANUP_LIST in "$YSH_TRANSACTION_INPUT_LIST" "$YSH_TRANSACTION_NEW_LIST" "$YSH_TRANSACTION_OLD_LIST" \
         "$YSH_TRANSACTION_REPORT" "$YSH_TRANSACTION_CALL_LOG" "$YSH_TRANSACTION_OUTPUT" "$YSH_TRANSACTION_CHANGE_LIST" \
-        "$YSH_TRANSACTION_COMMITTED_INPUT_LIST" "$YSH_TRANSACTION_COMMITTED_OLD_LIST"; do
+        "$YSH_TRANSACTION_FINAL_CHANGE_LIST" "$YSH_TRANSACTION_COMMITTED_INPUT_LIST" "$YSH_TRANSACTION_COMMITTED_OLD_LIST"; do
         [ -z "$YSH_CLEANUP_LIST" ] || rm -f "$YSH_CLEANUP_LIST"
     done
 }
 
 ysh_append_transaction_log() {
+    if [ "$YSH_EXPLAIN" -eq 2 ]; then
+        while IFS= read -r YSH_LOG_LINE && IFS= read -r YSH_LOG_CHANGED <&4; do
+            case "$YSH_LOG_LINE" in
+            \{*\})
+                if [ "$YSH_LOG_CHANGED" -eq 1 ]; then
+                    YSH_LOG_CHANGED_JSON=true
+                else
+                    YSH_LOG_CHANGED_JSON=false
+                fi
+                printf '%s,"changed":%s}\n' "${YSH_LOG_LINE%?}" "$YSH_LOG_CHANGED_JSON" >> "$YSH_TRANSACTION_REPORT"
+                ;;
+            *) printf '%s\n' "$YSH_LOG_LINE" >> "$YSH_TRANSACTION_REPORT" ;;
+            esac
+        done < "$YSH_TRANSACTION_CALL_LOG" 4< "$YSH_TRANSACTION_CHANGE_LIST"
+        return
+    fi
     while IFS= read -r YSH_LOG_LINE; do
         printf '%s\n' "$YSH_LOG_LINE" >> "$YSH_TRANSACTION_REPORT"
     done < "$YSH_TRANSACTION_CALL_LOG"
@@ -316,6 +339,7 @@ ysh_close_transaction() {
     YSH_TRANSACTION_CALL_LOG=
     YSH_TRANSACTION_OUTPUT=
     YSH_TRANSACTION_CHANGE_LIST=
+    YSH_TRANSACTION_FINAL_CHANGE_LIST=
     YSH_TRANSACTION_COMMITTED_INPUT_LIST=
     YSH_TRANSACTION_COMMITTED_OLD_LIST=
     trap - 0 1 2 3 15
@@ -342,7 +366,46 @@ ysh_report_check() {
     [ "$YSH_CHECK_CHANGED_COUNT" -eq 0 ]
 }
 
-ysh_run_inplace_transaction() {
+ysh_diff_files() {
+    YSH_DIFF_OLD=$1
+    YSH_DIFF_NEW=$2
+    YSH_DIFF_PATH=${3#./}
+    YSH_DIFF_OLD_NEWLINES=$(LC_ALL=C wc -l < "$YSH_DIFF_OLD")
+    YSH_DIFF_NEW_NEWLINES=$(LC_ALL=C wc -l < "$YSH_DIFF_NEW")
+    ysh_diff_program \
+        -v path="$YSH_DIFF_PATH" \
+        -v old_newlines="$YSH_DIFF_OLD_NEWLINES" \
+        -v new_newlines="$YSH_DIFF_NEW_NEWLINES" \
+        "$YSH_DIFF_OLD" "$YSH_DIFF_NEW"
+}
+
+ysh_report_diff() {
+    YSH_DIFF_CHANGED_COUNT=0
+    while IFS= read -r YSH_DIFF_INPUT && IFS= read -r YSH_DIFF_NEW <&4 && IFS= read -r YSH_DIFF_CHANGED <&5; do
+        if [ "$YSH_DIFF_CHANGED" -eq 1 ]; then
+            YSH_DIFF_CHANGED_COUNT=$((YSH_DIFF_CHANGED_COUNT + 1))
+            if ! ysh_diff_files "$YSH_DIFF_INPUT" "$YSH_DIFF_NEW" "$YSH_DIFF_INPUT"; then
+                ysh_error "could not render diff: $YSH_DIFF_INPUT"
+                return 2
+            fi
+        fi
+    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_NEW_LIST" 5< "$YSH_TRANSACTION_CHANGE_LIST"
+    ysh_emit_transaction_log "$YSH_TRANSACTION_REPORT"
+    [ "$YSH_DIFF_CHANGED_COUNT" -eq 0 ]
+}
+
+ysh_finalize_edit_plan() {
+    : > "$YSH_TRANSACTION_FINAL_CHANGE_LIST"
+    while IFS= read -r YSH_PLAN_INPUT && IFS= read -r YSH_PLAN_NEW <&4 && IFS= read -r YSH_PLAN_CHANGED <&5; do
+        if [ "$YSH_PLAN_CHANGED" -eq 1 ] && cmp -s "$YSH_PLAN_INPUT" "$YSH_PLAN_NEW"; then
+            YSH_PLAN_CHANGED=0
+        fi
+        printf '%s\n' "$YSH_PLAN_CHANGED" >> "$YSH_TRANSACTION_FINAL_CHANGE_LIST"
+    done < "$YSH_TRANSACTION_INPUT_LIST" 4< "$YSH_TRANSACTION_NEW_LIST" 5< "$YSH_TRANSACTION_CHANGE_LIST"
+    cp "$YSH_TRANSACTION_FINAL_CHANGE_LIST" "$YSH_TRANSACTION_CHANGE_LIST"
+}
+
+ysh_run_edit_transaction() {
     YSH_TRANSACTION_INPUT_LIST=
     YSH_TRANSACTION_NEW_LIST=
     YSH_TRANSACTION_OLD_LIST=
@@ -350,6 +413,7 @@ ysh_run_inplace_transaction() {
     YSH_TRANSACTION_CALL_LOG=
     YSH_TRANSACTION_OUTPUT=
     YSH_TRANSACTION_CHANGE_LIST=
+    YSH_TRANSACTION_FINAL_CHANGE_LIST=
     YSH_TRANSACTION_COMMITTED_INPUT_LIST=
     YSH_TRANSACTION_COMMITTED_OLD_LIST=
     trap 'ysh_cleanup_transaction' 0
@@ -361,6 +425,7 @@ ysh_run_inplace_transaction() {
     YSH_TRANSACTION_CALL_LOG=$(mktemp "${TMPDIR:-/tmp}/ysh-call-log.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-output.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_CHANGE_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-changes.XXXXXX") || { ysh_close_transaction; return 1; }
+    YSH_TRANSACTION_FINAL_CHANGE_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-final-changes.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_COMMITTED_INPUT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-committed-inputs.XXXXXX") || { ysh_close_transaction; return 1; }
     YSH_TRANSACTION_COMMITTED_OLD_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-committed-old.XXXXXX") || { ysh_close_transaction; return 1; }
 
@@ -426,16 +491,20 @@ ${YSH_TRANSACTION_INPUT}"
     if ! ysh_run_awk "$@" > "$YSH_TRANSACTION_OUTPUT" 2> "$YSH_TRANSACTION_CALL_LOG"; then
         ysh_emit_transaction_errors "$YSH_TRANSACTION_CALL_LOG"
         ysh_error "transaction aborted before writing any files"
-        if [ "$YSH_CHECK" -eq 1 ]; then
+        if [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ] || [ "$YSH_PRESERVE_ONLY" -eq 1 ]; then
             return 2
         fi
         return 1
     fi
     if ! ysh_split_transaction_output; then
         ysh_error "transaction aborted before writing any files"
-        if [ "$YSH_CHECK" -eq 1 ]; then
+        if [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ] || [ "$YSH_PRESERVE_ONLY" -eq 1 ]; then
             return 2
         fi
+        return 1
+    fi
+    if ! ysh_finalize_edit_plan; then
+        ysh_error "transaction aborted while finalizing the edit plan"
         return 1
     fi
     ysh_append_transaction_log
@@ -445,6 +514,15 @@ ${YSH_TRANSACTION_INPUT}"
         ysh_report_check || YSH_CHECK_STATUS=1
         ysh_close_transaction
         return "$YSH_CHECK_STATUS"
+    fi
+    if [ "$YSH_DIFF" -eq 1 ]; then
+        if ysh_report_diff; then
+            YSH_DIFF_STATUS=0
+        else
+            YSH_DIFF_STATUS=$?
+        fi
+        ysh_close_transaction
+        return "$YSH_DIFF_STATUS"
     fi
 
     YSH_TRANSACTION_STATUS=0
@@ -491,6 +569,8 @@ ysh_main() {
     YSH_NULL_INPUT=0
     YSH_INPLACE=0
     YSH_CHECK=0
+    YSH_DIFF=0
+    YSH_PRESERVE_ONLY=0
     YSH_EXIT_STATUS=0
     YSH_EXPLAIN=0
     YSH_INDENT=2
@@ -608,6 +688,14 @@ ysh_main() {
             ;;
         --check)
             YSH_CHECK=1
+            shift
+            ;;
+        --diff)
+            YSH_DIFF=1
+            shift
+            ;;
+        --preserve-only)
+            YSH_PRESERVE_ONLY=1
             shift
             ;;
         -e|--exit-status)
@@ -774,12 +862,23 @@ ${YSH_POSITIONAL_REST}"
         ysh_error "--check cannot be combined with --inplace"
         return 2
     fi
-    if [ "$YSH_CHECK" -eq 1 ] && [ "$YSH_EXIT_STATUS" -eq 1 ]; then
-        ysh_error "--check cannot be combined with --exit-status"
+    if [ "$YSH_DIFF" -eq 1 ] && { [ "$YSH_INPLACE" -eq 1 ] || [ "$YSH_CHECK" -eq 1 ]; }; then
+        ysh_error "--diff cannot be combined with --inplace or --check"
+        return 2
+    fi
+    if { [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; } && [ "$YSH_EXIT_STATUS" -eq 1 ]; then
+        ysh_error "--check and --diff cannot be combined with --exit-status"
         return 2
     fi
     if [ "$YSH_CHECK" -eq 1 ]; then
         YSH_INPLACE=1
+    fi
+    if [ "$YSH_DIFF" -eq 1 ]; then
+        YSH_INPLACE=1
+    fi
+    if [ "$YSH_PRESERVE_ONLY" -eq 1 ] && [ "$YSH_INPLACE" -eq 0 ]; then
+        ysh_error "--preserve-only requires --inplace, --check, or --diff"
+        return 2
     fi
     if [ "$YSH_INPLACE" -eq 1 ]; then
         if [ "$YSH_NULL_INPUT" -eq 1 ]; then
@@ -793,9 +892,10 @@ ${YSH_POSITIONAL_REST}"
         if [ -z "$YSH_INPUT_FILES" ]; then
             YSH_INPUT_FILES=$YSH_INPUT_FILE
         fi
-        ysh_run_inplace_transaction
+        ysh_run_edit_transaction
         YSH_TRANSACTION_RESULT=$?
-        if [ "$YSH_CHECK" -eq 1 ] && [ "$YSH_TRANSACTION_RESULT" -ne 0 ] && [ "$YSH_TRANSACTION_RESULT" -ne 1 ]; then
+        if { [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; } &&
+            [ "$YSH_TRANSACTION_RESULT" -ne 0 ] && [ "$YSH_TRANSACTION_RESULT" -ne 1 ]; then
             return 2
         fi
         return "$YSH_TRANSACTION_RESULT"

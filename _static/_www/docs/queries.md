@@ -282,14 +282,21 @@ ysh -o=yaml 'setpath(["spec", "replicas"]; 4)' deploy.yml
 ysh -o=yaml 'delpaths([["metadata", "annotations"], ["metadata", "managedFields"]])' deploy.yml
 ```
 
-Use `--check` to run the same preflight without writing. It returns `0` when clean, `1` for drift, and `2` for an invalid query or input. Use `-i` to transactionally replace one or more real, non-symlink inputs. Every changed candidate is complete before the first replacement; no-op files are not replaced, and a commit failure restores the originals.
+Use `--check` for a quiet preflight or `--diff` to see the exact prepared transaction. Both write nothing and return `0` when clean, `1` for drift, and `2` for an invalid query or input. Use `-i` to commit those candidates transactionally. No-op files are not replaced, and a commit failure restores the originals.
 
 ```sh
 ysh --check '.image.tag = "stable"' services/*.yml
+ysh --diff '.image.tag = "stable"' services/*.yml
 ysh -i '.image.tag = "stable"' services/*.yml
 ```
 
-Safe scalar edits, direct inserts/deletes, and pure sequence reorders preserve presentation; other structural edits use stable semantic YAML.
+Safe scalar edits, direct block inserts/deletes, block mapping and sequence appends, and pure sequence reorders preserve presentation. Other structural edits use stable semantic YAML. Add `--preserve-only` when regeneration should be an error:
+
+```sh
+ysh --preserve-only --diff '.items += ["release"]' config.yml
+```
+
+Strict mode can reject a semantically valid transform—for example, a flow-layout rewrite or a mapping append that would materialize an alias. That refusal is the contract, not a parser failure.
 
 ## Merged and aliased nodes
 

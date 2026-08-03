@@ -5,7 +5,7 @@ YAML.sh is a focused, yq-like tool delivered as one readable shell file. It runs
 ```sh
 ysh '.services[] | select(.enabled) | .name' config.yml
 ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
-ysh --check '.release.channel = "stable"' services/*.yml
+ysh --preserve-only --diff '.release.channel = "stable"' services/*.yml
 ```
 
 ## Start with the task
@@ -26,7 +26,7 @@ YAML.sh lives in that second moment. It keeps the useful configuration workflow 
 - a portable POSIX shell launcher and AWK engine;
 - real mappings, sequences, tags, anchors, aliases, and merge behavior;
 - a writable expression stream rather than chained query flags;
-- one compiled query and one preflighted transaction for repository work;
+- one shared check, diff, and commit plan for repository work;
 - no package manager, runtime, plugin system, or hidden binary.
 
 ## Real structure
@@ -67,7 +67,7 @@ Read [security and limits](security.md) before handling untrusted documents or e
 ```sh
 ysh --events config.yml
 ysh --ast config.yml
-ysh --check '.image.tag = "stable"' services/*.yml
+ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
 ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 

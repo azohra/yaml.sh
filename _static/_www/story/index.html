@@ -47,7 +47,7 @@
         <span aria-hidden="true">◆</span>
         <span>6 minute read</span>
         <span aria-hidden="true">◆</span>
-        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.10.0">YAML.sh v1.10</a>
+        <a href="https://github.com/azohra/yaml.sh/releases/tag/v1.11.0">YAML.sh v1.11</a>
       </div>
     </header>
 
@@ -87,13 +87,13 @@
           <p>Once the node graph existed, each capability made the next one possible. Traversal became an expression stream. Expressions became writable transformations. A source layer learned to preserve comments, whitespace, and style. File handling grew into preflighted multi-file transactions with rollback.</p>
           <p>The releases trace that architecture becoming useful. Each one made a specific part of the premise real while keeping the runtime to one POSIX shell file and AWK.</p>
           <ol class="story-timeline" aria-label="Release milestones">
-            <li><strong>v0.3</strong><span>Audit the old tool and make its limits explicit.</span></li>
             <li><strong>v1.0</strong><span>Replace flattened paths with a proper YAML node graph.</span></li>
             <li><strong>v1.2</strong><span>Turn queries into writable transformations.</span></li>
             <li><strong>v1.4</strong><span>Measure compatibility instead of describing it vaguely.</span></li>
             <li><strong>v1.6</strong><span>Add practical language depth without losing the one-file runtime.</span></li>
             <li><strong>v1.9</strong><span>Make multi-file edits explainable, rollback-safe, and transactional.</span></li>
             <li><strong>v1.10</strong><span>Make the repository the unit of work: one query, one process, one preflight.</span></li>
+            <li><strong>v1.11</strong><span>Make prepared edits exact, reviewable, and strict about source fidelity.</span></li>
           </ol>
         </section>
 
@@ -102,7 +102,7 @@
           <p>The hard part was not producing more code. The hard part was deciding what evidence would let us believe it.</p>
           <p>We compared YAML.sh with the official YAML Test Suite and with yq itself. We added real configuration workflows from Kubernetes, Docker Compose, GitHub Actions, GitLab CI, and deployment overlays. We generated expressions, hostile inputs, large documents, deep collections, and presentation-preserving mutations. A supported behaviour needed a test; nearby unsupported behaviour needed an explicit error instead of a confident misparse.</p>
           <p>That distinction matters. Matching 2,628 categorized yq programs does not mean YAML.sh contains all of yq. Passing 282 expected YAML Test Suite cases does not mean every corner of the YAML specification is implemented. The numbers describe the tested contract. They do not dissolve the boundary around it.</p>
-          <p>By v1.10, that contract was large enough to be useful and specific enough to be trusted. One command can check a repository without writing, bind data across files, prepare every mutation in one process, skip files that are already correct, roll back a broken commit, and leave a JSON audit trail containing paths but not values.</p>
+          <p>By v1.11, that contract was large enough to be useful and specific enough to be trusted. One command can preview the exact repository transaction, refuse presentation loss, bind data across files, skip files that are already correct, roll back a broken commit, and leave a JSON audit trail containing paths but not values.</p>
           <dl class="story-evidence">
             <div><dt>yq programs</dt><dd>2,628 / 2,628</dd><dd>in the categorized release corpus</dd></div>
             <div><dt>YAML outcomes</dt><dd>282 / 282</dd><dd>expected YAML Test Suite cases</dd></div>
@@ -121,7 +121,7 @@
         <section id="where-it-fits">
           <h2>Where it fits</h2>
           <p>YAML.sh is not yq in disguise. yq remains the right answer when you want its complete language, codecs, ecosystem, and mature performance envelope. YAML.sh deliberately leaves out dynamic evaluation, file-loading operators, dates, many codecs, and other capabilities that would weaken its small and inspectable runtime.</p>
-          <p>It is better at a narrower thing: arriving as one readable text file in an environment that already has a shell and AWK. There is no package manager, language runtime, YAML library, or mystery binary. The security model can also be smaller because several powerful classes of behaviour simply do not exist. Its repository mode can check without writing, update several files from shared data, skip no-ops, roll back a partial commit, and explain changed paths without recording values.</p>
+          <p>It is better at a narrower thing: arriving as one readable text file in an environment that already has a shell and AWK. There is no package manager, language runtime, YAML library, or mystery binary. The security model can also be smaller because several powerful classes of behaviour simply do not exist. Its repository mode can preview exact candidates, require source preservation, update several files from shared data, roll back a partial commit, and explain changed paths without recording values.</p>
           <p>That is enough of a difference to be a product, not just a stunt. Sometimes yq is exactly right. Sometimes you are writing the script that would install yq.</p>
         </section>
 

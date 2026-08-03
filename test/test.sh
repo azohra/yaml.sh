@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.10.0" "$(./ysh --version)"
+    assertEquals "v1.11.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -11,6 +11,8 @@ testHelp() {
     assertContains "$result" "events"
     assertContains "$result" "explain"
     assertContains "$result" "transactionally"
+    assertContains "$result" "preview the exact transaction"
+    assertContains "$result" "refuse edits that would regenerate"
 }
 
 testYqStyleFileQuery() {
@@ -575,6 +577,148 @@ testCheckPreflightsRepositoryChanges() {
     rm -f "$report_file" "$invalid_file" "$second_file" "$first_file"
 }
 
+testDiffPreviewsExactRepositoryTransaction() {
+    first_file=test/.tmp-diff-first-$$.yml
+    second_file=test/.tmp-diff-second-$$.yml
+    invalid_file=test/.tmp-diff-invalid-$$.yml
+    diff_file=test/.tmp-diff-output-$$
+    report_file=test/.tmp-diff-report-$$
+    printf '%s\n' 'name: ready # keep one' > "$first_file"
+    printf '%s\n' 'name: waiting # keep two' 'tail: kept' > "$second_file"
+    printf '%s\n' 'broken: [one' > "$invalid_file"
+
+    ./ysh --diff '.name = "ready"' "$first_file" > "$diff_file" 2> "$report_file"
+    assertEquals 0 $?
+    assertEquals 0 "$(wc -c < "$diff_file" | tr -d ' ')"
+
+    ./ysh --diff '.name = "temporary" | .name = "ready"' "$first_file" > "$diff_file" 2> "$report_file"
+    assertEquals 0 $?
+    assertEquals 0 "$(wc -c < "$diff_file" | tr -d ' ')"
+
+    ./ysh --diff --explain=json '.name = "temporary" | .name = "ready"' "$first_file" > "$diff_file" 2> "$report_file"
+    assertEquals 0 $?
+    assertContains "$(cat "$report_file")" '"changed":false'
+
+    ./ysh --diff '.name = "ready"' "$first_file" "$second_file" > "$diff_file" 2> "$report_file"
+    assertEquals 1 $?
+    result=$(cat "$diff_file")
+    assertContains "$result" "a/$second_file"
+    assertContains "$result" "b/$second_file"
+    printf '%s\n' "$result" | grep -F -- '-name: waiting # keep two' >/dev/null
+    assertEquals 0 $?
+    printf '%s\n' "$result" | grep -F -- '+name: ready # keep two' >/dev/null
+    assertEquals 0 $?
+    assertContains "$result" ' tail: kept'
+    assertNotContains "$result" "$first_file"
+    assertEquals 'name: waiting # keep two' "$(sed -n '1p' "$second_file")"
+
+    ./ysh --diff --explain=json '.name = "ready"' "$first_file" "$second_file" > "$diff_file" 2> "$report_file"
+    assertEquals 1 $?
+    assertEquals 2 "$(wc -l < "$report_file" | tr -d ' ')"
+    assertContains "$(sed -n '1p' "$report_file")" '"changed":false'
+    assertContains "$(sed -n '2p' "$report_file")" '"changed":true'
+    assertContains "$(sed -n '2p' "$report_file")" '"presentation":"preserved"'
+    assertContains "$(sed -n '2p' "$report_file")" '"path":".name"'
+
+    ./ysh --diff '.name = "ready"' "$first_file" "$invalid_file" > "$diff_file" 2> "$report_file"
+    assertEquals 2 $?
+    assertEquals 0 "$(wc -c < "$diff_file" | tr -d ' ')"
+    assertContains "$(cat "$report_file")" 'transaction aborted before writing any files'
+
+    ./ysh --diff -i '.name = "ready"' "$first_file" >/dev/null 2>&1
+    assertEquals 2 $?
+    ./ysh --diff -e '.name = "ready"' "$first_file" >/dev/null 2>&1
+    assertEquals 2 $?
+
+    rm -f "$report_file" "$diff_file" "$invalid_file" "$second_file" "$first_file"
+}
+
+testDiffReportsMissingFinalNewline() {
+    diff_input=test/.tmp-diff-newline-$$.yml
+    diff_output=test/.tmp-diff-newline-$$.out
+    printf '%s' 'name: old' > "$diff_input"
+
+    ./ysh --diff '.name = "new"' "$diff_input" > "$diff_output"
+    assertEquals 1 $?
+    grep -F -- '-name: old' "$diff_output" >/dev/null
+    assertEquals 0 $?
+    grep -F -- '+name: new' "$diff_output" >/dev/null
+    assertEquals 0 $?
+    grep -F -- '\ No newline at end of file' "$diff_output" >/dev/null
+    assertEquals 0 $?
+    assertEquals 9 "$(wc -c < "$diff_input" | tr -d ' ')"
+
+    ./ysh --diff '.name = "temporary" | .name = "old"' "$diff_input" > "$diff_output"
+    assertEquals 1 $?
+    grep -F -- '-name: old' "$diff_output" >/dev/null
+    assertEquals 0 $?
+    grep -F -- '+name: old' "$diff_output" >/dev/null
+    assertEquals 0 $?
+    grep -F -- '\ No newline at end of file' "$diff_output" >/dev/null
+    assertEquals 0 $?
+
+    rm -f "$diff_output" "$diff_input"
+}
+
+testDiffSeparatesDistantHunks() {
+    diff_input=test/.tmp-diff-hunks-$$.yml
+    diff_output=test/.tmp-diff-hunks-$$.out
+    printf '%s\n' 'a: old' 'b: keep' 'c: keep' 'd: keep' 'e: keep' 'f: keep' 'g: keep' 'h: keep' 'i: keep' 'j: old' > "$diff_input"
+
+    ./ysh --diff '.a = "new" | .j = "new"' "$diff_input" > "$diff_output"
+    assertEquals 1 $?
+    assertEquals 2 "$(grep -c '^@@' "$diff_output")"
+    grep -F -- '-a: old' "$diff_output" >/dev/null
+    assertEquals 0 $?
+    grep -F -- '+j: new' "$diff_output" >/dev/null
+    assertEquals 0 $?
+    assertEquals 'a: old' "$(sed -n '1p' "$diff_input")"
+    assertEquals 'j: old' "$(sed -n '10p' "$diff_input")"
+
+    rm -f "$diff_output" "$diff_input"
+}
+
+testPreserveOnlyRefusesRegeneration() {
+    preserve_file=test/.tmp-preserve-only-$$.yml
+    preserve_backup=test/.tmp-preserve-only-backup-$$.yml
+    preserve_output=test/.tmp-preserve-only-output-$$
+    preserve_error=test/.tmp-preserve-only-error-$$
+    alias_file=test/.tmp-preserve-only-alias-$$.yml
+    printf '%s\n' 'service:' '  name: api # keep' '  labels:' '    tier: web' 'items: # keep order' '  - one' 'tail: kept' > "$preserve_file"
+    cp "$preserve_file" "$preserve_backup"
+
+    ./ysh --preserve-only -i '.service.labels style = "flow"' "$preserve_file" > "$preserve_output" 2> "$preserve_error"
+    assertEquals 2 $?
+    assertContains "$(cat "$preserve_error")" 'preserve-only edit would regenerate YAML presentation'
+    cmp -s "$preserve_backup" "$preserve_file"
+    assertEquals 0 $?
+
+    ./ysh --preserve-only --check '.service.labels style = "flow"' "$preserve_file" >/dev/null 2> "$preserve_error"
+    assertEquals 2 $?
+    ./ysh --preserve-only --diff '.service.labels style = "flow"' "$preserve_file" > "$preserve_output" 2> "$preserve_error"
+    assertEquals 2 $?
+    assertEquals 0 "$(wc -c < "$preserve_output" | tr -d ' ')"
+
+    ./ysh --preserve-only -i '.service += {region: "west"} | .items += ["two"]' "$preserve_file"
+    assertEquals 0 $?
+    result=$(cat "$preserve_file")
+    assertContains "$result" 'name: api # keep'
+    assertContains "$result" 'region: "west"'
+    assertContains "$result" '  - "two"'
+    assertContains "$result" 'tail: kept'
+
+    printf '%s\n' 'defaults: &defaults' '  retries: 3' 'service:' '  inherited: *defaults' > "$alias_file"
+    ./ysh --preserve-only --diff '.service += {region: "west"}' "$alias_file" > "$preserve_output" 2> "$preserve_error"
+    assertEquals 2 $?
+    assertContains "$(cat "$preserve_error")" 'preserve-only edit would regenerate YAML presentation'
+    assertContains "$(cat "$alias_file")" 'inherited: *defaults'
+
+    ./ysh --preserve-only '.service.name = "worker"' "$preserve_file" >/dev/null 2>&1
+    assertEquals 2 $?
+
+    rm -f "$alias_file" "$preserve_error" "$preserve_output" "$preserve_backup" "$preserve_file"
+}
+
 testInplaceTransactionRollsBackCommitFailure() {
     first_file=test/.tmp-inplace-rollback-first-$$.yml
     second_file=test/.tmp-inplace-rollback-second-$$.yml
@@ -1020,11 +1164,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.10.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.11.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.10.0"
-    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.10"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.11.0"
+    assertContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.11"
     assertNotContains "$(cat _static/_www/story/index.html)" "v1.8"
     assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""

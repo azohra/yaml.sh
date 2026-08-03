@@ -29,13 +29,13 @@ ysh -e '.services[] | select(.name == "api")' config.yml >/dev/null
 
 ## Change a file safely
 
-Check the exact write path first:
+Preview the exact write first:
 
 ```sh
-ysh --check '.image.tag = "stable"' deploy.yml
+ysh --diff '.image.tag = "stable"' deploy.yml
 ```
 
-Exit status is `0` for clean, `1` for drift, and `2` for an invalid query or input. Then make the same update atomically:
+Exit status is `0` for clean, `1` for drift, and `2` for an invalid query or input. Use `--check` when a file list is enough. Then make the same update atomically:
 
 ```sh
 ysh -i '.image.tag = "stable"' deploy.yml
@@ -43,10 +43,20 @@ ysh -i '.image.tag = "stable"' deploy.yml
 
 `-i` refuses symlinks and only replaces the original after every document succeeds.
 
+When preserving comments and layout is mandatory, make it executable policy:
+
+```sh
+ysh --preserve-only --diff '.image.tag = "stable"' deploy.yml
+ysh --preserve-only -i '.image.tag = "stable"' deploy.yml
+```
+
+The command fails instead of falling back to regenerated YAML.
+
 Update a repository as one transaction:
 
 ```sh
 ysh --check '.image.tag = "stable"' services/*.yml
+ysh --diff '.image.tag = "stable"' services/*.yml
 ysh --explain=json -i '.image.tag = "stable"' services/*.yml 2>changes.jsonl
 ```
 

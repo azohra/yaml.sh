@@ -15,7 +15,9 @@ STREAM=$(mktemp "${TMPDIR:-/tmp}/ysh-scale-stream.XXXXXX")
 OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-scale-output.XXXXXX")
 ERROR=$(mktemp "${TMPDIR:-/tmp}/ysh-scale-error.XXXXXX")
 TIME_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-scale-time.XXXXXX")
-trap 'rm -f "$INPUT" "$STREAM" "$OUTPUT" "$ERROR" "$TIME_OUTPUT"' 0 1 2 3 15
+INPUT_BEFORE=$(mktemp "${TMPDIR:-/tmp}/ysh-scale-before.XXXXXX")
+DIFF_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-scale-diff.XXXXXX")
+trap 'rm -f "$INPUT" "$STREAM" "$OUTPUT" "$ERROR" "$TIME_OUTPUT" "$INPUT_BEFORE" "$DIFF_OUTPUT"' 0 1 2 3 15
 
 awk -v count="$SCALE_NODES" 'BEGIN {
     print "items:"
@@ -60,6 +62,25 @@ if [ -n "$rss_kb" ] && [ "$rss_kb" -gt "$MAX_RSS_KB" ]; then
     exit 1
 fi
 
+cp "$INPUT" "$INPUT_BEFORE"
+if "$YSH_BINARY" --max-nodes "$((SCALE_NODES * 2 + 10))" --preserve-only --diff \
+    ".items[$((SCALE_NODES - 1))] = 0" "$INPUT" > "$DIFF_OUTPUT" 2> "$ERROR"; then
+    diff_status=0
+else
+    diff_status=$?
+fi
+if [ "$diff_status" -ne 1 ] || ! cmp -s "$INPUT" "$INPUT_BEFORE" ||
+    ! grep -Fq -- "-  - $SCALE_NODES" "$DIFF_OUTPUT" ||
+    ! grep -Fq -- '+  - 0' "$DIFF_OUTPUT"; then
+    printf '%s\n' 'Scale edit did not produce an exact, non-writing strict diff.' >&2
+    exit 1
+fi
+diff_lines=$(wc -l < "$DIFF_OUTPUT" | tr -d ' ')
+if [ "$diff_lines" -gt 10 ]; then
+    printf 'One-line scale edit produced a %s-line diff.\n' "$diff_lines" >&2
+    exit 1
+fi
+
 awk -v count="$SCALE_DOCUMENTS" 'BEGIN {
     for (i = 0; i < count; i++) {
         print "---"
@@ -73,4 +94,4 @@ if [ "$("$YSH_BINARY" --max-nodes "$((SCALE_DOCUMENTS * 10 + 10))" --document "$
 fi
 
 bytes=$(wc -c < "$INPUT" | tr -d ' ')
-printf 'Scale contract: %s payload nodes, %s bytes, %ss, %s KiB RSS; %s documents pass\n' "$SCALE_NODES" "$bytes" "$elapsed" "$rss_kb" "$SCALE_DOCUMENTS"
+printf 'Scale contract: %s payload nodes, %s bytes, %ss, %s KiB RSS; strict diff and %s documents pass\n' "$SCALE_NODES" "$bytes" "$elapsed" "$rss_kb" "$SCALE_DOCUMENTS"

@@ -22,7 +22,10 @@ ACTUAL=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-actual.XXXXXX")
 EXPECTED=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-expected.XXXXXX")
 CANDIDATE=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-candidate.XXXXXX")
 CANDIDATE_ORACLE=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-candidate-oracle.XXXXXX")
-trap 'rm -f "$INPUT" "$ORACLE" "$ROUNDTRIP" "$ACTUAL" "$EXPECTED" "$CANDIDATE" "$CANDIDATE_ORACLE"' 0 1 2 3 15
+BEFORE=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-before.XXXXXX")
+PREVIEW=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-preview.XXXXXX")
+EDIT=$(mktemp "${TMPDIR:-/tmp}/ysh-fuzz-edit.XXXXXX")
+trap 'rm -f "$INPUT" "$ORACLE" "$ROUNDTRIP" "$ACTUAL" "$EXPECTED" "$CANDIDATE" "$CANDIDATE_ORACLE" "$BEFORE" "$PREVIEW" "$EDIT"' 0 1 2 3 15
 
 generate_case() {
     generated_case=$1
@@ -156,8 +159,24 @@ run_property() {
         jq -cS . "$property_oracle" > "$EXPECTED"
         cmp -s "$ACTUAL" "$EXPECTED"
         ;;
-    query|mutation)
+    query)
         "$YSH_BINARY" --json "$QUERY" "$property_input" | jq -cS . > "$ACTUAL" 2>/dev/null || return 1
+        jq -cS "$QUERY" "$property_oracle" > "$EXPECTED" 2>/dev/null || return 1
+        cmp -s "$ACTUAL" "$EXPECTED"
+        ;;
+    mutation)
+        cp "$property_input" "$EDIT"
+        cp "$EDIT" "$BEFORE"
+        if "$YSH_BINARY" --diff "$QUERY" "$EDIT" > "$PREVIEW" 2>/dev/null; then
+            preview_status=0
+        else
+            preview_status=$?
+        fi
+        [ "$preview_status" -eq 1 ] || return 1
+        cmp -s "$EDIT" "$BEFORE" || return 1
+        grep -q '^--- ' "$PREVIEW" || return 1
+        "$YSH_BINARY" -i "$QUERY" "$EDIT" >/dev/null 2>&1 || return 1
+        "$YSH_BINARY" --json . "$EDIT" | jq -cS . > "$ACTUAL" 2>/dev/null || return 1
         jq -cS "$QUERY" "$property_oracle" > "$EXPECTED" 2>/dev/null || return 1
         cmp -s "$ACTUAL" "$EXPECTED"
         ;;

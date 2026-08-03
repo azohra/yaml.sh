@@ -100,16 +100,23 @@ ysh --check '.release.channel = "stable"' config.yml
 
 Check mode writes nothing. It exits `0` when clean, `1` when the query would change a file, and `2` when the query or input is invalid. Once the check looks right, update in place:
 
+See the exact candidate instead:
+
+```sh
+ysh --diff '.release.channel = "stable"' config.yml
+```
+
 ```sh
 ysh -i '.release.channel = "stable"' config.yml
 ```
 
-In-place output is atomic and preserves file permissions. Common replacements, inserts, deletes, and sequence reorders retain comments, blank lines, directives, properties, block/flow layout, and quote style. Unsupported presentation edits fall back to stable semantic YAML—review the diff like the tiny chaos engineer you are.
+In-place output is atomic and preserves file permissions. Common replacements, inserts, deletes, sequence reorders, and block appends retain comments, blank lines, directives, properties, layout, and quote style. Unsupported presentation edits fall back to stable semantic YAML. Add `--preserve-only` to make that fallback an error.
 
 The same expression can check or update several files as one preflighted transaction:
 
 ```sh
 ysh --check '.release.channel = "stable"' services/*.yml
+ysh --diff '.release.channel = "stable"' services/*.yml
 ysh -i '.release.channel = "stable"' services/*.yml
 ```
 

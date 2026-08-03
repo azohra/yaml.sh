@@ -5,7 +5,7 @@ INSTALL_DIR=/usr/local/bin
 
 all: ysh lint test docs-check
 
-ysh: src/ysh.sh src/ysh.awk Makefile $(BUILDERS)
+ysh: src/ysh.sh src/ysh.awk src/diff.awk Makefile $(BUILDERS)
 	@echo "👷 Building"
 	@awk -f build/shbuilder.awk src/ysh.sh > ysh
 	@chmod 755 ysh

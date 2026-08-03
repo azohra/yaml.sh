@@ -5790,6 +5790,81 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
     return 1
 }
 
+function presentation_track_sequence_append(target, source,    parent, header, first, after, raw, indent, i, child, origin, item) {
+    if (node_kind[target] != "sequence" || node_kind[source] != "sequence" ||
+        sequence_count[target] == 0 || sequence_count[source] <= sequence_count[target]) {
+        return 0
+    }
+    parent = node_parent[target]
+    header = node_line[target]
+    if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
+        header in presentation_deleted_line || header in presentation_reorder_count) {
+        return 0
+    }
+    raw = raw_input_line[header]
+    if (raw ~ /[\[{].*[\]}]/) {
+        return 0
+    }
+    for (i = 1; i <= sequence_count[target]; i++) {
+        child = sequence_child[source, i]
+        origin = node_origin[child]
+        if (origin != sequence_child[target, i]) {
+            return 0
+        }
+    }
+    first = node_line[sequence_child[target, 1]]
+    if (first <= header) {
+        return 0
+    }
+    raw = raw_input_line[first]
+    indent = indentation(raw, first)
+    if (substr(trim(raw), 1, 1) != "-") {
+        return 0
+    }
+    after = presentation_span_end(target)
+    for (i = sequence_count[target] + 1; i <= sequence_count[source]; i++) {
+        item = ++presentation_sequence_insert_count[after]
+        presentation_sequence_insert_node[after, item] = sequence_child[source, i]
+        presentation_sequence_insert_indent[after, item] = indent
+    }
+    return 1
+}
+
+function presentation_track_mapping_append(target, source,    first, after, raw, indent, i, child, origin, item, key) {
+    if (node_kind[target] != "mapping" || node_kind[source] != "mapping" ||
+        mapping_count[target] == 0 || mapping_count[source] <= mapping_count[target]) {
+        return 0
+    }
+    for (i = 1; i <= mapping_count[target]; i++) {
+        if (mapping_key[source, i] != mapping_key[target, i] || mapping_merge[source, i] != mapping_merge[target, i]) {
+            return 0
+        }
+        child = mapping_child[source, i]
+        origin = node_origin[child]
+        if (origin != mapping_child[target, i]) {
+            return 0
+        }
+    }
+    first = node_line[mapping_child[target, 1]]
+    if (first < 1) {
+        return 0
+    }
+    raw = raw_input_line[first]
+    if (raw ~ /[\[{].*[\]}]/) {
+        return 0
+    }
+    indent = indentation(raw, first)
+    after = presentation_span_end(target)
+    for (i = mapping_count[target] + 1; i <= mapping_count[source]; i++) {
+        item = ++presentation_insert_count[after]
+        key = mapping_key[source, i]
+        presentation_insert_node[after, item] = mapping_child[source, i]
+        presentation_insert_key[after, item] = key
+        presentation_insert_indent[after, item] = indent
+    }
+    return 1
+}
+
 function presentation_track_replace(target, source,    line, raw, resolved_source) {
     if (!inplace_mode || !presentation_possible) {
         return
@@ -5797,6 +5872,16 @@ function presentation_track_replace(target, source,    line, raw, resolved_sourc
     resolved_source = resolve_alias(source)
     if (node_kind[target] == "sequence" && node_kind[resolved_source] == "sequence") {
         if (presentation_track_sequence_reorder(target, resolved_source)) {
+            return
+        }
+        if (presentation_track_sequence_append(target, resolved_source)) {
+            return
+        }
+        presentation_possible = 0
+        return
+    }
+    if (node_kind[target] == "mapping" && node_kind[resolved_source] == "mapping") {
+        if (presentation_track_mapping_append(target, resolved_source)) {
             return
         }
         presentation_possible = 0
@@ -5976,6 +6061,27 @@ function emit_presented_insert(key, node, indent,    inline, properties) {
     emit_yaml_collection(node, indent + yaml_indent)
 }
 
+function emit_presented_sequence_insert(node, indent,    inline, properties) {
+    printf "%s-", yaml_spaces(indent)
+    if (node_kind[node] == "scalar" && (node_style[node] == "literal" || node_style[node] == "folded")) {
+        properties = yaml_properties(node)
+        printf " %s%s%s\n", (properties == "" ? "" : properties " "), yaml_block_indicator(node), yaml_line_comment(node)
+        emit_yaml_block_scalar(node, indent + yaml_indent)
+        return
+    }
+    inline = yaml_inline_node(node)
+    if (inline != "") {
+        printf " %s%s\n", inline, yaml_line_comment(node)
+        return
+    }
+    properties = yaml_properties(node)
+    if (properties != "") {
+        printf " %s", properties
+    }
+    printf "%s\n", yaml_line_comment(node)
+    emit_yaml_collection(node, indent + yaml_indent)
+}
+
 function emit_presented_reorder(line,    item, source_line, start, end) {
     for (item = 1; item <= presentation_reorder_count[line]; item++) {
         start = presentation_reorder_start[line, item]
@@ -6006,6 +6112,9 @@ function emit_preserved_input(start_line, end_line,    line, i) {
         }
         if (line in presentation_reorder_count) {
             emit_presented_reorder(line)
+        }
+        for (i = 1; i <= presentation_sequence_insert_count[line]; i++) {
+            emit_presented_sequence_insert(presentation_sequence_insert_node[line, i], presentation_sequence_insert_indent[line, i])
         }
         for (i = 1; i <= presentation_insert_count[line]; i++) {
             emit_presented_insert(presentation_insert_key[line, i], presentation_insert_node[line, i], presentation_insert_indent[line, i])
@@ -6096,6 +6205,9 @@ function output_transaction_files(query,    file, last_file, start_nodes, marker
             transform_all_documents(query, file)
         } else {
             start_nodes = transaction_start_nodes
+        }
+        if (preserve_only_mode && expression_file_changed[file] && !presentation_possible) {
+            fail("preserve-only edit would regenerate YAML presentation: " input_file_name[file])
         }
         print marker file " " (expression_file_changed[file] ? 1 : 0)
         if (presentation_possible && input_file_has_lines[file]) {

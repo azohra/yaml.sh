@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.10.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.11.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -87,7 +87,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.10.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.11.0</span></div>
       <article>
           <h1 id="yq-compatibility">yq compatibility</h1>
           <p>YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell and portable AWK program. This is a capability map, not a claim that YAML.sh is a drop-in yq replacement.</p>
@@ -132,7 +132,7 @@
               <tr>
                 <td>Files and documents</td>
                 <td>Strong</td>
-                <td>one-process multi-file evaluation; all-document mode; writable cross-file <code>eval-all</code>; no-write checks; preflighted transactions</td>
+                <td>one-process multi-file evaluation; all-document mode; writable cross-file <code>eval-all</code>; exact no-write diffs; preflighted transactions</td>
               </tr>
               <tr>
                 <td>Strings</td>
@@ -159,7 +159,8 @@
             <li>It runs where <code>/bin/sh</code> and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.</li>
             <li>Input bytes, graph nodes, and collection depth are bounded; file-loading and dynamic-code operators do not exist, and environment access can be disabled.</li>
             <li><code>--ast</code> and <code>--events</code> expose the parser directly when a strange document needs explaining.</li>
-            <li><code>--check</code> uses the real write path and reports clean, drift, or error without touching files.</li>
+            <li><code>--check</code>, <code>--diff</code>, and <code>-i</code> share one prepared edit plan. Previewed bytes are committed bytes; net-zero updates are no-ops.</li>
+            <li><code>--preserve-only</code> turns source fidelity into an enforceable precondition instead of a best-effort promise.</li>
             <li>Multi-file queries compile once. Writable <code>eval-all</code> can read one file, mutate several others, preflight the complete set, skip no-ops, and roll back commit failures.</li>
             <li><code>--explain=json</code> produces one value-free audit record per input for CI.</li>
             <li>Parser outcomes, invalid input, yq comparisons, presentation edits, and useful scale are covered by repeatable tests.</li>
