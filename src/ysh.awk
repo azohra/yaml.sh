@@ -5726,6 +5726,10 @@ function presentation_attached_start(child, lower_bound,    line, raw, indent) {
     return line
 }
 
+function presentation_has_flow_collection(value) {
+    return (index(value, "[") && index(value, "]")) || (index(value, "{") && index(value, "}"))
+}
+
 function presentation_track_sequence_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, lower, start, previous_end) {
     if (node_kind[target] != "sequence" || node_kind[source] != "sequence" ||
         sequence_count[target] == 0 || sequence_count[target] != sequence_count[source]) {
@@ -5739,7 +5743,7 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
     }
     raw = raw_input_line[header]
     text = substr(raw, indentation(raw, header) + 1)
-    if (!find_mapping_separator(text, 1) || text ~ /[\[{].*[\]}]/) {
+    if (!find_mapping_separator(text, 1) || presentation_has_flow_collection(text)) {
         return 0
     }
 
@@ -5802,7 +5806,7 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         return 0
     }
     raw = raw_input_line[header]
-    if (raw ~ /[\[{].*[\]}]/) {
+    if (presentation_has_flow_collection(raw)) {
         return 0
     }
     for (i = 1; i <= sequence_count[target]; i++) {
@@ -5850,7 +5854,7 @@ function presentation_track_mapping_append(target, source,    first, after, raw,
         return 0
     }
     raw = raw_input_line[first]
-    if (raw ~ /[\[{].*[\]}]/) {
+    if (presentation_has_flow_collection(raw)) {
         return 0
     }
     indent = indentation(raw, first)
@@ -5894,7 +5898,7 @@ function presentation_track_replace(target, source,    line, raw, resolved_sourc
     line = node_line[target]
     raw = raw_input_line[line]
     if (line < 1 || node_kind[target] != "scalar" || node_kind[resolved_source] != "scalar" ||
-        raw ~ /(^|:[[:space:]]*)[|>][+-]?[[:space:]]*(#|$)/ || raw ~ /[\[{].*[\]}]/ || raw ~ /:[[:space:]]*[!&]/) {
+        raw ~ /(^|:[[:space:]]*)[|>][+-]?[[:space:]]*(#|$)/ || presentation_has_flow_collection(raw) || raw ~ /:[[:space:]]*[!&]/) {
         presentation_possible = 0
         return
     }
@@ -5932,7 +5936,7 @@ function presentation_track_insert(target,    parent, key, i, child, first_line,
         return
     }
     raw = raw_input_line[first_line]
-    if (raw ~ /[\[{].*[\]}]/) {
+    if (presentation_has_flow_collection(raw)) {
         presentation_possible = 0
         return
     }
@@ -6000,7 +6004,7 @@ function presentation_track_delete(target,    parent, line, end, raw, indent, te
     raw = raw_input_line[line]
     indent = indentation(raw, line)
     text = substr(raw, indent + 1)
-    if ((text ~ /^-[[:space:]]+/ && find_top_level_colon(text, 1)) || text ~ /[\[{].*[\]}]/) {
+    if ((text ~ /^-[[:space:]]+/ && find_top_level_colon(text, 1)) || presentation_has_flow_collection(text)) {
         presentation_possible = 0
         return
     }
