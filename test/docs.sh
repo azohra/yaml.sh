@@ -6,7 +6,7 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 PUBLISHED=$ROOT/_static/_www/docs
 STORY=$ROOT/_static/_www/story
 GENERATED=$(mktemp -d "${TMPDIR:-/tmp}/ysh-docs.XXXXXX")
-PAGES='getting-started recipes queries operators documents output yq-compatibility supported_yml security migration internals development'
+PAGES='getting-started recipes queries contracts operators documents output yq-compatibility supported_yml security migration internals development'
 trap 'rm -rf "$GENERATED"' 0 1 2 3 15
 
 YSH_DOCS_OUTPUT=$GENERATED "$ROOT/build/docs.sh" >/dev/null

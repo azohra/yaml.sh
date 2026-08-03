@@ -222,6 +222,9 @@ String codecs cover embedded configuration and shell handoffs:
 | --- | --- | --- |
 | YAML | `from_yaml`, `@yamld` | `to_yaml(INDENT)`, `@yaml` |
 | JSON | `from_json`, `@jsond` | `to_json(INDENT)`, `@json` |
+| TOML | `from_toml`, `@tomld` | `to_toml`, `@toml` |
+| INI | `from_ini`, `@inid` | `to_ini`, `@ini` |
+| XML data | `from_xml`, `@xmld` | `to_xml`, `@xml` |
 | Properties | `from_props`, `@propsd` | `to_props`, `@props` |
 | CSV | `from_csv`, `@csvd` | `to_csv`, `@csv` |
 | TSV | `from_tsv`, `@tsvd` | `to_tsv`, `@tsv` |
@@ -235,7 +238,7 @@ ysh '.payload | from_json | .items | @csv' config.yml
 ysh '.secret | @base64' config.yml
 ```
 
-CSV and TSV decoding treats the first row as headers and parses scalar cells. Properties use dotted paths and decode values as strings. XML is not accepted.
+CSV and TSV decoding treats the first row as headers and parses scalar cells. Properties use dotted paths and decode values as strings. TOML, INI, and XML use the [configuration contract](contracts.md) documented for each format.
 
 `eval(EXPR)` runs a string through YAML.sh's expression parser. `load`, `load_str`, `load_base64`, and `load_props` read a named local file:
 
@@ -250,7 +253,7 @@ Loaded bytes share `--max-input-bytes`; dynamic expressions share the node and n
 
 ## Context and environment
 
-`path`, `parent`, `key`, `line`, `column`, and `tag` expose graph context. `filename`, `fileIndex`, and `documentIndex` identify input provenance:
+`path`, `parent`, `root`, `key`, `line`, `column`, and `tag` expose graph context. `root` returns the complete graph from a descendant. `filename`, `fileIndex`, and `documentIndex` identify input provenance:
 
 ```sh
 ysh '.. | select(. == "api") | path' config.yml

@@ -95,7 +95,30 @@ ysh '.embedded | from_yaml | .image.tag' config.yml
 ysh '.rows | @csv' config.yml
 ```
 
-The same expression surface supports JSON, YAML, properties, CSV, TSV, Base64, URI, and shell text. See the [query guide](queries.md#encode-decode-evaluate-and-load) for the exact forms.
+The same expression surface supports JSON, YAML, TOML, INI, XML, properties, CSV, TSV, Base64, URI, and shell text. See the [query guide](queries.md#encode-decode-evaluate-and-load) for the exact forms.
+
+## Validate and patch configuration
+
+Gate a document with a local schema:
+
+```sh
+ysh --schema service.schema.json '.' service.yml
+```
+
+Preview and apply the same RFC 6902 patch through the YAML source compiler:
+
+```sh
+ysh --apply-patch change.json --preserve-only --diff service.yml
+ysh --apply-patch change.json --preserve-only -i service.yml
+```
+
+Generate the patch first when you have a desired document:
+
+```sh
+ysh --json --generate-patch desired.yml '.' current.yml > change.json
+```
+
+See [configuration contracts](contracts.md) for Merge Patch, structured schema errors, and direct TOML/INI/XML conversion.
 
 ## Load local configuration
 

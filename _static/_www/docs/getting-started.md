@@ -149,7 +149,24 @@ ysh '.payload | from_json | .name' config.yml
 ysh -n 'load("defaults.yml") * load("production.yml")'
 ```
 
-The expression language can encode and decode JSON, YAML, properties, CSV, TSV, Base64, URI, and shell text. Add `--security-disable-file-ops` when a query must not read paths of its own.
+The expression language can encode and decode JSON, YAML, TOML, INI, XML, properties, CSV, TSV, Base64, URI, and shell text. Add `--security-disable-file-ops` when a query must not read paths of its own.
+
+Read a format directly by filename or with `-p`:
+
+```sh
+ysh '.database.port' config.toml
+ysh -p ini -o yaml '.' app.conf
+ysh -p xml --json '.catalog.item' catalog.xml
+```
+
+Validate or apply a standard patch without embedding either document in the query:
+
+```sh
+ysh --schema service.schema.json '.' service.yml
+ysh --apply-patch promote.json --preserve-only --diff service.yml
+```
+
+See [configuration contracts](contracts.md) for JSON Pointer, JSON Patch, Merge Patch, schema diagnostics, and format boundaries.
 
 ## Compose configuration
 

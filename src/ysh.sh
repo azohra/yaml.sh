@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.15.0
+YSH_VERSION=1.16.0
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -25,7 +25,9 @@ Usage:
 Examples:
   ysh ".server.host" config.yml
   ysh ".services[] | select(.enabled) | .name" config.yml
-  ysh -o yaml '.release.channel = "stable"' config.yml
+  ysh -p toml -o yaml '.database' config.toml
+  ysh --schema service.schema.json service.yml
+  ysh --apply-patch change.json service.yml
   ysh -i '.services[] | select(.enabled) | .tier = "active"' config.yml
   ysh --check '.image.tag = "stable"' services/*.yml
   ysh --preserve-only --diff '.image.tag = "stable"' services/*.yml
@@ -38,7 +40,8 @@ Examples:
   printf "%s\\n" "answer: 42" | ysh ".answer"
 
 Output:
-  -o, --output FORMAT      value, raw, json, or yaml
+  -p, --input-format FMT  yaml, json, toml, ini, xml, or auto
+  -o, --output FORMAT      value, raw, json, yaml, toml, ini, or xml
   -r, --raw-output        print scalar values without JSON quoting
       --json              emit JSON
   -y, --yaml-output       emit YAML
@@ -69,6 +72,11 @@ Evaluation:
       --security-disable-file-ops
                           disable load(), load_str(), load_base64(), and load_props()
       --shuffle-seed N    make shuffle reproducible with an integer seed
+      --schema FILE       validate query results against a local JSON/YAML schema
+      --apply-patch FILE  apply a local RFC 6902 JSON Patch after the query
+      --merge-patch FILE  apply a local RFC 7396 Merge Patch after the query
+      --generate-patch FILE
+                          emit RFC 6902 operations from results to a target file
 
 Safety:
       --max-input-bytes N reject larger inputs (default: 16777216)
@@ -92,8 +100,22 @@ ysh_set_output_mode() {
     value|raw) YSH_OUTPUT_MODE="value" ;;
     json) YSH_OUTPUT_MODE="json" ;;
     yaml|yml) YSH_OUTPUT_MODE="yaml" ;;
+    toml) YSH_OUTPUT_MODE="toml" ;;
+    ini) YSH_OUTPUT_MODE="ini" ;;
+    xml) YSH_OUTPUT_MODE="xml" ;;
     *)
         ysh_error "unsupported output format: $1"
+        return 2
+        ;;
+    esac
+}
+
+ysh_set_input_format() {
+    case "$1" in
+    yaml|yml) YSH_INPUT_FORMAT=yaml ;;
+    json|toml|ini|xml|auto) YSH_INPUT_FORMAT=$1 ;;
+    *)
+        ysh_error "unsupported input format: $1"
         return 2
         ;;
     esac
@@ -102,6 +124,7 @@ ysh_set_output_mode() {
 ysh_invoke_awk() {
     ysh_awk_program \
         -v output_mode="$YSH_OUTPUT_MODE" \
+        -v input_format="$YSH_INPUT_FORMAT" \
         -v selected_document="$YSH_DOCUMENT" \
         -v all_documents_mode="$YSH_ALL_DOCUMENTS" \
         -v eval_all_mode="$YSH_EVAL_ALL" \
@@ -124,6 +147,10 @@ ysh_invoke_awk() {
         -v max_input_bytes="$YSH_MAX_INPUT_BYTES" \
         -v max_nodes="$YSH_MAX_NODES" \
         -v max_depth="$YSH_MAX_DEPTH" \
+        -v schema_file="$YSH_SCHEMA_FILE" \
+        -v patch_file="$YSH_PATCH_FILE" \
+        -v merge_patch_file="$YSH_MERGE_PATCH_FILE" \
+        -v patch_target_file="$YSH_PATCH_TARGET_FILE" \
         "$@"
 }
 
@@ -655,6 +682,7 @@ ${YSH_TRANSACTION_SNAPSHOT}"
 
 ysh_main() {
     YSH_OUTPUT_MODE="value"
+    YSH_INPUT_FORMAT=auto
     YSH_DOCUMENT=0
     YSH_ALL_DOCUMENTS=0
     YSH_EVAL_ALL=0
@@ -688,6 +716,10 @@ ysh_main() {
     YSH_MAX_INPUT_BYTES=${YSH_MAX_INPUT_BYTES:-16777216}
     YSH_MAX_NODES=${YSH_MAX_NODES:-100000}
     YSH_MAX_DEPTH=${YSH_MAX_DEPTH:-256}
+    YSH_SCHEMA_FILE=
+    YSH_PATCH_FILE=
+    YSH_MERGE_PATCH_FILE=
+    YSH_PATCH_TARGET_FILE=
     YSH_POSITIONAL_COUNT=0
     YSH_POSITIONAL_ONE=
     YSH_POSITIONAL_TWO=
@@ -696,6 +728,18 @@ ysh_main() {
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
+        -p|--input-format)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires a format"
+                return 2
+            fi
+            ysh_set_input_format "$2" || return $?
+            shift 2
+            ;;
+        -p=*|--input-format=*)
+            ysh_set_input_format "${1#*=}" || return $?
+            shift
+            ;;
         -o|--output|--output-format)
             if [ "$#" -lt 2 ]; then
                 ysh_error "$1 requires a format"
@@ -780,6 +824,14 @@ ysh_main() {
             YSH_OUTPUT_MODE="events"
             shift
             ;;
+        --toml-test-json)
+            YSH_OUTPUT_MODE="toml-test-json"
+            shift
+            ;;
+        --toml-test-encode)
+            YSH_OUTPUT_MODE="toml-test-encode"
+            shift
+            ;;
         -n|--null-input)
             YSH_NULL_INPUT=1
             shift
@@ -819,6 +871,19 @@ ysh_main() {
         --security-disable-file-ops)
             YSH_DISABLE_FILE_OPS=1
             shift
+            ;;
+        --schema|--apply-patch|--merge-patch|--generate-patch)
+            if [ "$#" -lt 2 ]; then
+                ysh_error "$1 requires a file"
+                return 2
+            fi
+            case "$1" in
+            --schema) YSH_SCHEMA_FILE=$2 ;;
+            --apply-patch) YSH_PATCH_FILE=$2 ;;
+            --merge-patch) YSH_MERGE_PATCH_FILE=$2 ;;
+            --generate-patch) YSH_PATCH_TARGET_FILE=$2 ;;
+            esac
+            shift 2
             ;;
         --shuffle-seed)
             if [ "$#" -lt 2 ]; then
@@ -973,7 +1038,7 @@ $1"
             YSH_INPUT_FILE=$YSH_POSITIONAL_ONE
         else
             case "$YSH_POSITIONAL_ONE" in
-            *.yml|*.yaml|*.json) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
+            *.yml|*.yaml|*.json|*.toml|*.ini|*.xml) YSH_INPUT_FILE=$YSH_POSITIONAL_ONE ;;
             *) YSH_QUERY=$YSH_POSITIONAL_ONE ;;
             esac
         fi
@@ -986,6 +1051,22 @@ $1"
     if [ -n "$YSH_INPUT_FILE" ]; then
         YSH_INPUT_FILENAME=$YSH_INPUT_FILE
     fi
+
+    if [ "$YSH_INPUT_FORMAT" = auto ]; then
+        case "$YSH_INPUT_FILE" in
+        *.json) YSH_INPUT_FORMAT=json ;;
+        *.toml) YSH_INPUT_FORMAT=toml ;;
+        *.ini) YSH_INPUT_FORMAT=ini ;;
+        *.xml) YSH_INPUT_FORMAT=xml ;;
+        *) YSH_INPUT_FORMAT=yaml ;;
+        esac
+    fi
+    for YSH_CONTRACT_FILE in "$YSH_SCHEMA_FILE" "$YSH_PATCH_FILE" "$YSH_MERGE_PATCH_FILE" "$YSH_PATCH_TARGET_FILE"; do
+        if [ -n "$YSH_CONTRACT_FILE" ] && [ ! -f "$YSH_CONTRACT_FILE" ]; then
+            ysh_error "contract file does not exist: $YSH_CONTRACT_FILE"
+            return 1
+        fi
+    done
 
     if [ "$YSH_INPLACE" -eq 1 ]; then
         case "$YSH_INPUT_FILE" in
@@ -1008,6 +1089,21 @@ $1"
         fi
         YSH_INPUT_FILES="${YSH_INPUT_FILE}
 ${YSH_POSITIONAL_REST}"
+    fi
+
+    if [ "$YSH_INPUT_FORMAT" != yaml ]; then
+        if [ -n "$YSH_INPUT_FILES" ] || [ "$YSH_EVAL_ALL" -eq 1 ]; then
+            ysh_error "non-YAML input currently accepts one document at a time"
+            return 2
+        fi
+        if [ "$YSH_INPLACE" -eq 1 ] || [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; then
+            ysh_error "source-aware edits currently require YAML input"
+            return 2
+        fi
+    fi
+    if [ -n "$YSH_PATCH_TARGET_FILE" ] && { [ "$YSH_INPLACE" -eq 1 ] || [ "$YSH_CHECK" -eq 1 ] || [ "$YSH_DIFF" -eq 1 ]; }; then
+        ysh_error "--generate-patch cannot be combined with an edit transaction"
+        return 2
     fi
 
     if [ "$YSH_CHECK" -eq 1 ] && [ "$YSH_INPLACE" -eq 1 ]; then

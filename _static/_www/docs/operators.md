@@ -1,6 +1,6 @@
 # Operator manifest
 
-This is the audited YAML-oriented surface for v1.15. “Supported” means the listed forms are expected to agree with yq for documented inputs. “Focused” names a smaller portable contract. “Excluded” is a tested boundary—not a guess.
+This is the audited YAML-oriented surface for v1.16. “Supported” means the listed forms are expected to agree with yq for documented inputs. “Focused” names a smaller portable contract. “Excluded” is a tested boundary—not a guess.
 
 The evidence column names the focused test or release gate that owns each claim. The differential gate compares supported programs with mikefarah/yq v4.53.3; the parser-boundary gate makes exclusions fail closed.
 
@@ -22,7 +22,7 @@ The evidence column names the focused test or release gate that owns each claim.
 | Delete | Supported | `del`, `delpaths`, mapping and sequence targets | `testExpressionPathBasedUpdates` |
 | Divide | Supported | numeric `/` and `/=`; zero is rejected | `testExpressionArithmetic` |
 | Document index | Supported | `documentIndex` across streams and files | `testEvalAllAcrossFiles` |
-| Encode and decode | Focused | `from_json`/`from_yaml`/`from_props`/`from_csv`/`from_tsv`, matching `to_*` and `@codec` forms; Base64, URI, shell; XML excluded | `testExpressionPortableUtilities` |
+| Encode and decode | Focused | `from_json`, `from_yaml`, `from_toml`, `from_ini`, `from_xml`, `from_props`, `from_csv`, `from_tsv`; matching `to_*` and shorthand forms; Base64, URI, shell | `testConfigurationFormatCodecs`, `testExpressionPortableUtilities` |
 | Entries | Supported | `to_entries`, `from_entries`, `with_entries` | `testExpressionEntries` |
 | Environment | Supported | `env`, `strenv`, `envsubst` options; disable switch | `testExpressionEnvironmentComposition` |
 | Equals | Supported | structural `==` and `!=` | `testExpressionSelectAndComparisons` |
@@ -53,13 +53,14 @@ The evidence column names the focused test or release gate that owns each claim.
 | Recursive descent | Supported | `..`, optional traversal, recursive selection and updates | `testExpressionRecursiveAndOptionalTraversal` |
 | Reduce | Supported | `reduce`, `ireduce`, whole-stream eval-all folding | `testExpressionReduceAndDeepMerge` |
 | Reverse | Supported | sequences | `testExpressionSequenceAndStringHelpers` |
+| Root | Supported | graph/document root from any selected descendant | `testConfigurationPointersAndPatches` |
 | Select | Supported | scalar and structural predicates | `testExpressionSelectAndComparisons` |
 | Shuffle | Focused | portable Fisher–Yates shuffle; `--shuffle-seed` supplies reproducible runs | `testExpressionPortableUtilities` |
 | Slice array | Supported | positive, negative, and open sequence slices | `testExpressionSlicesInterpolationAndRegex` |
 | Sort | Supported | `sort`, `sort_by`, scalar ordering | `testExpressionProjectedCollectionsAndQuantifiers` |
 | Sort keys | Supported | targeted and recursive `sort_keys(..)` | `testExpressionCapabilityClosure` |
 | Split into documents | Focused | `split_doc` is explicit and idempotent; YAML streams are always document-separated | `testExpressionCapabilityClosure` |
-| Strings | Focused | interpolation, case, `trim`, `to_string`, split/join, contains/prefix/suffix, POSIX `test`/`sub` | `testExpressionCapabilityClosure` |
+| Strings | Focused | interpolation, string slices, case, `trim`, `to_string`, split/join, contains/prefix/suffix, POSIX `test`/`sub` | `testExpressionCapabilityClosure`, `testConfigurationPointersAndPatches` |
 | Style | Focused | scalar and collection style read/write; source compiler decides preservation | `testExpressionBlockStylesAndOutputControls` |
 | Subtract | Supported | numeric `-` and `-=` | `testExpressionArithmetic` |
 | Tag | Supported | read/write core and custom tags | `testExpressionWritableYamlGraphMetadata` |
@@ -72,6 +73,20 @@ The evidence column names the focused test or release gate that owns each claim.
 
 ## CLI boundaries
 
-YAML.sh accepts YAML input and emits values, JSON, or YAML. Its expression codecs cover JSON, YAML, properties, CSV, TSV, Base64, URI, and shell text. XML, date arithmetic, system execution, regex capture objects, and yq’s format-specific CLI remain outside the contract.
+YAML.sh reads YAML, JSON, TOML, INI, and XML and emits values or those semantic formats. Non-YAML input handles one semantic document at a time; source-aware `-i`, multi-file transactions, and presentation metadata remain YAML contracts. Date arithmetic, system execution, regex capture objects, and yq’s complete format-specific flag surface remain outside the contract.
+
+## Configuration contracts
+
+These are YAML.sh capabilities rather than yq operator-catalog rows.
+
+| Contract | Status | Forms | Evidence |
+|---|---|---|---|
+| JSON Pointer | Supported | RFC 6901 lookup and escaping | `testConfigurationPointersAndPatches` |
+| JSON Patch | Supported | RFC 6902 add/remove/replace/move/copy/test; deterministic diff generation | 108 pinned external assertions, source-edit and CLI tests |
+| Merge Patch | Supported | RFC 7396 object merge and replacement semantics | `testConfigurationPointersAndPatches`, CLI tests |
+| JSON Schema | Focused | documented 2020-12 validation vocabulary, local `$ref`, value-free path diagnostics | 701 pinned official assertions, `testConfigurationSchemaContracts` |
+| TOML | Focused | decoder and encoder each pass the complete official valid 1.0 corpus; 462/474 invalid rejections | pinned `toml-test` v2.2.0 |
+| INI | Focused | global scalars and nested dotted sections | `testConfigurationFormatCodecs` |
+| XML | Focused | `+@attribute` / `+content` data profile; repeated elements; no DTD/custom entities | `testConfigurationFormatCodecs` |
 
 For parser syntax rather than query operators, see [YAML support](supported_yml.md). For the practical comparison, see [yq compatibility](yq-compatibility.md).

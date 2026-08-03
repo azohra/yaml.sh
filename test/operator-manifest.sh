@@ -12,6 +12,8 @@ summary=$(awk -F '|' '
         gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
         return value
     }
+    /^## CLI boundaries/ { done = 1 }
+    done { next }
     /^\| yq area / || /^\|---/ { next }
     /^\|/ {
         area = clean($2)

@@ -1,6 +1,6 @@
 # Output & metadata
 
-The same query can return a value, JSON, YAML, a node type, its expanded tag, or its source line.
+The same query can return a value, JSON, YAML, TOML, INI, XML, a node type, its expanded tag, or its source line.
 
 ## Default value output
 
@@ -62,6 +62,18 @@ For edits, evaluation finishes before YAML.sh compiles a source plan. The plan m
 | Alias or merged value | Updates the owned anchor source; alias and merge occurrences stay intact |
 
 Stable flow formatting may normalize whitespace and key quoting inside a changed flow span. Multiline flow spans with internal comments are refused in strict mode because compacting them would discard comment ownership. A structural change without a safe source plan uses the semantic emitter, or fails before candidate output under `--preserve-only`.
+
+## TOML, INI, and XML
+
+Use `-o toml`, `-o ini`, or `-o xml` for semantic conversion:
+
+```sh
+ysh -o toml '.service' config.yml
+ysh -p toml -o yaml '.' config.toml
+ysh -p xml -o json '.' catalog.xml
+```
+
+TOML and INI require a mapping root. XML requires one root-element mapping and uses the documented `+@attribute` / `+content` shape. These emitters do not reconstruct comments or original layout. See [configuration contracts](contracts.md) for exact boundaries.
 
 With several inputs, source snapshots are evaluated and every changed candidate is built before the first replacement. Live files must still match those snapshots before reporting or commit, and each changed target is checked again immediately before replacement. No-op files are not replaced. The snapshots allow rollback if a later commit fails or the process is interrupted. Permission bits survive; symlinks, duplicate paths, and newline-containing names are refused.
 
