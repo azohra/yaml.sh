@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.14.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.15.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -101,19 +101,21 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.14.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.15.0</span></div>
       <article>
           <h1 id="security-limits">Security &amp; limits</h1>
-          <p>YAML.sh parses data. It does not evaluate YAML as shell, load neighboring files, run commands, or execute application-specific tag constructors.</p>
+          <p>YAML.sh parses data and runs an explicit query program. It never evaluates YAML as shell, runs commands, opens network connections, or executes application-specific tag constructors.</p>
           <h2 id="the-small-security-model"><a href="#the-small-security-model">The small security model<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
-            <li>No <code>load</code>, dynamic <code>eval</code>, system execution, network, or plugin operators.</li>
+            <li>No system execution, network, or plugin operators.</li>
             <li>No application-specific object construction from YAML tags.</li>
             <li>Environment access is limited to explicit <code>env</code>, <code>strenv</code>, and <code>envsubst</code> operators.</li>
+            <li>File access is limited to explicit <code>load</code>, <code>load_str</code>, <code>load_base64</code>, and <code>load_props</code>; every read shares the input-byte ceiling.</li>
+            <li>Dynamic <code>eval</code> compiles only YAML.sh expressions and has expression-node and nesting ceilings.</li>
             <li>Check, diff, and in-place writes reject symlinks and duplicate inputs, evaluate source snapshots, then refuse detected live-file drift.</li>
             <li>Input bytes, graph nodes, and nesting depth have hard configurable ceilings.</li>
           </ul>
-          <p>This is a narrower attack surface than a general automation language. It is not a sandbox for arbitrary expressions: a query can still consume CPU and memory up to the configured limits.</p>
+          <p>This is a narrower attack surface than a general automation language. It is not a sandbox: a query can still read allowed files and consume CPU and memory up to the configured limits.</p>
           <h2 id="bound-input"><a href="#bound-input">Bound input<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -136,7 +138,7 @@
               </tr>
               <tr>
                 <td><code>--max-nodes</code></td>
-                <td>Documents or expressions that create too many graph nodes</td>
+                <td>Documents, embedded codecs, or expressions that create too many graph nodes</td>
               </tr>
               <tr>
                 <td><code>--max-depth</code></td>
@@ -165,6 +167,15 @@ USER_NAME=&quot;$UNTRUSTED_NAME&quot; ysh '.users[strenv(USER_NAME)]' config.yml
 </code></pre>
           </div>
           <p>Use <code>--security-disable-env-ops</code> when even that environment read is inappropriate.</p>
+          <h2 id="disable-file-access"><a href="#disable-file-access">Disable file access<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <p>Loads are useful for bootstrapping configuration, but they follow paths supplied by the query. Disable the entire class when a query crosses a trust boundary:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">ysh --security-disable-file-ops &quot;$UNTRUSTED_QUERY&quot; config.yml
+</code></pre>
+          </div>
+          <p>The flag makes every <code>load*</code> operator fail. It does not affect the input files named on the command line. <code>load</code> parses YAML, <code>load_props</code> parses properties, <code>load_str</code> returns text, and <code>load_base64</code> decodes RFC 4648 text. Loaded content is subject to <code>--max-input-bytes</code>.</p>
+          <p><code>eval(EXPR)</code> treats its string as code in YAML.sh's expression language. Do not pass untrusted expression text to it merely because shell execution is absent.</p>
           <h2 id="in-place-writes"><a href="#in-place-writes">In-place writes<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p><code>--check</code>, <code>--diff</code>, and <code>-i</code> require one or more real files. YAML.sh snapshots and transforms the complete set before replacing anything and creates candidates only for files that actually change. It preserves permissions and refuses symlinks, duplicate paths, and newline-containing names. A changed live input aborts rather than being overwritten. A commit failure or interrupt restores the evaluated snapshots.</p>
           <p><code>--diff</code> prints changed values; treat its output like file contents. Use <code>--explain=json</code> when logs need paths and decisions without values. Add <code>--preserve-only</code> when regenerated presentation would be unsafe or too noisy to review.</p>
@@ -181,6 +192,7 @@ USER_NAME=&quot;$UNTRUSTED_NAME&quot; ysh '.users[strenv(USER_NAME)]' config.yml
         <li class="level-2"><a href="#bound-input">Bound input</a></li>
         <li class="level-2"><a href="#disable-environment-access">Disable environment access</a></li>
         <li class="level-2"><a href="#treat-queries-as-programs">Treat queries as programs</a></li>
+        <li class="level-2"><a href="#disable-file-access">Disable file access</a></li>
         <li class="level-2"><a href="#in-place-writes">In-place writes</a></li>
         <li class="level-2"><a href="#reporting-a-vulnerability">Reporting a vulnerability</a></li>
       </ol>

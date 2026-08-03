@@ -355,6 +355,23 @@ paths	test.yml	.top_values.lower3 | join("-")
 collections	test.yml	.simple_list.list | length
 collections	test.yml	.object_list.list | length
 collections	test.yml	.object_list.list | any_c(.value == 2)
+codecs	expressions.yml	{"a": {"cool": "thing"}} | .a | @json
+codecs	expressions.yml	"{\"cool\":\"thing\",\"n\":3}" | @jsond
+codecs	expressions.yml	{"a": {"cool": "thing"}} | .a | @yaml
+codecs	expressions.yml	"cool: thing" | @yamld
+codecs	expressions.yml	"a special string" | @base64
+codecs	expressions.yml	"YSBzcGVjaWFsIHN0cmluZw==" | @base64d
+codecs	expressions.yml	"café 😊" | @uri
+codecs	expressions.yml	"caf%C3%A9+%F0%9F%98%8A" | @urid
+codecs	expressions.yml	"with space" | @sh
+codecs	expressions.yml	{"cool": "thing", "items": ["one", "two"]} | @props
+codecs	expressions.yml	"cats=great\ndogs=cool as well" | @propsd
+codecs	expressions.yml	[["name", "age"], ["alice", 3]] | @csv
+codecs	expressions.yml	"name,age\nalice,3" | @csvd
+codecs	expressions.yml	[["name", "age"], ["alice", 3]] | @tsv
+codecs	expressions.yml	"name\tage\nalice\t3" | @tsvd
+dynamic	expressions.yml	{"path": ".metadata.owner", "metadata": {"owner": "platform"}} | eval(.path)
+dynamic	expressions.yml	{"a": {"b": "one", "c": "two"}} | .a ref $target | $target.b = "changed" | $target.c = "also"
 slices	expressions.yml	[1,2,3,4,5][:-1]
 slices	expressions.yml	[2,3,4,5,6][-3:]
 slices	expressions.yml	[3,4,5,6,7][0:0]

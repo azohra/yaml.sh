@@ -87,6 +87,25 @@ Disable environment operators when expressions are untrusted:
 ysh --security-disable-env-ops '.services | length' config.yml
 ```
 
+## Decode embedded configuration
+
+```sh
+ysh '.payload | from_json | .services[] | select(.enabled)' config.yml
+ysh '.embedded | from_yaml | .image.tag' config.yml
+ysh '.rows | @csv' config.yml
+```
+
+The same expression surface supports JSON, YAML, properties, CSV, TSV, Base64, URI, and shell text. See the [query guide](queries.md#encode-decode-evaluate-and-load) for the exact forms.
+
+## Load local configuration
+
+```sh
+ysh -n 'load("defaults.yml") * load("production.yml")'
+ysh -n 'load_props("application.properties")'
+```
+
+Use `--security-disable-file-ops` when the query must not choose local paths. Loaded content shares the normal input-byte ceiling.
+
 ## Merge defaults with an override
 
 ```sh

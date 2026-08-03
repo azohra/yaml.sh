@@ -184,6 +184,12 @@ ysh '.metadata as $meta | {owner: $meta.owner, region: $meta.region}' config.yml
 ysh '.key as $key | .data[$key]' config.yml
 ```
 
+Use `ref` when the variable is explicitly a writable path reference:
+
+```sh
+ysh '.service ref $service | $service.image = "app:stable" | $service.ready = true' deploy.yml
+```
+
 Dynamic brackets accept a computed string key or integer index. Parenthesized object keys are computed from the current input:
 
 ```sh
@@ -207,6 +213,40 @@ The `*` operator recursively merges two mappings; at non-mapping leaves, the rig
 | `*n` | Add new fields only |
 
 Modifiers combine, as in `*?+` for existing fields with appended arrays.
+
+## Encode, decode, evaluate, and load
+
+String codecs cover embedded configuration and shell handoffs:
+
+| Format | Decode | Encode |
+| --- | --- | --- |
+| YAML | `from_yaml`, `@yamld` | `to_yaml(INDENT)`, `@yaml` |
+| JSON | `from_json`, `@jsond` | `to_json(INDENT)`, `@json` |
+| Properties | `from_props`, `@propsd` | `to_props`, `@props` |
+| CSV | `from_csv`, `@csvd` | `to_csv`, `@csv` |
+| TSV | `from_tsv`, `@tsvd` | `to_tsv`, `@tsv` |
+| Base64 | `@base64d` | `@base64` |
+| URI | `@urid` | `@uri` |
+| Shell text | — | `@sh` |
+
+```sh
+ysh '.embedded | from_yaml | .image.tag' config.yml
+ysh '.payload | from_json | .items | @csv' config.yml
+ysh '.secret | @base64' config.yml
+```
+
+CSV and TSV decoding treats the first row as headers and parses scalar cells. Properties use dotted paths and decode values as strings. XML is not accepted.
+
+`eval(EXPR)` runs a string through YAML.sh's expression parser. `load`, `load_str`, `load_base64`, and `load_props` read a named local file:
+
+```sh
+ysh -n 'load("defaults.yml") * load("production.yml")'
+ysh '.query | eval(.)' request.yml
+```
+
+Loaded bytes share `--max-input-bytes`; dynamic expressions share the node and nesting ceilings. Use `--security-disable-file-ops` to reject every load. Treat dynamic expression strings as code even though YAML.sh has no system-execution operator.
+
+`shuffle` uses a portable pseudo-random Fisher–Yates pass. Supply `--shuffle-seed N` when a build must reproduce the same order.
 
 ## Context and environment
 
@@ -310,13 +350,13 @@ ysh --diff '.image.tag = "stable"' services/*.yml
 ysh -i '.image.tag = "stable"' services/*.yml
 ```
 
-Scalar edits, owned flow and block-scalar spans, direct block inserts/appends/deletes, and pure mapping or sequence reorders preserve source outside the compiled edit spans. Add `--preserve-only` when semantic regeneration should be an error:
+Scalar edits, owned flow and block-scalar spans, full-line comment edits, direct block inserts/appends/deletes, and pure mapping or sequence reorders preserve source outside the compiled edit spans. Add `--preserve-only` when semantic regeneration should be an error:
 
 ```sh
 ysh --preserve-only --diff '.items += ["release"]' config.yml
 ```
 
-Changed flow collections use stable flow formatting inside their owned span. Strict mode can still reject a semantically valid transform when spans overlap, key-node metadata would be required, or shared aliases would need to be materialized. That refusal is the contract, not a parser failure.
+Changed flow collections use stable flow formatting inside their owned span. Strict mode can still reject a semantically valid transform when spans overlap or shared aliases would need to be materialized. That refusal is the contract, not a parser failure.
 
 ## Merged and aliased nodes
 
@@ -335,19 +375,21 @@ Anchor renames update aliases that already reference the same node. Removing a r
 
 ## Presentation
 
-`style` and `line_comment` inspect YAML presentation metadata. Their yq-shaped property forms edit it:
+`style`, `head_comment`, `line_comment`, and `foot_comment` inspect YAML presentation metadata. Their yq-shaped property forms edit values and generated key references:
 
 ```sh
 ysh '.image | line_comment' deploy.yml
 ysh -i '.image line_comment = "promoted by release"' deploy.yml
+ysh -i '.image head_comment = "managed by release"' deploy.yml
+ysh -i '(.image | key) foot_comment = "keep this key"' deploy.yml
 ysh -i '.image style = "double" | .labels style = "flow"' deploy.yml
 ysh -o=yaml '.notes style = "literal"' deploy.yml
 ```
 
-Scalar styles can be reset or set to plain, single, double, literal, or folded. Collections can be reset to block output or set to flow. Head/foot comments and key-node presentation are not implemented.
+Scalar styles can be reset or set to plain, single, double, literal, or folded. Collections can be reset to block output or set to flow. Block comment edits participate in strict source preservation; comments inside changed flow spans may require semantic emission.
 
 ## Current expression boundary
 
-This is a useful yq-shaped language, not the complete yq language. It does not implement date or load operators, non-YAML codecs, regex flags/captures, or yq's complete flag surface. Slices target sequences; interpolation is intentionally scalar-oriented. See the [operator manifest](operators.md) for the audited form-by-form boundary.
+This is a useful yq-shaped language, not the complete yq language. Date/time, XML, system execution, regex flags/captures, and yq's complete format/flag surface remain outside it. Slices target sequences; interpolation is intentionally scalar-oriented. See the [operator manifest](operators.md) for the audited form-by-form boundary.
 
 Supported transformations are tested against their expected graph behavior. For automation that needs arbitrary yq programs, use yq; YAML.sh is for the delightfully constrained machine where installing yq is the problem you are trying to solve.

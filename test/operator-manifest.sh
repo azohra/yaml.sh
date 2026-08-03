@@ -36,7 +36,7 @@ summary=$(awk -F '|' '
         }
     }
     END {
-        if (count < 55 || totals["Supported"] < 35 || totals["Focused"] < 8 || totals["Excluded"] < 5) {
+        if (count < 55 || totals["Supported"] < 40 || totals["Focused"] < 5 || totals["Excluded"] < 1) {
             print "manifest coverage is incomplete" > "/dev/stderr"
             failed = 1
         }
@@ -52,7 +52,7 @@ printf '%s\n' "$summary" | while read -r kind value; do
     }
 done
 
-for form in trim to_string column array_to_map split_doc 'sort_keys(..)'; do
+for form in trim to_string column array_to_map split_doc 'sort_keys(..)' from_json from_yaml from_props from_csv from_tsv load_props eval shuffle ref; do
     grep -Fq "$form" "$MANIFEST" || {
         printf 'Operator manifest is missing %s\n' "$form" >&2
         exit 1

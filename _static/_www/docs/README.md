@@ -27,6 +27,7 @@ YAML.sh lives in that second moment. It keeps the useful configuration workflow 
 - a portable POSIX shell launcher and AWK engine;
 - real mappings, sequences, tags, anchors, aliases, and merge behavior;
 - a writable expression stream rather than chained query flags;
+- embedded JSON, YAML, properties, CSV, TSV, Base64, URI, and shell codecs;
 - one shared check, diff, and commit plan for repository work;
 - no package manager, runtime, plugin system, or hidden binary.
 
@@ -48,7 +49,7 @@ The graph is why empty collections survive, punctuated keys behave, aliases reta
 
 ## Where it fits
 
-The useful overlap with yq is large, but deliberate. YAML.sh does not implement non-YAML codecs, dates, file-loading operators, dynamic evaluation, system execution, or yq's complete operator and flag surface.
+The useful overlap with yq is large, but deliberate. YAML.sh includes bounded dynamic evaluation, guarded local loads, reproducible shuffle, and the portable codecs that fit its runtime. XML, dates, system execution, regex capture objects, and yq's complete format/flag surface remain outside the contract.
 
 Three references make that boundary easy to inspect:
 

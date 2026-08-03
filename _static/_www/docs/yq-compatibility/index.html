@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.14.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.15.0</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -101,7 +101,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.14.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.15.0</span></div>
       <article>
           <h1 id="yq-compatibility">yq compatibility</h1>
           <p>YAML.sh follows yq syntax where that syntax can stay readable in one POSIX shell and portable AWK program. This is a capability map, not a claim that YAML.sh is a drop-in yq replacement.</p>
@@ -136,7 +136,7 @@
               <tr>
                 <td>Context</td>
                 <td>Strong</td>
-                <td><code>path</code>, <code>parent</code>, <code>key</code>, <code>line</code>, focused <code>column</code>, <code>tag</code>, <code>filename</code>, <code>fileIndex</code>, <code>documentIndex</code></td>
+                <td><code>path</code>, <code>parent</code>, <code>key</code>, exact block/flow <code>line</code> and <code>column</code>, <code>tag</code>, <code>filename</code>, <code>fileIndex</code>, <code>documentIndex</code></td>
               </tr>
               <tr>
                 <td>Environment</td>
@@ -147,6 +147,11 @@
                 <td>Files and documents</td>
                 <td>Strong</td>
                 <td>one-process multi-file evaluation; all-document mode; whole-stream reduction; <code>split_doc</code>; writable cross-file <code>eval-all</code>; exact no-write diffs; snapshot-guarded transactions</td>
+              </tr>
+              <tr>
+                <td>Portable utilities</td>
+                <td>Focused</td>
+                <td>JSON, YAML, properties, CSV, TSV, Base64, URI, and shell codecs; dynamic <code>eval</code>; guarded loads; reproducible shuffle</td>
               </tr>
               <tr>
                 <td>Strings</td>
@@ -160,8 +165,8 @@
               </tr>
               <tr>
                 <td>YAML presentation</td>
-                <td>Focused</td>
-                <td>compiled scalar, flow, block-scalar, record, and reorder spans; writable line comments and styles</td>
+                <td>Strong</td>
+                <td>exact source coordinates; writable value/key head, line, and foot comments; compiled scalar, flow, block, record, comment, and reorder spans</td>
               </tr>
             </tbody>
           </table></div>
@@ -171,7 +176,7 @@
           <ul>
             <li>The executable is readable source: one POSIX shell file with its portable AWK engine embedded.</li>
             <li>It runs where <code>/bin/sh</code> and AWK already exist, including BusyBox, old macOS, and minimal recovery systems.</li>
-            <li>Input bytes, graph nodes, and collection depth are bounded; file-loading and dynamic-code operators do not exist, and environment access can be disabled.</li>
+            <li>Input bytes, graph nodes, collection depth, embedded parses, and dynamic evaluation are bounded. Environment and file operators have separate disable switches.</li>
             <li><code>--ast</code> and <code>--events</code> expose the parser directly when a strange document needs explaining.</li>
             <li><code>--check</code>, <code>--diff</code>, and <code>-i</code> share one prepared edit plan. Previewed bytes are committed bytes; net-zero updates are no-ops.</li>
             <li><code>--preserve-only</code> turns source fidelity into an enforceable precondition instead of a best-effort promise.</li>
@@ -180,45 +185,37 @@
             <li><code>--explain=json</code> produces one value-free audit record per input for CI.</li>
             <li>Parser outcomes, invalid input, yq comparisons, presentation edits, and useful scale are covered by repeatable tests.</li>
           </ul>
-          <p>yq remains the better choice for its complete operator surface, many codecs, polished platform packaging, and broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, and a deliberately narrow security model matter more than total surface area.</p>
+          <p>yq remains the better choice for complete XML/date/format support, polished platform packaging, and its broad ecosystem. YAML.sh is strongest when inspectability, runtime reach, exact source-aware repository edits, and a small controllable security model matter most.</p>
           <h2 id="deliberate-boundary"><a href="#deliberate-boundary">Deliberate boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="table-wrap"><table>
             <thead><tr>
-              <th>Not implemented</th>
-              <th>Why</th>
+              <th>Boundary</th>
+              <th>Contract</th>
             </tr></thead>
             <tbody>
               <tr>
-                <td>XML, CSV, TSV, TOML, INI, properties, Base64, URI codecs</td>
-                <td>YAML.sh is a YAML tool; codecs would add a second product and substantial code.</td>
-              </tr>
-              <tr>
-                <td><code>load*</code>, dynamic <code>eval</code>, system execution</td>
-                <td>File and code execution widen the security model and audit surface.</td>
+                <td>XML, TOML, and INI codecs</td>
+                <td>No partial parser is advertised. These formats remain explicit errors.</td>
               </tr>
               <tr>
                 <td>Date/time and timezone operators</td>
-                <td>Portable AWK has no reliable cross-platform date library.</td>
+                <td>Portable AWK has no cross-platform timezone database or reliable host date API.</td>
               </tr>
               <tr>
-                <td>Head/foot comments and key-node presentation</td>
-                <td>The graph stores mapping keys as edges rather than full nodes; pretending to support their metadata would be misleading.</td>
+                <td>System execution</td>
+                <td>Expressions never launch commands.</td>
               </tr>
               <tr>
-                <td><code>match</code> captures, named captures, regex flags</td>
-                <td>AWK regex is intentionally the portable POSIX intersection.</td>
-              </tr>
-              <tr>
-                <td><code>shuffle</code></td>
-                <td>Portable deterministic behavior would not match yq's randomized output.</td>
+                <td>Regex captures and flags</td>
+                <td><code>test</code> and global <code>sub</code> use the platform's POSIX ERE engine.</td>
               </tr>
               <tr>
                 <td>Complete yq CLI flag parity</td>
-                <td>Format conversion, colors, XML flags, splitting, shell completion, and similar surfaces are out of scope.</td>
+                <td>YAML.sh does not reproduce format-selection flags, colors, XML flags, shell completion, or plugin surfaces.</td>
               </tr>
             </tbody>
           </table></div>
-          <p>Some areas remain partial: column data is focused on block nodes, collection string conversion emits stable YAML rather than preserving every source spelling, and anchor renames deliberately keep existing aliases valid even where yq leaves their displayed alias name unchanged.</p>
+          <p>Properties use dotted paths and CSV/TSV use header-row object decoding. XML-specific forms are rejected. Dynamic expressions speak YAML.sh's documented language, and file reads can be disabled with <code>--security-disable-file-ops</code>. Anchor renames keep existing aliases valid even where yq leaves their displayed alias name unchanged.</p>
           <h2 id="compared-with-yq"><a href="#compared-with-yq">Compared with yq<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>The <a href="/docs/operators/">operator manifest</a> audits every YAML-oriented yq area and names the evidence behind each status. The differential suite then compares those forms with pinned yq v4.53.3 across generated variations, configuration workflows, metadata, and cross-file programs. See <a href="/docs/supported_yml/">YAML support</a> for parser coverage and limits.</p>
           <p>If a form is not in the query guide or tests, treat it as unsupported even when a nearby form works.</p>

@@ -58,8 +58,8 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - LF and CRLF input.
 - Multiple documents using `---` and `...`.
 - Empty explicit documents represented as null.
-- Source lines and focused block-node columns retained on nodes.
-- Anchor, alias, tag, scalar/collection style, and line-comment metadata available to queries and supported setters.
+- Exact source lines and columns for block and multiline flow values and keys; generated nodes report 0.
+- Anchor, alias, tag, scalar/collection style, and value/key head, line, and foot comments available to queries and setters.
 
 ## Intentional limitations
 
@@ -69,16 +69,16 @@ YAML version directives are validated but do not switch between complete YAML 1.
 - Collection-valued mapping keys are rejected. Explicit scalar keys are supported.
 - Tags and anchors before scalar keys are accepted, but mapping keys remain text in the graph.
 - Full YAML 1.1/1.2 schema resolution and application-specific construction are not implemented.
-- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded line comments, and supported scalar/collection styles where representable. It does not reconstruct original spacing or head/foot comments.
-- In-place source plans cover scalar replacements, single- and multiline flow collections, block scalars, direct block inserts/appends/deletes, and pure mapping or sequence reorders. Untouched spans remain byte-identical; changed flow spans use stable flow formatting.
+- Semantic YAML emission preserves data, node kinds, tags, anchors, aliases, merge edges, recorded comments, and supported scalar/collection styles where representable. It does not reconstruct unowned spacing.
+- In-place source plans cover scalar replacements, single- and multiline flow collections, block scalars, direct block inserts/appends/deletes, comment edits, and pure mapping or sequence reorders. Untouched spans remain byte-identical; changed flow spans use stable flow formatting.
 - Updating through an alias or inherited merge value follows shared node identity and can change the anchor or merge source.
 - Sequence slices, scalar interpolation, grouping, `ireduce`, computed object keys, `setpath`/`delpaths`, and POSIX-ERE `test`/global `sub` are supported. Regex flags, captures, and backreferences are not portable and remain outside the contract.
-- `style` can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. `line_comment` can inspect and set line comments. Head/foot comments and key-node presentation remain outside the graph.
+- `style` can inspect recognized styles; reset or set plain/single/double/literal/folded scalar styles; and reset or set flow collection styles. `head_comment`, `line_comment`, and `foot_comment` work on values and generated key references. Full-line block comment edits compile into source spans; ambiguous textual comment placement follows yq's emitter conventions.
 - `tag`, `anchor`, and `alias` are writable properties. Anchor renames keep referring aliases valid; duplicate anchors, unsafe removal, missing or forward targets, and recursive aliases are rejected.
 - Multi-file queries compile once. `--check` reports drift and `--diff` prints exact prepared candidates without writing. `--preserve-only` rejects candidates requiring presentation regeneration. File operations evaluate source snapshots, refuse detected live drift, skip no-ops, reject symlinks and duplicate paths, preserve permissions, and roll back commit failures or interrupts.
 - Writable `eval-all` can bind data from one input and update every selected source file in the same transaction.
 - Merge modifiers append arrays (`*+`), merge arrays by index (`*d`), update existing fields (`*?`), or add new fields (`*n`).
-- The expression language does not implement file-loading operators, date operators, dynamic evaluation, or yq's non-YAML codecs.
+- The expression language includes bounded dynamic evaluation, policy-controlled YAML/text/Base64/properties loads, and JSON/YAML/properties/CSV/TSV/Base64/URI/shell codecs. Date/time, XML, system execution, and regex capture objects remain outside the contract.
 
 YAML.sh does not evaluate YAML as shell code. Input size, node count, and depth have configurable limits. Use a maintained full YAML library when application-specific construction or certification beyond these tested behaviors is required.
 
