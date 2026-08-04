@@ -15,7 +15,7 @@
   <a href="https://yaml.azohra.com">Website</a> ·
   <a href="https://yaml.azohra.com/docs/">Docs</a> ·
   <a href="https://yaml.azohra.com/docs/recipes/">Recipes</a> ·
-  <a href="https://yaml.azohra.com/docs/supported_yml/">YAML support</a>
+  <a href="https://yaml.azohra.com/docs/yaml-support/">YAML support</a>
 </p>
 
 ---
@@ -109,7 +109,7 @@ YAML files are data; queries are programs. Queries cannot execute commands or op
 
 YAML.sh documents what it supports:
 
-- [YAML support](https://yaml.azohra.com/docs/supported_yml/) records accepted and rejected syntax.
+- [YAML support](https://yaml.azohra.com/docs/yaml-support/) records accepted and rejected syntax.
 - [Queries](https://yaml.azohra.com/docs/queries/) defines the expression language.
 - [Validate, patch, and convert](https://yaml.azohra.com/docs/contracts/) defines schemas, patches, and non-YAML formats.
 - [Security and limits](https://yaml.azohra.com/docs/security/) explains capabilities and resource ceilings.

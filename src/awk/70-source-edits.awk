@@ -1,3 +1,7 @@
+function node_parent_of(node) {
+    return (node in node_parent) ? node_parent[node] : 0
+}
+
 function presentation_comment_position(value,    i, char, previous, quote, escaped, braces, brackets) {
     if (!index(value, "#")) {
         return 0
@@ -19,7 +23,7 @@ function presentation_comment_position(value,    i, char, previous, quote, escap
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "{") {
             braces++
@@ -39,6 +43,12 @@ function presentation_comment_position(value,    i, char, previous, quote, escap
 function presentation_plain_safe(value,    lowered, i) {
     lowered = tolower(value)
     if (value == "" || value ~ /^[[:space:]]/ || value ~ /[[:space:]]$/) {
+        return 0
+    }
+    if (value ~ /^["'%]/ || value == "-" || value == "?" || value ~ /^[-?][[:space:]]/) {
+        return 0
+    }
+    if (value == "<<") {
         return 0
     }
     for (i = 1; i <= length(value); i++) {
@@ -77,7 +87,7 @@ function presentation_scalar_text(node, original,    quote, value, properties, r
         rendered = yaml_scalar_text(node)
         return properties == "" ? rendered : properties " " rendered
     }
-    quote = sprintf("%c", 39)
+    quote = SQ
     if (node_style[node] == "single") {
         gsub(quote, quote quote, value)
         rendered = quote value quote
@@ -189,7 +199,7 @@ function presentation_track_comment(node, property, as_key, value,    source, st
         presentation_queue_comment_after(line, value, indent)
         return 1
     }
-    parent = (source in node_parent) ? node_parent[source] : 0
+    parent = node_parent_of(source)
     if (!parent) {
         presentation_queue_comment_before(line, value, indent)
     } else if (node_kind[parent] == "sequence") {
@@ -227,12 +237,19 @@ function presentation_track_owned_span(node,    line, end, i) {
     return 1
 }
 
-function presentation_track_sequence_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, previous_end) {
-    if (node_kind[target] != "sequence" || node_kind[source] != "sequence" ||
-        sequence_count[target] == 0 || sequence_count[target] != sequence_count[source]) {
+function presentation_track_sequence_reorder(target, source) {
+    return presentation_track_collection_reorder(target, source, "sequence")
+}
+
+function presentation_track_collection_reorder(target, source, kind,    parent, header, raw, text, target_end, serial, count, i, j, child, origin, found, previous_end, key) {
+    if (node_kind[target] != kind || node_kind[source] != kind) {
         return 0
     }
-    parent = (target in node_parent) ? node_parent[target] : 0
+    count = kind == "mapping" ? mapping_count[target] : sequence_count[target]
+    if (count == 0 || count != (kind == "mapping" ? mapping_count[source] : sequence_count[source])) {
+        return 0
+    }
+    parent = node_parent_of(target)
     header = node_line[target]
     if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
         header in presentation_deleted_line || header in presentation_reorder_count) {
@@ -246,8 +263,8 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
 
     serial = ++presentation_reorder_serial
     previous_end = header
-    for (i = 1; i <= sequence_count[target]; i++) {
-        child = sequence_child[target, i]
+    for (i = 1; i <= count; i++) {
+        child = kind == "mapping" ? mapping_child[target, i] : sequence_child[target, i]
         if (node_line[child] <= header) {
             return 0
         }
@@ -255,12 +272,15 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
         previous_end = presentation_span_end(child)
     }
     target_end = presentation_span_end(target)
-    for (i = 1; i <= sequence_count[source]; i++) {
-        child = sequence_child[source, i]
+    for (i = 1; i <= count; i++) {
+        child = kind == "mapping" ? mapping_child[source, i] : sequence_child[source, i]
         origin = node_origin[child]
+        key = kind == "mapping" ? mapping_key[source, i] : ""
         found = 0
-        for (j = 1; j <= sequence_count[target]; j++) {
-            if (sequence_child[target, j] == origin && !(serial SUBSEP origin in presentation_reorder_seen)) {
+        for (j = 1; j <= count; j++) {
+            if ((kind == "mapping" ? mapping_child[target, j] : sequence_child[target, j]) == origin &&
+                (kind != "mapping" || mapping_key[target, j] == key) &&
+                !(serial SUBSEP origin in presentation_reorder_seen)) {
                 found = j
                 presentation_reorder_seen[serial, origin] = 1
                 break
@@ -270,13 +290,13 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
             return 0
         }
         presentation_reorder_start[header, i] = presentation_original_start[serial, origin]
-        if (found < sequence_count[target]) {
-            presentation_reorder_end[header, i] = presentation_original_start[serial, sequence_child[target, found + 1]] - 1
+        if (found < count) {
+            presentation_reorder_end[header, i] = presentation_original_start[serial, kind == "mapping" ? mapping_child[target, found + 1] : sequence_child[target, found + 1]] - 1
         } else {
             presentation_reorder_end[header, i] = target_end
         }
     }
-    presentation_reorder_count[header] = sequence_count[source]
+    presentation_reorder_count[header] = count
     for (i = header + 1; i <= target_end; i++) {
         presentation_deleted_line[i] = 1
         presentation_reorder_owned_line[i] = header
@@ -289,15 +309,19 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         sequence_count[target] == 0 || sequence_count[source] <= sequence_count[target]) {
         return 0
     }
-    parent = (target in node_parent) ? node_parent[target] : 0
+    parent = node_parent_of(target)
     header = node_line[target]
-    if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
-        header in presentation_deleted_line || header in presentation_reorder_count) {
-        return 0
-    }
-    raw = raw_input_line[header]
-    if (presentation_has_flow_collection(raw)) {
-        return 0
+    if (parent) {
+        # Nested sequences hang off a mapping key line that must still be
+        # source-owned; document-root sequences have no header line at all.
+        if (node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
+            header in presentation_deleted_line || header in presentation_reorder_count) {
+            return 0
+        }
+        raw = raw_input_line[header]
+        if (presentation_has_flow_collection(raw)) {
+            return 0
+        }
     }
     for (i = 1; i <= sequence_count[target]; i++) {
         child = sequence_child[source, i]
@@ -307,7 +331,7 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         }
     }
     first = node_line[sequence_child[target, 1]]
-    if (first <= header) {
+    if (first < 1 || (parent && first <= header)) {
         return 0
     }
     raw = raw_input_line[first]
@@ -324,63 +348,8 @@ function presentation_track_sequence_append(target, source,    parent, header, f
     return 1
 }
 
-function presentation_track_mapping_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, previous_end, key) {
-    if (node_kind[target] != "mapping" || node_kind[source] != "mapping" ||
-        mapping_count[target] == 0 || mapping_count[target] != mapping_count[source]) {
-        return 0
-    }
-    parent = (target in node_parent) ? node_parent[target] : 0
-    header = node_line[target]
-    if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
-        header in presentation_deleted_line || header in presentation_reorder_count) {
-        return 0
-    }
-    raw = raw_input_line[header]
-    text = substr(raw, indentation(raw, header) + 1)
-    if (!find_mapping_separator(text, 1) || presentation_has_flow_collection(text)) {
-        return 0
-    }
-
-    serial = ++presentation_reorder_serial
-    previous_end = header
-    for (i = 1; i <= mapping_count[target]; i++) {
-        child = mapping_child[target, i]
-        if (node_line[child] <= header) {
-            return 0
-        }
-        presentation_original_start[serial, child] = presentation_attached_start(child, previous_end + 1)
-        previous_end = presentation_span_end(child)
-    }
-    target_end = presentation_span_end(target)
-    for (i = 1; i <= mapping_count[source]; i++) {
-        child = mapping_child[source, i]
-        origin = node_origin[child]
-        key = mapping_key[source, i]
-        found = 0
-        for (j = 1; j <= mapping_count[target]; j++) {
-            if (mapping_key[target, j] == key && mapping_child[target, j] == origin &&
-                !(serial SUBSEP origin in presentation_reorder_seen)) {
-                found = j
-                presentation_reorder_seen[serial, origin] = 1
-                break
-            }
-        }
-        if (!found) {
-            return 0
-        }
-        presentation_reorder_start[header, i] = presentation_original_start[serial, origin]
-        if (found < mapping_count[target]) {
-            presentation_reorder_end[header, i] = presentation_original_start[serial, mapping_child[target, found + 1]] - 1
-        } else {
-            presentation_reorder_end[header, i] = target_end
-        }
-    }
-    presentation_reorder_count[header] = mapping_count[source]
-    for (i = header + 1; i <= target_end; i++) {
-        presentation_deleted_line[i] = 1
-        presentation_reorder_owned_line[i] = header
-    }
-    return 1
+function presentation_track_mapping_reorder(target, source) {
+    return presentation_track_collection_reorder(target, source, "mapping")
 }
 
 function presentation_track_mapping_append(target, source,    first, after, raw, indent, i, child, origin, item, key) {
@@ -563,7 +532,7 @@ function presentation_track_delete(target,    parent, line, end, raw, indent, te
         presentation_track_owned_span(flow_owner)
         return
     }
-    parent = (target in node_parent) ? node_parent[target] : 0
+    parent = node_parent_of(target)
     line = node_line[target]
     if (!parent || line < 1 || line in presentation_line_node) {
         presentation_possible = 0
@@ -685,7 +654,7 @@ function emit_presented_line(line, node,    raw, indent, text, separator, rest, 
 }
 
 function emit_presented_insert(key, node, indent,    inline, properties) {
-    printf "%s%s:", yaml_spaces(indent), presentation_plain_safe(key) ? key : json_quote(key)
+    printf "%s%s:", yaml_spaces(indent), yaml_key_text(key)
     inline = yaml_inline_node(node)
     if (inline != "") {
         printf " %s\n", inline
@@ -738,15 +707,6 @@ function emit_presented_reorder(line,    item, source_line, start, end, replacem
     }
 }
 
-function emit_presented_comment(value, indent,    count, i, lines, separator) {
-    count = split(value, lines, /\n/)
-    for (i = 1; i <= count; i++) {
-        separator = lines[i] == "" ? "" : " "
-        printf "%s#%s%s\n", yaml_spaces(indent), separator, lines[i]
-        delete lines[i]
-    }
-}
-
 function emit_preserved_input(start_line, end_line,    line, i, replacement_end) {
     if (!start_line) {
         start_line = 1
@@ -756,7 +716,7 @@ function emit_preserved_input(start_line, end_line,    line, i, replacement_end)
     }
     for (line = start_line; line <= end_line; line++) {
         for (i = 1; i <= presentation_comment_before_count[line]; i++) {
-            emit_presented_comment(presentation_comment_before_value[line, i], presentation_comment_before_indent[line, i])
+            emit_yaml_comment(presentation_comment_before_value[line, i], presentation_comment_before_indent[line, i])
         }
         if (line in presentation_deleted_line) {
         } else if (line in presentation_line_node) {
@@ -778,9 +738,14 @@ function emit_preserved_input(start_line, end_line,    line, i, replacement_end)
             emit_presented_insert(presentation_insert_key[line, i], presentation_insert_node[line, i], presentation_insert_indent[line, i])
         }
         for (i = 1; i <= presentation_comment_after_count[line]; i++) {
-            emit_presented_comment(presentation_comment_after_value[line, i], presentation_comment_after_indent[line, i])
+            emit_yaml_comment(presentation_comment_after_value[line, i], presentation_comment_after_indent[line, i])
         }
     }
+}
+
+function source_edit_abort(file) {
+    source_edit_file_count[file] = 0
+    return 0
 }
 
 function source_edit_add(kind, start, end,    edit) {
@@ -792,8 +757,7 @@ function source_edit_add(kind, start, end,    edit) {
 
 function source_edit_compile(start_line, end_line, file,    line, run_start, run_end, replacement_end, i, last_end, comment_replace) {
     if (!presentation_possible) {
-        source_edit_file_count[file] = 0
-        return 0
+        return source_edit_abort(file)
     }
     if (!start_line) {
         start_line = 1
@@ -812,8 +776,7 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
                 for (i = line; i <= replacement_end; i++) {
                     if (presentation_reorder_owned_line[i] != presentation_reorder_owned_line[line]) {
                         presentation_possible = 0
-                        source_edit_file_count[file] = 0
-                        return 0
+                        return source_edit_abort(file)
                     }
                 }
                 source_edit_add("nested-replace", line, replacement_end)
@@ -825,8 +788,7 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
                     i in presentation_deleted_line || i in presentation_reorder_count ||
                     ((presentation_sequence_insert_count[i] || presentation_insert_count[i]) && i != replacement_end)) {
                     presentation_possible = 0
-                    source_edit_file_count[file] = 0
-                    return 0
+                    return source_edit_abort(file)
                 }
             }
             source_edit_add("replace", line, replacement_end)
@@ -866,8 +828,7 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
     for (i = 1; i <= source_edit_count; i++) {
         if (source_edit_kind[i] != "insert" && source_edit_start[i] <= last_end) {
             presentation_possible = 0
-            source_edit_file_count[file] = 0
-            return 0
+            return source_edit_abort(file)
         }
         if (source_edit_kind[i] != "insert") {
             last_end = source_edit_end[i]

@@ -1,4 +1,4 @@
-function expression_evaluate_navigation(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, start_index, end_index, size, mutation_path, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+function expression_evaluate_navigation(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, start_index, end_index, size, mutation_path, input_target, path_stream, value_stream, path_node, target_count, property_expression, property, targets) {
     output = expression_stream_new()
     if (kind == "first" || kind == "filter") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
@@ -9,9 +9,8 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
             if (kind == "filter") {
                 result_node = new_node("sequence", 0, "", "", "")
             }
-            collection = ++collection_serial
             if (node_kind[node] == "mapping") {
-                collect_mapping_keys(node, collection)
+                collection = mapping_key_set(node)
                 size = collection_count[collection]
             } else {
                 size = sequence_count[node]
@@ -171,8 +170,7 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
                     expression_stream_push(output, sequence_child[resolved, j])
                 }
             } else if (node_kind[resolved] == "mapping") {
-                collection = ++collection_serial
-                collect_mapping_keys(resolved, collection)
+                collection = mapping_key_set(resolved)
                 for (j = 1; j <= collection_count[collection]; j++) {
                     key = collection_key[collection, j]
                     expression_stream_push(output, mapping_lookup(resolved, key))
@@ -280,7 +278,7 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
             if (!expression_stream_count[path_stream]) {
                 fail("setpath path produced no value")
             }
-            child = expression_stream_count[value_stream] ? expression_stream_node[value_stream, 1] : expression_null()
+            child = expression_stream_first_or_null(value_stream)
             result_node = expression_follow_path(node, expression_stream_node[path_stream, 1], 1)
             expression_apply_replace(result_node, child, expression_path_was_missing)
             expression_stream_push(output, node)
@@ -288,7 +286,6 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
         return output
     }
     if (kind == "delpaths") {
-        path_serial = ++expression_path_serial
         for (i = 1; i <= expression_stream_count[input]; i++) {
             target_count = 0
             node = expression_stream_node[input, i]
@@ -305,12 +302,11 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
             for (j = 1; j <= sequence_count[path_node]; j++) {
                 child = expression_follow_path(node, sequence_child[path_node, j], 0)
                 if (child) {
-                    expression_path_target[path_serial, ++target_count] = child
+                    targets[++target_count] = child
                 }
             }
             for (j = target_count; j >= 1; j--) {
-                expression_apply_delete(expression_path_target[path_serial, j])
-                delete expression_path_target[path_serial, j]
+                expression_apply_delete(targets[j])
             }
             expression_stream_push(output, node)
         }
@@ -334,7 +330,7 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
                 node = expression_stream_node[left_stream, i]
                 single = expression_stream_single(node)
                 right_stream = expression_evaluate(expression_right[expression], single)
-                child = expression_stream_count[right_stream] ? expression_stream_node[right_stream, 1] : expression_null()
+                child = expression_stream_first_or_null(right_stream)
                 expression_apply_replace(node, child,
                     (node in expression_missing_parent) && !expression_placeholder_attached[node])
             }

@@ -1,6 +1,5 @@
 :root {
   --ink: #101410;
-  --ink-soft: #1a211a;
   --paper: #f5f1e8;
   --paper-dim: #ded9ce;
   --acid: #d8ff45;
@@ -427,7 +426,7 @@ h1 span {
 
 .section-heading h2,
 .install h2,
-.feature-large h2 {
+.feature-large h3 {
   margin: 0;
   font-size: clamp(44px, 5.2vw, 74px);
   line-height: 0.98;
@@ -572,7 +571,7 @@ h1 span {
   color: rgba(16, 20, 16, 0.68);
 }
 
-.feature h3 {
+.feature:not(.feature-large) h3 {
   margin: 70px 0 14px;
   font-size: 28px;
   letter-spacing: -0.04em;
@@ -737,11 +736,6 @@ footer nav {
   justify-self: end;
 }
 
-@keyframes blink {
-  0%, 45% { opacity: 1; }
-  46%, 100% { opacity: 0; }
-}
-
 @keyframes ticker-pan {
   from { transform: translateX(0); }
   to { transform: translateX(calc(-100% + 100vw)); }
@@ -758,7 +752,6 @@ footer nav {
 
   .terminal-card {
     width: min(620px, 100%);
-    transform: none;
   }
 
   .pipeline {
@@ -982,11 +975,11 @@ footer nav {
     grid-column: auto;
   }
 
-  .feature h3 {
+  .feature:not(.feature-large) h3 {
     margin-top: 44px;
   }
 
-  .feature-large h2,
+  .feature-large h3,
   .install h2 {
     font-size: clamp(42px, 12.5vw, 54px);
   }

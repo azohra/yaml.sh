@@ -65,7 +65,7 @@
           <p>It was also the ceiling. Once a mapping, sequence, alias, tag, or empty collection had been flattened, important relationships were gone. Every new feature had to reconstruct meaning the parser had already thrown away. Editing YAML without mangling it was almost impossible.</p>
           <p>I asked whether there was a better parsing design I had missed. There was. The missing idea was not a smarter regular expression. It was an intermediate representation that respected YAML.</p>
           <p>The answer was a node graph. Mappings remain mappings. Sequences remain ordered. Empty collections survive. Tags and source positions stay attached. Anchors and aliases can share identity. Queries and updates operate on nodes instead of guessing their way back from strings.</p>
-          <div class="story-code" aria-label="YAML.sh processing pipeline">
+          <div class="story-code" role="img" aria-label="YAML.sh processing pipeline">
             <span>The new shape</span>
             <pre><code>YAML stream → node graph → expression stream → values / YAML</code></pre>
           </div>
@@ -118,7 +118,7 @@
         <nav class="story-links" aria-label="Continue exploring YAML.sh">
           <a href="https://github.com/azohra/yaml.sh"><span>Read the source</span><b aria-hidden="true">↗</b></a>
           <a href="/docs/recipes/"><span>Try a few recipes</span><b aria-hidden="true">→</b></a>
-          <a href="/docs/supported_yml/"><span>Explore YAML support</span><b aria-hidden="true">→</b></a>
+          <a href="/docs/yaml-support/"><span>Explore YAML support</span><b aria-hidden="true">→</b></a>
           <a href="/docs/getting-started/"><span>Install one file</span><b aria-hidden="true">→</b></a>
         </nav>
       </article>

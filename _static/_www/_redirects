@@ -1,2 +1,3 @@
 /get /install 301
 /documentation /docs/ 301
+/docs/supported_yml/ /docs/yaml-support/ 301

@@ -4,6 +4,39 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.18.0] - 2026-08-03
+
+Version 1.18 makes regenerated YAML output idiomatic and round-trip faithful, extends careful edits to root-level sequences, and lands a second refinement round across the engine, site, and harness.
+
+### Added
+
+- In-place edits now preserve comments and formatting when appending to a document whose root is a sequence, matching the existing mapping behavior.
+- `make benchmark` enforces throughput budgets (~3x the release-machine measurements, `YSH_BENCHMARK_SCALE` for slower hosts) and runs in the weekly evidence workflow.
+
+### Changed
+
+- `-o yaml` and regenerated collections emit plain keys and plain unstyled string values whenever plain style is unambiguous, matching yq, `to_yaml`, and in-place inserts; explicitly quoted input keeps its recorded style, and ambiguous values (number lookalikes, `true`/`null`, special characters) stay quoted. Genuine merge keys now emit as `<<`, so merge semantics survive a round trip — previously `"<<"` was quoted and re-parsed as a literal key. Literal keys spelled `<<` remain quoted.
+- The documentation page `/docs/supported_yml/` moved to `/docs/yaml-support/` with a permanent redirect.
+
+### Fixed
+
+- Multiline quoted scalars opened behind nested block indicators (`- key: "abc` continued on the next line) now parse to the values Ruby's parser and yq produce instead of failing with "trailing content after quoted scalar". Pinned YAML Test Suite outcomes are unchanged.
+- The docs generator no longer lets a one-row table corrupt the table after it, validates delimiter rows, and fails the build with file:line diagnostics on Markdown outside its supported dialect instead of degrading silently.
+- Docs pages stop claiming `aria-current` on pages they are not, page-turn cards no longer link to themselves, and the homepage tab widget gained the keyboard behavior its ARIA roles promised.
+- The installer checks for curl and a writable destination before downloading, names `YSH_INSTALL_DIR` when it cannot write, and reports success and PATH visibility explicitly.
+
+### Maintenance
+
+- Shared helpers replace repeated engine shapes: key-set collection, sequence/collection requirement checks, stream defaults, schema bound checks, a single-character lexer table (expected-token errors now print the literal), codec and context name tables, and one comment emitter and reorder tracker each.
+- Scratch globals became locals across the runtime; two seen-sets no longer grow for the process lifetime, and a hoisted quote constant removes per-character sprintf calls from scanner loops for a measured 3-6% parse improvement.
+- The behavioral suite runs its scratch files in shunit2's per-run temp directory, converts seventeen error assertions to a shared helper, and moves content tripwires from the release test into the docs gate; the derived yq differential corpus is generated at run time instead of committed with a sync test.
+- Fuzz and presentation matrices name their factors once and compute their summaries; the fuzz seed is validated; failure bundles and cache-key checks tightened.
+- The docs stylesheet's design tokens no longer collide with the marketing stylesheet's identically named tokens, and its breadcrumb component no longer shares a class name with a different marketing component.
+
+### Compatibility
+
+- The v1 CLI and query language are unchanged. Regenerated YAML output presentation changed as described above; the emitted documents are semantically identical, and explicitly styled input is preserved. The parser repair only accepts previously rejected valid YAML. The old documentation URL redirects permanently.
+
 ## [1.17.1] - 2026-08-03
 
 Version 1.17.1 is a refinement round: dead code, duplication, and stale claims are removed without changing documented v1 behavior.
@@ -452,7 +485,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - YAML.sh remains a deliberately scoped YAML implementation rather than a complete YAML 1.2 processor.
 - Collection-valued explicit keys, recursive aliases, forward aliases, multiline flow collections, explicit block-scalar indentation indicators, and full schema-dependent resolution are not supported.
-- The exact contract is maintained in [`_static/_www/docs/supported_yml.md`](_static/_www/docs/supported_yml.md).
+- The exact contract is maintained in [`_static/_www/docs/yaml-support.md`](_static/_www/docs/yaml-support.md).
 
 ## [0.4.0] - 2026-08-01
 
@@ -506,6 +539,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.18.0]: https://github.com/azohra/yaml.sh/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/azohra/yaml.sh/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/azohra/yaml.sh/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/azohra/yaml.sh/compare/v1.15.0...v1.16.0

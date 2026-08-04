@@ -91,8 +91,7 @@ function expression_semantic_equal(left, right,    left_node, right_node, i, col
         return 1
     }
     if (expression_mapping_length(left_node) != expression_mapping_length(right_node)) return 0
-    collection = ++collection_serial
-    collect_mapping_keys(left_node, collection)
+    collection = mapping_key_set(left_node)
     for (i = 1; i <= collection_count[collection]; i++) {
         key = collection_key[collection, i]
         child = mapping_lookup(right_node, key)
@@ -205,8 +204,7 @@ function merge_patch_apply(target, patch,    resolved_target, resolved_patch, co
         if (expression_last_replace_changed) expression_mark_changed(target)
         resolved_target = resolve_alias(target)
     }
-    collection = ++collection_serial
-    collect_mapping_keys(resolved_patch, collection)
+    collection = mapping_key_set(resolved_patch)
     for (i = 1; i <= collection_count[collection]; i++) {
         key = collection_key[collection, i]
         child = resolve_alias(mapping_lookup(resolved_patch, key))
@@ -249,10 +247,8 @@ function patch_diff_into(before, after, path, result,    left, right, left_keys,
         patch_operation(result, "replace", path, right)
         return
     }
-    left_keys = ++collection_serial
-    right_keys = ++collection_serial
-    collect_mapping_keys(left, left_keys)
-    collect_mapping_keys(right, right_keys)
+    left_keys = mapping_key_set(left)
+    right_keys = mapping_key_set(right)
     for (i = 1; i <= collection_count[left_keys]; i++) {
         key = collection_key[left_keys, i]
         if (!mapping_lookup(right, key)) patch_operation(result, "remove", path "/" patch_pointer_encode(key), 0)
@@ -357,6 +353,18 @@ function schema_boolean(node, keyword,    resolved) {
     resolved = resolve_alias(node)
     if (node_kind[resolved] != "scalar" || node_type[resolved] != "bool") fail("JSON Schema " keyword " must be a boolean")
     return tolower(node_value[resolved]) == "true"
+}
+
+function schema_check_bound(resolved_schema, keyword, actual, comparison, integer_bound, errors, instance_path, schema_path, message,    child, bound) {
+    child = mapping_lookup(resolved_schema, keyword)
+    if (!child) return 1
+    bound = integer_bound ? schema_nonnegative_integer(child, keyword) : schema_number(child, keyword)
+    if ((comparison == "min" && actual < bound) || (comparison == "max" && actual > bound) ||
+        (comparison == "exclusive-min" && actual <= bound) || (comparison == "exclusive-max" && actual >= bound)) {
+        schema_add_error(errors, instance_path, schema_path "/" keyword, keyword, message)
+        return 0
+    }
+    return 1
 }
 
 function schema_trial(instance, schema, instance_path, schema_path, root,    errors) {
@@ -466,16 +474,8 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
 
     if (node_kind[resolved_instance] == "mapping") {
         size = expression_mapping_length(resolved_instance)
-        child = mapping_lookup(resolved_schema, "minProperties")
-        if (child && size < schema_nonnegative_integer(child, "minProperties")) {
-            schema_add_error(errors, instance_path, schema_path "/minProperties", "minProperties", "object has too few properties")
-            valid = 0
-        }
-        child = mapping_lookup(resolved_schema, "maxProperties")
-        if (child && size > schema_nonnegative_integer(child, "maxProperties")) {
-            schema_add_error(errors, instance_path, schema_path "/maxProperties", "maxProperties", "object has too many properties")
-            valid = 0
-        }
+        if (!schema_check_bound(resolved_schema, "minProperties", size, "min", 1, errors, instance_path, schema_path, "object has too few properties")) valid = 0
+        if (!schema_check_bound(resolved_schema, "maxProperties", size, "max", 1, errors, instance_path, schema_path, "object has too many properties")) valid = 0
         required = mapping_lookup(resolved_schema, "required")
         if (required) {
             required = resolve_alias(required)
@@ -496,8 +496,7 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
         if (pattern_properties && node_kind[resolve_alias(pattern_properties)] != "mapping") fail("JSON Schema patternProperties must be an object")
         additional = mapping_lookup(resolved_schema, "additionalProperties")
         name_schema = mapping_lookup(resolved_schema, "propertyNames")
-        collection = ++collection_serial
-        collect_mapping_keys(resolved_instance, collection)
+        collection = mapping_key_set(resolved_instance)
         for (i = 1; i <= collection_count[collection]; i++) {
             key = collection_key[collection, i]
             instance_child = mapping_lookup(resolved_instance, key)
@@ -514,8 +513,7 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
                 }
             }
             if (pattern_properties) {
-                keys = ++collection_serial
-                collect_mapping_keys(resolve_alias(pattern_properties), keys)
+                keys = mapping_key_set(resolve_alias(pattern_properties))
                 for (j = 1; j <= collection_count[keys]; j++) {
                     pattern = collection_key[keys, j]
                     if (key ~ pattern) {
@@ -538,8 +536,7 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
         if (dependent) {
             dependent = resolve_alias(dependent)
             if (node_kind[dependent] != "mapping") fail("JSON Schema dependentRequired must be an object")
-            keys = ++collection_serial
-            collect_mapping_keys(dependent, keys)
+            keys = mapping_key_set(dependent)
             for (i = 1; i <= collection_count[keys]; i++) {
                 key = collection_key[keys, i]
                 if (!mapping_lookup(resolved_instance, key)) continue
@@ -559,8 +556,7 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
         if (dependent) {
             dependent = resolve_alias(dependent)
             if (node_kind[dependent] != "mapping") fail("JSON Schema dependentSchemas must be an object")
-            keys = ++collection_serial
-            collect_mapping_keys(dependent, keys)
+            keys = mapping_key_set(dependent)
             for (i = 1; i <= collection_count[keys]; i++) {
                 key = collection_key[keys, i]
                 if (mapping_lookup(resolved_instance, key) &&
@@ -571,16 +567,8 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
 
     if (node_kind[resolved_instance] == "sequence") {
         size = sequence_count[resolved_instance]
-        child = mapping_lookup(resolved_schema, "minItems")
-        if (child && size < schema_nonnegative_integer(child, "minItems")) {
-            schema_add_error(errors, instance_path, schema_path "/minItems", "minItems", "array has too few items")
-            valid = 0
-        }
-        child = mapping_lookup(resolved_schema, "maxItems")
-        if (child && size > schema_nonnegative_integer(child, "maxItems")) {
-            schema_add_error(errors, instance_path, schema_path "/maxItems", "maxItems", "array has too many items")
-            valid = 0
-        }
+        if (!schema_check_bound(resolved_schema, "minItems", size, "min", 1, errors, instance_path, schema_path, "array has too few items")) valid = 0
+        if (!schema_check_bound(resolved_schema, "maxItems", size, "max", 1, errors, instance_path, schema_path, "array has too many items")) valid = 0
         child = mapping_lookup(resolved_schema, "uniqueItems")
         if (child && schema_boolean(child, "uniqueItems")) {
             for (i = 1; i <= size; i++) for (j = i + 1; j <= size; j++) {
@@ -621,16 +609,8 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
 
     if (node_kind[resolved_instance] == "scalar" && node_type[resolved_instance] == "string") {
         size = schema_utf8_length(node_value[resolved_instance])
-        child = mapping_lookup(resolved_schema, "minLength")
-        if (child && size < schema_nonnegative_integer(child, "minLength")) {
-            schema_add_error(errors, instance_path, schema_path "/minLength", "minLength", "string is too short")
-            valid = 0
-        }
-        child = mapping_lookup(resolved_schema, "maxLength")
-        if (child && size > schema_nonnegative_integer(child, "maxLength")) {
-            schema_add_error(errors, instance_path, schema_path "/maxLength", "maxLength", "string is too long")
-            valid = 0
-        }
+        if (!schema_check_bound(resolved_schema, "minLength", size, "min", 1, errors, instance_path, schema_path, "string is too short")) valid = 0
+        if (!schema_check_bound(resolved_schema, "maxLength", size, "max", 1, errors, instance_path, schema_path, "string is too long")) valid = 0
         child = mapping_lookup(resolved_schema, "pattern")
         if (child) {
             child = resolve_alias(child)
@@ -644,26 +624,10 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
 
     if (node_kind[resolved_instance] == "scalar" && (node_type[resolved_instance] == "int" || node_type[resolved_instance] == "float")) {
         number = node_value[resolved_instance] + 0
-        child = mapping_lookup(resolved_schema, "minimum")
-        if (child && number < schema_number(child, "minimum")) {
-            schema_add_error(errors, instance_path, schema_path "/minimum", "minimum", "number is below the minimum")
-            valid = 0
-        }
-        child = mapping_lookup(resolved_schema, "maximum")
-        if (child && number > schema_number(child, "maximum")) {
-            schema_add_error(errors, instance_path, schema_path "/maximum", "maximum", "number is above the maximum")
-            valid = 0
-        }
-        child = mapping_lookup(resolved_schema, "exclusiveMinimum")
-        if (child && number <= schema_number(child, "exclusiveMinimum")) {
-            schema_add_error(errors, instance_path, schema_path "/exclusiveMinimum", "exclusiveMinimum", "number is not above the exclusive minimum")
-            valid = 0
-        }
-        child = mapping_lookup(resolved_schema, "exclusiveMaximum")
-        if (child && number >= schema_number(child, "exclusiveMaximum")) {
-            schema_add_error(errors, instance_path, schema_path "/exclusiveMaximum", "exclusiveMaximum", "number is not below the exclusive maximum")
-            valid = 0
-        }
+        if (!schema_check_bound(resolved_schema, "minimum", number, "min", 0, errors, instance_path, schema_path, "number is below the minimum")) valid = 0
+        if (!schema_check_bound(resolved_schema, "maximum", number, "max", 0, errors, instance_path, schema_path, "number is above the maximum")) valid = 0
+        if (!schema_check_bound(resolved_schema, "exclusiveMinimum", number, "exclusive-min", 0, errors, instance_path, schema_path, "number is not above the exclusive minimum")) valid = 0
+        if (!schema_check_bound(resolved_schema, "exclusiveMaximum", number, "exclusive-max", 0, errors, instance_path, schema_path, "number is not below the exclusive maximum")) valid = 0
         child = mapping_lookup(resolved_schema, "multipleOf")
         if (child) {
             divisor = schema_number(child, "multipleOf")
