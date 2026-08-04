@@ -391,6 +391,6 @@ ysh -o=yaml '.notes style = "literal"' deploy.yml
 
 Scalar styles can be reset or set to plain, single, double, literal, or folded. Collections can be reset to block output or set to flow. Block comment edits participate in strict source preservation; comments inside changed flow spans may require semantic emission.
 
-## Language boundary
+## Where the language stops
 
 The language does not currently include date/time operators, system execution, or regex flags and capture objects. Slices target sequences, and interpolation accepts scalar results. XML is supported as a data codec rather than as a family of query operators. See the [operator reference](operators.md) for the complete surface and [yq compatibility](yq-compatibility.md) when adapting an existing yq expression.

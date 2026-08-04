@@ -39,8 +39,8 @@
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
               <li><a href="/docs/operators/">Operator reference</a></li>
-              <li><a href="/docs/documents/">Files & documents</a></li>
-              <li><a href="/docs/output/">Output & metadata</a></li>
+              <li><a href="/docs/documents/">Editing files</a></li>
+              <li><a href="/docs/output/">Output formats</a></li>
             </ul>
           </section>
           <section class="nav-group">
@@ -78,8 +78,8 @@
             <ul>
               <li><a href="/docs/queries/">Query language</a></li>
               <li><a href="/docs/operators/">Operator reference</a></li>
-              <li><a href="/docs/documents/">Files & documents</a></li>
-              <li><a href="/docs/output/">Output & metadata</a></li>
+              <li><a href="/docs/documents/">Editing files</a></li>
+              <li><a href="/docs/output/">Output formats</a></li>
             </ul>
           </section>
           <section class="nav-group">
@@ -114,14 +114,14 @@ ysh --preserve-only --diff '.theme = &quot;midnight&quot;' settings.yml
 ysh --schema settings.schema.json '.' settings.yml
 </code></pre>
           </div>
-          <h2 id="start-with-the-job"><a href="#start-with-the-job">Start with the job<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h2 id="pick-a-task"><a href="#pick-a-task">Pick a task<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
-            <li><a href="/docs/getting-started/">Install one file and run the first query</a>.</li>
-            <li><a href="/docs/recipes/">Copy a recipe for filtering, updates, composition, or validation</a>.</li>
-            <li><a href="/docs/queries/">Learn paths, streams, construction, and updates</a>.</li>
-            <li><a href="/docs/contracts/">Validate, patch, and convert configuration</a>.</li>
-            <li><a href="/docs/documents/">Check, compose, and update files or document streams</a>.</li>
-            <li><a href="/docs/output/">Choose value, JSON, YAML, metadata, AST, or events</a>.</li>
+            <li><a href="/docs/getting-started/">Install one file and run your first query</a>.</li>
+            <li><a href="/docs/recipes/">Copy a working recipe for common tasks</a>.</li>
+            <li><a href="/docs/queries/">Learn the query language</a>.</li>
+            <li><a href="/docs/contracts/">Validate against a schema, apply a patch, or convert formats</a>.</li>
+            <li><a href="/docs/documents/">Edit one file or many — preview first, write safely</a>.</li>
+            <li><a href="/docs/output/">Choose the output format</a>.</li>
           </ul>
           <h2 id="what-it-can-do"><a href="#what-it-can-do">What it can do<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
@@ -131,7 +131,7 @@ ysh --schema settings.schema.json '.' settings.yml
             <li><strong>Inspect strange input.</strong> View types, source locations, parser events, an AST, or an explanation of an edit.</li>
           </ul>
           <p>The released <code>ysh</code> contains the complete shell launcher and AWK engine. Copy one file, read it, and run it without another language runtime.</p>
-          <h2 id="know-the-boundary"><a href="#know-the-boundary">Know the boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h2 id="what-s-supported-and-what-isn-t"><a href="#what-s-supported-and-what-isn-t">What's supported — and what isn't<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <ul>
             <li><a href="/docs/yaml-support/">YAML support</a> records accepted and rejected syntax.</li>
             <li><a href="/docs/queries/">Queries</a> defines the expression language.</li>
@@ -154,9 +154,9 @@ ysh --explain=json --diff '.image.tag = &quot;stable&quot;' services/*.yml 2&gt;
     <aside class="page-nav" aria-label="On this page">
       <strong>On this page</strong>
       <ol>
-        <li class="level-2"><a href="#start-with-the-job">Start with the job</a></li>
+        <li class="level-2"><a href="#pick-a-task">Pick a task</a></li>
         <li class="level-2"><a href="#what-it-can-do">What it can do</a></li>
-        <li class="level-2"><a href="#know-the-boundary">Know the boundary</a></li>
+        <li class="level-2"><a href="#what-s-supported-and-what-isn-t">What's supported — and what isn't</a></li>
         <li class="level-2"><a href="#open-the-hood">Open the hood</a></li>
       </ol>
       <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/README.md">Edit this page</a>

@@ -105,7 +105,7 @@ Events and AST output show how YAML.sh understood a document. Explain mode repor
 
 YAML files are data; queries are programs. Queries cannot execute commands or open network connections, but they can explicitly read environment variables or local files, and `eval` can compile a dynamically supplied expression. Those capabilities can be disabled independently. Read [security and limits](https://yaml.azohra.com/docs/security/) before running untrusted input.
 
-## Know the boundary
+## What's supported — and what isn't
 
 YAML.sh documents what it supports:
 

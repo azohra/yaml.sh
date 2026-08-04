@@ -4,6 +4,10 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+### Changed
+
+- Documentation headings speak plainly: "Start with the job" became "Pick a task", "Know the boundary" became "What's supported — and what isn't", and the sidebar, page titles, and landing links now name reader tasks instead of internal design vocabulary.
+
 ## [1.18.0] - 2026-08-03
 
 Version 1.18 makes regenerated YAML output idiomatic and round-trip faithful, extends careful edits to root-level sequences, and lands a second refinement round across the engine, site, and harness.
