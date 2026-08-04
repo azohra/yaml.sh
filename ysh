@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.17.2
+YSH_VERSION=1.18.0
 
 # Replaced by the build with the embedded AWK engine.
 ysh_awk_program() {
@@ -8266,6 +8266,10 @@ function yaml_properties(node,    result, tag) {
     return result
 }
 
+function yaml_key_text(key) {
+    return presentation_plain_safe(key) ? key : json_quote(key)
+}
+
 function yaml_scalar_text(node,    value, properties, lowered, quote) {
     if (node_kind[node] == "alias") {
         return "*" node_value[node]
@@ -8292,7 +8296,7 @@ function yaml_scalar_text(node,    value, properties, lowered, quote) {
         gsub(quote, quote quote, value)
         return properties quote value quote
     }
-    if (node_style[node] == "plain" && presentation_plain_safe(value)) {
+    if ((node_style[node] == "plain" || node_style[node] == "") && presentation_plain_safe(value)) {
         return properties value
     }
     return properties json_quote(value)
@@ -8339,7 +8343,7 @@ function yaml_flow_node(node,    result, i, key) {
     for (i = 1; i <= mapping_count[node]; i++) {
         if (i > 1) result = result ", "
         key = mapping_key[node, i]
-        result = result json_quote(key) ": " yaml_flow_node(mapping_child[node, i])
+        result = result (mapping_merge[node, i] ? "<<" : yaml_key_text(key)) ": " yaml_flow_node(mapping_child[node, i])
     }
     return result "}"
 }
@@ -8390,7 +8394,7 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
             if (mapping_merge[node, i]) {
                 printf "%s<<:", yaml_spaces(indent)
             } else {
-                printf "%s%s:", yaml_spaces(indent), json_quote(key)
+                printf "%s%s:", yaml_spaces(indent), yaml_key_text(key)
             }
             if (node_kind[child] == "scalar" && (node_style[child] == "literal" || node_style[child] == "folded")) {
                 properties = yaml_properties(child)
@@ -8512,6 +8516,12 @@ function presentation_comment_position(value,    i, char, previous, quote, escap
 function presentation_plain_safe(value,    lowered, i) {
     lowered = tolower(value)
     if (value == "" || value ~ /^[[:space:]]/ || value ~ /[[:space:]]$/) {
+        return 0
+    }
+    if (value ~ /^["'%]/ || value == "-" || value == "?" || value ~ /^[-?][[:space:]]/) {
+        return 0
+    }
+    if (value == "<<") {
         return 0
     }
     for (i = 1; i <= length(value); i++) {
@@ -8774,13 +8784,17 @@ function presentation_track_sequence_append(target, source,    parent, header, f
     }
     parent = node_parent_of(target)
     header = node_line[target]
-    if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
-        header in presentation_deleted_line || header in presentation_reorder_count) {
-        return 0
-    }
-    raw = raw_input_line[header]
-    if (presentation_has_flow_collection(raw)) {
-        return 0
+    if (parent) {
+        # Nested sequences hang off a mapping key line that must still be
+        # source-owned; document-root sequences have no header line at all.
+        if (node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
+            header in presentation_deleted_line || header in presentation_reorder_count) {
+            return 0
+        }
+        raw = raw_input_line[header]
+        if (presentation_has_flow_collection(raw)) {
+            return 0
+        }
     }
     for (i = 1; i <= sequence_count[target]; i++) {
         child = sequence_child[source, i]
@@ -8790,7 +8804,7 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         }
     }
     first = node_line[sequence_child[target, 1]]
-    if (first <= header) {
+    if (first < 1 || (parent && first <= header)) {
         return 0
     }
     raw = raw_input_line[first]
@@ -9113,7 +9127,7 @@ function emit_presented_line(line, node,    raw, indent, text, separator, rest, 
 }
 
 function emit_presented_insert(key, node, indent,    inline, properties) {
-    printf "%s%s:", yaml_spaces(indent), presentation_plain_safe(key) ? key : json_quote(key)
+    printf "%s%s:", yaml_spaces(indent), yaml_key_text(key)
     inline = yaml_inline_node(node)
     if (inline != "") {
         printf " %s\n", inline

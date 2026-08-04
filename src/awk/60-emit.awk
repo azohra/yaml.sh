@@ -142,6 +142,10 @@ function yaml_properties(node,    result, tag) {
     return result
 }
 
+function yaml_key_text(key) {
+    return presentation_plain_safe(key) ? key : json_quote(key)
+}
+
 function yaml_scalar_text(node,    value, properties, lowered, quote) {
     if (node_kind[node] == "alias") {
         return "*" node_value[node]
@@ -168,7 +172,7 @@ function yaml_scalar_text(node,    value, properties, lowered, quote) {
         gsub(quote, quote quote, value)
         return properties quote value quote
     }
-    if (node_style[node] == "plain" && presentation_plain_safe(value)) {
+    if ((node_style[node] == "plain" || node_style[node] == "") && presentation_plain_safe(value)) {
         return properties value
     }
     return properties json_quote(value)
@@ -215,7 +219,7 @@ function yaml_flow_node(node,    result, i, key) {
     for (i = 1; i <= mapping_count[node]; i++) {
         if (i > 1) result = result ", "
         key = mapping_key[node, i]
-        result = result json_quote(key) ": " yaml_flow_node(mapping_child[node, i])
+        result = result (mapping_merge[node, i] ? "<<" : yaml_key_text(key)) ": " yaml_flow_node(mapping_child[node, i])
     }
     return result "}"
 }
@@ -266,7 +270,7 @@ function emit_yaml_collection(node, indent,    i, child, inline, properties, key
             if (mapping_merge[node, i]) {
                 printf "%s<<:", yaml_spaces(indent)
             } else {
-                printf "%s%s:", yaml_spaces(indent), json_quote(key)
+                printf "%s%s:", yaml_spaces(indent), yaml_key_text(key)
             }
             if (node_kind[child] == "scalar" && (node_style[child] == "literal" || node_style[child] == "folded")) {
                 properties = yaml_properties(child)

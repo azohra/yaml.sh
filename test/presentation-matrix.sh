@@ -72,7 +72,7 @@ generate_case() {
         print "metadata: # labels " seed > expected
         print "  owner: platform" > expected
         print "  environment: test" > expected
-        print "  region: \"west\"" > expected
+        print "  region: west" > expected
         print "service: !e!app" > expected
         print "  name: " changed_name "       # public name " seed > expected
         print "  owner: '\''" owner "'\''" > expected
@@ -124,7 +124,7 @@ while [ "$case_id" -le "$last_case" ]; do
         exit 1
     fi
 
-    awk '/^footer:/ { print "  - \"added\"" } { print }' "$EXPECTED" > "$EXPECTED_APPEND"
+    awk '/^footer:/ { print "  - added" } { print }' "$EXPECTED" > "$EXPECTED_APPEND"
     cp "$INPUT" "$BEFORE"
     if "$YSH_BINARY" --preserve-only --diff '.items += ["added"]' "$INPUT" > "$DIFF_OUTPUT" 2>/dev/null; then
         diff_status=0
@@ -132,7 +132,7 @@ while [ "$case_id" -le "$last_case" ]; do
         diff_status=$?
     fi
     if [ "$diff_status" -ne 1 ] || ! cmp -s "$INPUT" "$BEFORE" ||
-        ! grep -Fq '+  - "added"' "$DIFF_OUTPUT"; then
+        ! grep -Fq '+  - added' "$DIFF_OUTPUT"; then
         printf 'Strict diff case %s did not preview its exact non-writing edit.\n' "$case_id" >&2
         exit 1
     fi
@@ -166,7 +166,7 @@ printf '%s\n' \
     '  old line' \
     'tail: kept' > "$INPUT"
 printf '%s\n' \
-    'meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail' \
+    'meta: {enabled: true, labels: [one, two, three]} # flow tail' \
     'settings: # header' \
     '  # alpha setting' \
     '  a: 2' \

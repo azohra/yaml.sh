@@ -118,11 +118,11 @@ if ! grep -Fq '# Validate, patch & convert' "$PUBLISHED/contracts.md"; then
     printf '%s\n' 'Contracts page lost its heading.' >&2
     exit 1
 fi
-if ! grep -Fq '# YAML support' "$PUBLISHED/supported_yml.md"; then
+if ! grep -Fq '# YAML support' "$PUBLISHED/yaml-support.md"; then
     printf '%s\n' 'YAML support page lost its heading.' >&2
     exit 1
 fi
-if grep -Fq 'Date/time, XML' "$PUBLISHED/supported_yml.md"; then
+if grep -Fq 'Date/time, XML' "$PUBLISHED/yaml-support.md"; then
     printf '%s\n' 'YAML support page reintroduced retired capability copy.' >&2
     exit 1
 fi

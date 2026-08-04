@@ -45,6 +45,12 @@ function presentation_plain_safe(value,    lowered, i) {
     if (value == "" || value ~ /^[[:space:]]/ || value ~ /[[:space:]]$/) {
         return 0
     }
+    if (value ~ /^["'%]/ || value == "-" || value == "?" || value ~ /^[-?][[:space:]]/) {
+        return 0
+    }
+    if (value == "<<") {
+        return 0
+    }
     for (i = 1; i <= length(value); i++) {
         if (index(":#[]{},&*!|>@`", substr(value, i, 1))) {
             return 0
@@ -305,13 +311,17 @@ function presentation_track_sequence_append(target, source,    parent, header, f
     }
     parent = node_parent_of(target)
     header = node_line[target]
-    if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
-        header in presentation_deleted_line || header in presentation_reorder_count) {
-        return 0
-    }
-    raw = raw_input_line[header]
-    if (presentation_has_flow_collection(raw)) {
-        return 0
+    if (parent) {
+        # Nested sequences hang off a mapping key line that must still be
+        # source-owned; document-root sequences have no header line at all.
+        if (node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
+            header in presentation_deleted_line || header in presentation_reorder_count) {
+            return 0
+        }
+        raw = raw_input_line[header]
+        if (presentation_has_flow_collection(raw)) {
+            return 0
+        }
     }
     for (i = 1; i <= sequence_count[target]; i++) {
         child = sequence_child[source, i]
@@ -321,7 +331,7 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         }
     }
     first = node_line[sequence_child[target, 1]]
-    if (first <= header) {
+    if (first < 1 || (parent && first <= header)) {
         return 0
     }
     raw = raw_input_line[first]
@@ -644,7 +654,7 @@ function emit_presented_line(line, node,    raw, indent, text, separator, rest, 
 }
 
 function emit_presented_insert(key, node, indent,    inline, properties) {
-    printf "%s%s:", yaml_spaces(indent), presentation_plain_safe(key) ? key : json_quote(key)
+    printf "%s%s:", yaml_spaces(indent), yaml_key_text(key)
     inline = yaml_inline_node(node)
     if (inline != "") {
         printf " %s\n", inline

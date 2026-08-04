@@ -19,7 +19,7 @@ assertYshFails() {
 }
 
 testVersion() {
-    assertEquals "v1.17.2" "$(./ysh --version)"
+    assertEquals "v1.18.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -370,7 +370,7 @@ testExpressionCapabilityClosure() {
     assertEquals '["1","true","null","~","cat","an: object","- array\n- 2"]' "$(printf '%s\n' '- 1' '- true' '- null' '- ~' '- cat' '- an: object' '- - array' '  - 2' | ./ysh --json 'map(to_string)')"
     assertEquals '{"0":"zero","1":{"name":"one"}}' "$(printf '%s\n' '- zero' '- name: one' | ./ysh --json 'array_to_map')"
     assertEquals '[4,1,0]' "$(printf '%s\n' 'a: cat' 'b: bob' | ./ysh --json '[.b | column, .b | key | column, {"a": "new"} | column]')"
-    assertEquals "$(printf '%s\n' '"a": "cat"' '---' '"b": "dog"')" "$(printf '%s\n' '- a: cat' '- b: dog' | ./ysh -o=yaml '.[] | split_doc')"
+    assertEquals "$(printf '%s\n' 'a: cat' '---' 'b: dog')" "$(printf '%s\n' '- a: cat' '- b: dog' | ./ysh -o=yaml '.[] | split_doc')"
     assertEquals '{"a":{"c":3,"d":4},"b":2}' "$(printf '%s\n' 'b: 2' 'a:' '  d: 4' '  c: 3' | ./ysh --json 'sort_keys(..)')"
 }
 
@@ -465,7 +465,7 @@ testMultipleInputEvaluationAndMetadata() {
     printf '%s\n' 'answer: 2' > "$second"
     expected=$(printf '["%s",0,0,1]\n["%s",1,0,2]' "$first" "$second")
     assertEquals "$expected" "$(./ysh eval --json '[filename, fileIndex, documentIndex, .answer]' "$first" "$second")"
-    assertEquals "$(printf '%s\n' '"answer": 1' '---' '"answer": 2')" "$(./ysh -o yaml '.' "$first" "$second")"
+    assertEquals "$(printf '%s\n' 'answer: 1' '---' 'answer: 2')" "$(./ysh -o yaml '.' "$first" "$second")"
     ./ysh -i '.answer = 3' "$first" "$second" >/dev/null 2>&1
     assertEquals 0 $?
     assertEquals 3 "$(./ysh '.answer' "$first")"
@@ -490,7 +490,7 @@ testMultipleInputEvaluationSkipsEmptyFilesWithoutLosingMetadata() {
 testAllDocumentEvaluation() {
     input=$(printf '%s\n' '---' 'answer: 1' '---' 'answer: 2' '---' 'answer: 3')
     assertEquals "$(printf '%s\n' '[0,1]' '[1,2]' '[2,3]')" "$(printf '%s\n' "$input" | ./ysh --all-documents --json '[documentIndex, .answer]')"
-    assertEquals "$(printf '%s\n' '"answer": 1' '---' '"answer": 2' '---' '"answer": 3')" "$(printf '%s\n' "$input" | ./ysh --all-documents -o yaml '.')"
+    assertEquals "$(printf '%s\n' 'answer: 1' '---' 'answer: 2' '---' 'answer: 3')" "$(printf '%s\n' "$input" | ./ysh --all-documents -o yaml '.')"
 }
 
 testEvalAllAcrossFiles() {
@@ -553,7 +553,7 @@ testYamlOutputRoundTrips() {
 }
 
 testYamlOutputSeparatesStreams() {
-    assertEquals "$(printf '%s\n' '"api"' '---' '"worker"' '---' '"web"')" "$(./ysh -o=yaml '.services[].name' test/expressions.yml)"
+    assertEquals "$(printf '%s\n' 'api' '---' 'worker' '---' 'web')" "$(./ysh -o=yaml '.services[].name' test/expressions.yml)"
 }
 
 testInplaceUpdate() {
@@ -834,8 +834,8 @@ testPreserveOnlyRefusesRegeneration() {
     assertEquals 0 $?
     result=$(cat "$preserve_file")
     assertContains "$result" 'name: api # keep'
-    assertContains "$result" 'region: "west"'
-    assertContains "$result" '  - "two"'
+    assertContains "$result" 'region: west'
+    assertContains "$result" '  - two'
     assertContains "$result" 'tail: kept'
 
     printf '%s\n' 'defaults: &defaults' '  retries: 3' 'service:' '  inherited: *defaults' > "$alias_file"
@@ -848,8 +848,8 @@ testPreserveOnlyRefusesRegeneration() {
     ./ysh --preserve-only --diff '.meta.checked = true | .items |= map(.score += 1)' "$flow_file" > "$preserve_output" 2> "$preserve_error"
     assertEquals 1 $?
     assertEquals 0 "$(wc -c < "$preserve_error" | tr -d ' ')"
-    assertContains "$(cat "$preserve_output")" '+meta: {"enabled": false, "checked": true}'
-    assertContains "$(cat "$preserve_output")" '+items: [{"name": "one", "score": 5}]'
+    assertContains "$(cat "$preserve_output")" '+meta: {enabled: false, checked: true}'
+    assertContains "$(cat "$preserve_output")" '+items: [{name: one, score: 5}]'
     ./ysh --preserve-only -i '.meta.checked = true | .items |= map(.score += 1)' "$flow_file"
     assertEquals 0 $?
     assertEquals '{"enabled":false,"checked":true}' "$(./ysh --json '.meta' "$flow_file")"
@@ -984,7 +984,7 @@ testInplaceEditsPresentationMetadata() {
 
     ./ysh -i '.service.labels style = "flow"' "$inplace_file"
     assertEquals 0 $?
-    assertContains "$(cat "$inplace_file")" '"labels": {"tier": "web"}'
+    assertContains "$(cat "$inplace_file")" 'labels: {tier: web}'
 
     printf '%s\n' 'before: x' 'a: value' 'items:' '  - one' '  - two' 'after: z' > "$inplace_file"
     ./ysh --preserve-only -i \
@@ -1022,9 +1022,9 @@ testInplacePreservesStructuralPresentation() {
     assertContains "$result" '# worker stays documented'
     assertNotContains "$result" '  - first'
     assertContains "$result" '  - second'
-    assertContains "$result" '  protocol: "http"'
+    assertContains "$result" '  protocol: http'
     assertContains "$result" 'footer: kept    # untouched'
-    assertContains "$result" 'region: "west"'
+    assertContains "$result" 'region: west'
     rm -f "$inplace_file"
 }
 
@@ -1073,7 +1073,7 @@ testInplacePreservesRichYamlPresentation() {
     cp test/presentation.yml "$inplace_file"
     ./ysh -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .service.region = "west"' "$inplace_file"
 
-    expected=$(printf '%s\n' '%YAML 1.2' '%TAG !e! tag:example.com,2026:' '---' '# deployment' 'defaults: &defaults {retries: 3, mode: safe} # flow stays' 'service: !e!app' '  name: "worker"       # public name' "  owner: 'platform team'" '  notes: |-' '    keep this' '    exactly' '  inherited: *defaults' '  region: "west"' 'items: # order' '  # second item' "  - !e!item 'two'" '  # first item' '  - &first "uno"' 'footer: kept # tail')
+    expected=$(printf '%s\n' '%YAML 1.2' '%TAG !e! tag:example.com,2026:' '---' '# deployment' 'defaults: &defaults {retries: 3, mode: safe} # flow stays' 'service: !e!app' '  name: "worker"       # public name' "  owner: 'platform team'" '  notes: |-' '    keep this' '    exactly' '  inherited: *defaults' '  region: west' 'items: # order' '  # second item' "  - !e!item 'two'" '  # first item' '  - &first "uno"' 'footer: kept # tail')
     assertEquals "$expected" "$(cat "$inplace_file")"
     rm -f "$inplace_file"
 }
@@ -1094,7 +1094,7 @@ testInplaceCompilesOwnedMultilineSourceEdits() {
         '  second' \
         'after: kept' > "$inplace_file"
     printf '%s\n' \
-        'meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail' \
+        'meta: {enabled: true, labels: [one, two, three]} # flow tail' \
         'title: "new value" # quoted tail' \
         'note: |- # block tail' \
         '  new line' \
@@ -1105,7 +1105,7 @@ testInplaceCompilesOwnedMultilineSourceEdits() {
         '.meta.enabled = true | .meta.labels += ["three"] | .note = "new line\nsecond new" | .title = "new value"' \
         "$inplace_file" > "$diff_file"
     assertEquals 1 $?
-    assertContains "$(cat "$diff_file")" '+meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail'
+    assertContains "$(cat "$diff_file")" '+meta: {enabled: true, labels: [one, two, three]} # flow tail'
     assertContains "$(cat "$diff_file")" '+  new line'
     assertContains "$(cat "$diff_file")" '+title: "new value" # quoted tail'
     assertContains "$(cat "$inplace_file")" 'enabled: false'
@@ -1180,7 +1180,7 @@ testInplacePreservesAliasAndMergeSourceOwnership() {
     ./ysh --preserve-only -i '.service.inherited.retries = 5 | .service.mode = "strict"' "$inplace_file"
     assertEquals 0 $?
     result=$(cat "$inplace_file")
-    assertContains "$result" 'defaults: &defaults {"retries": 5, "mode": "strict"} # source owner'
+    assertContains "$result" 'defaults: &defaults {retries: 5, mode: strict} # source owner'
     assertContains "$result" '<<: *defaults # merge stays'
     assertContains "$result" 'inherited: *defaults # alias stays'
     assertContains "$result" 'tail: kept'
@@ -1271,7 +1271,7 @@ testExpressionPresentationMetadata() {
     assertEquals "$(printf '%s\n' single double literal folded)" "$styles"
     assertEquals '"new note"' "$(printf '%s\n' 'name: api # old' | ./ysh --json '.name line_comment = "new note" | .name | line_comment')"
     assertEquals '"single"' "$(printf '%s\n' 'name: api' | ./ysh --json '.name style = "single" | .name | style')"
-    assertEquals '"items": ["one", "two"]' "$(printf '%s\n' 'items: [one, two]' | ./ysh -o yaml '.items style = "flow"')"
+    assertEquals 'items: [one, two]' "$(printf '%s\n' 'items: [one, two]' | ./ysh -o yaml '.items style = "flow"')"
 }
 
 testExpressionBlockStylesAndOutputControls() {
@@ -1283,7 +1283,7 @@ testExpressionBlockStylesAndOutputControls() {
     assertEquals '"hello\nworld"' "$(printf '%s\n' "$folded" | ./ysh --json '.value')"
 
     result=$(printf '%s\n' 'root:' '  child: value' | ./ysh -I4 -o=yaml '.')
-    assertContains "$result" '    "child": "value"'
+    assertContains "$result" '    child: value'
     assertEquals '"Things" # note' "$(printf '%s\n' 'value: "Things" # note' | ./ysh --unwrap-scalar=false '.value')"
 
     style_file=$SHUNIT_TMPDIR/block-style.yml
@@ -1409,6 +1409,18 @@ testMultilinePlainScalars() {
     assertEquals '"not yaml another root"' "$(printf '%s\n' 'not yaml' 'another root' | ./ysh --json '.')"
     assertEquals '"flow in block"' "$(printf '%s\n' '-' '  "flow in block"' | ./ysh --json '.[0]')"
     assertEquals '"value"' "$(printf '%s\n' 'key: # comment' '  value' | ./ysh --json '.key')"
+}
+
+testInplacePreservesRootSequenceAppend() {
+    root_file=$SHUNIT_TMPDIR/inplace-root-sequence.yml
+    printf '%s\n' '# fleet manifest' '- name: web  # primary' '  port: 80' '- name: api' '  port: 8080' > "$root_file"
+    ./ysh --preserve-only -i '. += [{"name": "cache", "port": 6379}]' "$root_file" >/dev/null 2>&1
+    assertEquals 0 $?
+    assertContains "$(cat "$root_file")" '# fleet manifest'
+    assertTrue "original entry must keep its comment and spacing" "grep -Fq -- '- name: web  # primary' '$root_file'"
+    assertContains "$(cat "$root_file")" 'name: cache'
+    assertEquals '3' "$(./ysh --json '. | length' "$root_file")"
+    rm -f "$root_file"
 }
 
 testMultilineQuotedScalarsBehindNestedIndicators() {
@@ -1683,10 +1695,10 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.17.2/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.18.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.2"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.18.0"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
 }
 

@@ -181,7 +181,7 @@ function nav_group(label, a, al, b, bl, c, cl, d, dl) {
 function print_nav() {
     nav_group("Start", "index", "Overview", "getting-started", "Install & quick start", "recipes", "Recipes", "", "")
     nav_group("Use", "queries", "Query language", "operators", "Operator reference", "documents", "Files & documents", "output", "Output & metadata")
-    nav_group("Reference", "contracts", "Validate, patch & convert", "supported_yml", "YAML support", "yq-compatibility", "yq compatibility", "security", "Security & limits")
+    nav_group("Reference", "contracts", "Validate, patch & convert", "yaml-support", "YAML support", "yq-compatibility", "yq compatibility", "security", "Security & limits")
     nav_group("Build", "internals", "How it works", "development", "Development", "migration", "Migration", "", "")
 }
 
@@ -225,7 +225,7 @@ function print_header() {
     print "      <p class=\"nav-foot\">One file. <code>/bin/sh</code> + AWK.</p>"
     print "    </aside>"
     print "    <main id=\"content\" class=\"doc-content\">"
-    print "      <div class=\"eyebrow\"><span>Documentation</span><span>v" esc(version) "</span></div>"
+    print "      <div class=\"breadcrumb\"><span>Documentation</span><span>v" esc(version) "</span></div>"
     print "      <article>"
 }
 
@@ -343,7 +343,7 @@ END {
     print "      </article>"
     page_turn = "      <nav class=\"page-turn\" aria-label=\"More documentation\">"
     if (page_slug != "recipes") page_turn = page_turn "<a href=\"/docs/recipes/\"><span>Try a real task</span><strong>Open the recipe book →</strong></a>"
-    if (page_slug != "supported_yml") page_turn = page_turn "<a href=\"/docs/supported_yml/\"><span>Check YAML support</span><strong>See exactly what works →</strong></a>"
+    if (page_slug != "yaml-support") page_turn = page_turn "<a href=\"/docs/yaml-support/\"><span>Check YAML support</span><strong>See exactly what works →</strong></a>"
     print page_turn "</nav>"
     print "    </main>"
     print "    <aside class=\"page-nav\" aria-label=\"On this page\">"
