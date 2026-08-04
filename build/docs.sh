@@ -23,8 +23,8 @@ description_for() {
     queries) printf '%s\n' 'Paths, filters, construction, updates, and context.' ;;
     contracts) printf '%s\n' 'Validate schemas, apply standard patches, and convert configuration formats.' ;;
     operators) printf '%s\n' 'Operators, supported forms, and practical boundaries.' ;;
-    documents) printf '%s\n' 'Work across YAML streams and multiple files.' ;;
-    output) printf '%s\n' 'Choose value, JSON, YAML, metadata, AST, or events.' ;;
+    documents) printf '%s\n' 'Edit one file or many: preview first, write safely.' ;;
+    output) printf '%s\n' 'Choose the output format and inspect how YAML was read.' ;;
     yq-compatibility) printf '%s\n' 'What carries over from yq, what differs, and when to use each tool.' ;;
     yaml-support) printf '%s\n' 'Supported YAML syntax, resolution, and parser boundaries.' ;;
     security) printf '%s\n' 'Bound hostile input and understand the security model.' ;;

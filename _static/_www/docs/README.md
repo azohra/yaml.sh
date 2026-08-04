@@ -8,14 +8,14 @@ ysh --preserve-only --diff '.theme = "midnight"' settings.yml
 ysh --schema settings.schema.json '.' settings.yml
 ```
 
-## Start with the job
+## Pick a task
 
-- [Install one file and run the first query](getting-started.md).
-- [Copy a recipe for filtering, updates, composition, or validation](recipes.md).
-- [Learn paths, streams, construction, and updates](queries.md).
-- [Validate, patch, and convert configuration](contracts.md).
-- [Check, compose, and update files or document streams](documents.md).
-- [Choose value, JSON, YAML, metadata, AST, or events](output.md).
+- [Install one file and run your first query](getting-started.md).
+- [Copy a working recipe for common tasks](recipes.md).
+- [Learn the query language](queries.md).
+- [Validate against a schema, apply a patch, or convert formats](contracts.md).
+- [Edit one file or many — preview first, write safely](documents.md).
+- [Choose the output format](output.md).
 
 ## What it can do
 
@@ -26,7 +26,7 @@ ysh --schema settings.schema.json '.' settings.yml
 
 The released `ysh` contains the complete shell launcher and AWK engine. Copy one file, read it, and run it without another language runtime.
 
-## Know the boundary
+## What's supported — and what isn't
 
 - [YAML support](yaml-support.md) records accepted and rejected syntax.
 - [Queries](queries.md) defines the expression language.

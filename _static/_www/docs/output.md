@@ -1,4 +1,4 @@
-# Output & metadata
+# Output formats & inspection
 
 The same query can return a value, JSON, YAML, TOML, INI, XML, a node type, its expanded tag, or its source line.
 

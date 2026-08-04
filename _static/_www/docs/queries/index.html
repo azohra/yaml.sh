@@ -39,8 +39,8 @@
             <ul>
               <li><a href="/docs/queries/" aria-current="page">Query language</a></li>
               <li><a href="/docs/operators/">Operator reference</a></li>
-              <li><a href="/docs/documents/">Files & documents</a></li>
-              <li><a href="/docs/output/">Output & metadata</a></li>
+              <li><a href="/docs/documents/">Editing files</a></li>
+              <li><a href="/docs/output/">Output formats</a></li>
             </ul>
           </section>
           <section class="nav-group">
@@ -78,8 +78,8 @@
             <ul>
               <li><a href="/docs/queries/" aria-current="page">Query language</a></li>
               <li><a href="/docs/operators/">Operator reference</a></li>
-              <li><a href="/docs/documents/">Files & documents</a></li>
-              <li><a href="/docs/output/">Output & metadata</a></li>
+              <li><a href="/docs/documents/">Editing files</a></li>
+              <li><a href="/docs/output/">Output formats</a></li>
             </ul>
           </section>
           <section class="nav-group">
@@ -528,7 +528,7 @@ ysh -o=yaml '.notes style = &quot;literal&quot;' deploy.yml
 </code></pre>
           </div>
           <p>Scalar styles can be reset or set to plain, single, double, literal, or folded. Collections can be reset to block output or set to flow. Block comment edits participate in strict source preservation; comments inside changed flow spans may require semantic emission.</p>
-          <h2 id="language-boundary"><a href="#language-boundary">Language boundary<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
+          <h2 id="where-the-language-stops"><a href="#where-the-language-stops">Where the language stops<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>The language does not currently include date/time operators, system execution, or regex flags and capture objects. Slices target sequences, and interpolation accepts scalar results. XML is supported as a data codec rather than as a family of query operators. See the <a href="/docs/operators/">operator reference</a> for the complete surface and <a href="/docs/yq-compatibility/">yq compatibility</a> when adapting an existing yq expression.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/yaml-support/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
@@ -554,7 +554,7 @@ ysh -o=yaml '.notes style = &quot;literal&quot;' deploy.yml
         <li class="level-2"><a href="#assign-and-delete">Assign and delete</a></li>
         <li class="level-2"><a href="#merged-and-aliased-nodes">Merged and aliased nodes</a></li>
         <li class="level-2"><a href="#presentation">Presentation</a></li>
-        <li class="level-2"><a href="#language-boundary">Language boundary</a></li>
+        <li class="level-2"><a href="#where-the-language-stops">Where the language stops</a></li>
       </ol>
       <a class="edit-link" href="https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/queries.md">Edit this page</a>
     </aside>
