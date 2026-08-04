@@ -196,7 +196,7 @@ function codec_uri_decode(value,    result, i, char, digits, byte) {
 }
 
 function codec_shell_encode(value,    quote, result, quoted, i, char) {
-    quote = sprintf("%c", 39)
+    quote = SQ
     result = ""
     for (i = 1; i <= length(value); i++) {
         char = substr(value, i, 1)
@@ -1530,8 +1530,7 @@ function codec_yaml_process_line(raw, source_line,    clean, next_char) {
         flow_position_bind_pending(length(multiline_flow_text) + 2)
         flow_position_append(raw, clean, source_line)
         multiline_flow_text = multiline_flow_text " " clean
-        multiline_flow_depth = flow_balance(multiline_flow_text)
-        if (multiline_flow_depth <= 0) {
+        if (flow_balance(multiline_flow_text) <= 0) {
             process_line(multiline_flow_text, multiline_flow_line)
             flow_position_clear()
             multiline_flow_active = 0
@@ -1674,6 +1673,27 @@ function unicode_utf8(codepoint,    first, second, third, fourth) {
 }
 
 function decode_double_quoted(value,    result, i, char, next_char, digits, count, codepoint) {
+    if (!escape_table_ready) {
+        escape_literal["n"] = "\n"
+        escape_literal["r"] = "\r"
+        escape_literal["t"] = "\t"
+        escape_literal["b"] = sprintf("%c", 8)
+        escape_literal["0"] = sprintf("%c", 0)
+        escape_literal["a"] = sprintf("%c", 7)
+        escape_literal["v"] = sprintf("%c", 11)
+        escape_literal["f"] = sprintf("%c", 12)
+        escape_literal["e"] = sprintf("%c", 27)
+        escape_literal[" "] = " "
+        escape_literal["\t"] = "\t"
+        escape_literal["_"] = unicode_utf8(160)
+        escape_literal["N"] = unicode_utf8(133)
+        escape_literal["L"] = unicode_utf8(8232)
+        escape_literal["P"] = unicode_utf8(8233)
+        escape_literal["/"] = "/"
+        escape_literal["\\"] = "\\"
+        escape_literal["\""] = "\""
+        escape_table_ready = 1
+    }
     result = ""
     for (i = 1; i <= length(value); i++) {
         char = substr(value, i, 1)
@@ -1683,39 +1703,8 @@ function decode_double_quoted(value,    result, i, char, next_char, digits, coun
         }
 
         next_char = substr(value, ++i, 1)
-        if (next_char == "n") {
-            result = result "\n"
-        } else if (next_char == "r") {
-            result = result "\r"
-        } else if (next_char == "t") {
-            result = result "\t"
-        } else if (next_char == "b") {
-            result = result sprintf("%c", 8)
-        } else if (next_char == "0") {
-            result = result sprintf("%c", 0)
-        } else if (next_char == "a") {
-            result = result sprintf("%c", 7)
-        } else if (next_char == "v") {
-            result = result sprintf("%c", 11)
-        } else if (next_char == "f") {
-            result = result sprintf("%c", 12)
-        } else if (next_char == "e") {
-            result = result sprintf("%c", 27)
-        } else if (next_char == " " || next_char == "\t") {
-            result = result next_char
-        } else if (next_char == "_" || next_char == "N" || next_char == "L" || next_char == "P") {
-            if (next_char == "_") {
-                codepoint = 160
-            } else if (next_char == "N") {
-                codepoint = 133
-            } else if (next_char == "L") {
-                codepoint = 8232
-            } else {
-                codepoint = 8233
-            }
-            result = result unicode_utf8(codepoint)
-        } else if (next_char == "/" || next_char == "\\" || next_char == "\"") {
-            result = result next_char
+        if (next_char in escape_literal) {
+            result = result escape_literal[next_char]
         } else if (next_char == "x") {
             digits = substr(value, i + 1, 2)
             if (length(digits) != 2 || digits !~ /^[0-9a-fA-F]+$/) {
@@ -1742,7 +1731,7 @@ function decode_double_quoted(value,    result, i, char, next_char, digits, coun
     return result
 }
 
-function fold_quoted_scalar(value, double_quoted,    count, i, line, result, content, breaks, escaped_break) {
+function fold_quoted_scalar(value, double_quoted,    count, i, line, result, content, breaks, escaped_break, quoted_line) {
     count = split(value, quoted_line, /\n/)
     result = ""
     breaks = 0
@@ -1781,7 +1770,6 @@ function fold_quoted_scalar(value, double_quoted,    count, i, line, result, con
         } else if (i < count) {
             breaks++
         }
-        delete quoted_line[i]
     }
 
     if (breaks == 1) {
@@ -1797,7 +1785,7 @@ function fold_quoted_scalar(value, double_quoted,    count, i, line, result, con
 
 function scalar_value(value,    quote, inner) {
     value = trim(value)
-    quote = sprintf("%c", 39)
+    quote = SQ
 
     if (length(value) >= 2 && substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") {
         inner = substr(value, 2, length(value) - 2)
@@ -1833,7 +1821,7 @@ function scalar_type(raw, tag, value,    lowered, normalized_tag) {
 
     raw = trim(raw)
     if ((substr(raw, 1, 1) == "\"" && substr(raw, length(raw), 1) == "\"") ||
-        (substr(raw, 1, 1) == sprintf("%c", 39) && substr(raw, length(raw), 1) == sprintf("%c", 39))) {
+        (substr(raw, 1, 1) == SQ && substr(raw, length(raw), 1) == SQ)) {
         return "string"
     }
 
@@ -1885,7 +1873,7 @@ function strip_inline_comment(value,    i, char, previous, quote, escaped, brace
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "{") {
             braces++
@@ -1922,7 +1910,7 @@ function strip_flow_line_comment(value,    i, char, previous, quote, escaped) {
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "#" && (i == 1 || previous ~ /[[:space:]]/)) {
             return trim(substr(value, 1, i - 1))
@@ -2109,7 +2097,7 @@ function find_top_level_colon(value, require_space,    i, char, next_char, previ
             }
             continue
         }
-        if ((char == "\"" || char == sprintf("%c", 39)) &&
+        if ((char == "\"" || char == SQ) &&
             (i == 1 || previous ~ /[[:space:]\[{},]/)) {
             quote = char
         } else if (char == "{") {
@@ -2183,7 +2171,7 @@ function split_flow(value, output, offsets,    count, start, i, char, quote, esc
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "{") {
             braces++
@@ -2471,7 +2459,7 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
                 fail("empty entry between flow commas on line " source_line)
             }
             separator = find_mapping_separator(piece, 1)
-            if (!separator && (substr(piece, 1, 1) == "\"" || substr(piece, 1, 1) == sprintf("%c", 39))) {
+            if (!separator && (substr(piece, 1, 1) == "\"" || substr(piece, 1, 1) == SQ)) {
                 separator = find_mapping_separator(piece, 0)
             }
             if (separator) {
@@ -2541,7 +2529,7 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
     }
 
     if ((substr(value, 1, 1) == "\"" && substr(value, length(value), 1) != "\"") ||
-        (substr(value, 1, 1) == sprintf("%c", 39) && substr(value, length(value), 1) != sprintf("%c", 39))) {
+        (substr(value, 1, 1) == SQ && substr(value, length(value), 1) != SQ)) {
         fail("trailing content after quoted scalar on line " source_line)
     }
     node = new_node("scalar", source_line, scalar_value(value), scalar_type(value, tag, scalar_value(value)), tag)
@@ -2552,7 +2540,7 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
 function record_node_presentation(node, syntax, original,    first, comment_at) {
     first = substr(syntax, 1, 1)
     if (node_kind[node] != "alias") {
-        if (first == sprintf("%c", 39)) {
+        if (first == SQ) {
             node_style[node] = "single"
         } else if (first == "\"") {
             node_style[node] = "double"
@@ -2586,7 +2574,7 @@ function parse_value(value, source_line, indent, allow_block, column_base,    cl
         fail("plain dash is not valid in a flow collection on line " source_line)
     }
     if (allow_block && cleaned ~ /^[!&]/ && remainder ~ /^-[[:space:]]/) {
-        fail("block sequence entries must begin on their own line " source_line)
+        fail("block sequence entries must begin on their own line, on line " source_line)
     }
     if (allow_block && remainder ~ /^[|>]([-+]?[1-9]?|[1-9][-+]?)$/) {
         node = new_node("scalar", source_line, "", "string", tag)
@@ -2615,7 +2603,7 @@ function parse_value(value, source_line, indent, allow_block, column_base,    cl
 function is_plain_scalar_source(value, source_line,    remainder, first) {
     remainder = parse_properties(strip_inline_comment(trim(value)), source_line)
     first = substr(remainder, 1, 1)
-    return remainder != "" && first != "\"" && first != sprintf("%c", 39) &&
+    return remainder != "" && first != "\"" && first != SQ &&
         first != "[" && first != "{" && first != "|" && first != ">"
 }
 
@@ -2796,7 +2784,7 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     raw_value = trim(raw_suffix)
     column = raw_value == "" ? indent + separator + 1 : indent + separator + leading_horizontal_width(raw_suffix) + 1
     if (raw_key != "" && raw_value ~ /^-[[:space:]]/) {
-        fail("block sequence entries must begin on their own line " source_line)
+        fail("block sequence entries must begin on their own line, on line " source_line)
     }
     child = parse_value(raw_value, source_line, indent, 1, column)
     node_indent[child] = indent
@@ -2939,12 +2927,8 @@ function indentation(value, source_line,    copy) {
     return length(copy)
 }
 
-function parse_directive(text, source_line,    count, i, handle, prefix) {
-    for (i = 1; i <= directive_piece_count; i++) {
-        delete directive_piece[i]
-    }
+function parse_directive(text, source_line,    count, handle, prefix) {
     count = split(text, directive_piece, /[[:space:]]+/)
-    directive_piece_count = count
 
     document_directive_pending[document_index] = 1
     if (directive_piece[1] == "%YAML") {
@@ -2955,7 +2939,6 @@ function parse_directive(text, source_line,    count, i, handle, prefix) {
             fail("duplicate YAML directive on line " source_line)
         }
         document_yaml_directive_seen[document_index] = 1
-        document_yaml_version[document_index] = directive_piece[2]
         return
     }
     if (directive_piece[1] == "%TAG" && count == 3) {
@@ -3005,7 +2988,7 @@ function add_explicit_value(indent, text, source_line,    parent, child, raw_val
     delete explicit_key[indent]
     delete explicit_key_valid[indent]
     if (node_kind[child] == "pending" || (node_kind[child] == "scalar" && raw_value != "" &&
-        substr(raw_value, 1, 1) != "\"" && substr(raw_value, 1, 1) != sprintf("%c", 39))) {
+        substr(raw_value, 1, 1) != "\"" && substr(raw_value, 1, 1) != SQ)) {
         context_node[indent] = child
         context_valid[indent] = 1
         if (node_kind[child] == "scalar") {
@@ -3077,7 +3060,7 @@ function fill_pending_scalar(node, text, source_line,    cleaned, remainder, tag
         }
         bind_anchor(anchor, node)
     }
-    if (substr(remainder, 1, 1) != "\"" && substr(remainder, 1, 1) != sprintf("%c", 39)) {
+    if (substr(remainder, 1, 1) != "\"" && substr(remainder, 1, 1) != SQ) {
         node_plain_continuable[node] = 1
         node_last_content_line[node] = source_line
     }
@@ -3207,7 +3190,6 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         multiline_flow_line = source_line
         multiline_flow_text = start_flow_line(raw)
         flow_position_start(multiline_flow_text, source_line)
-        multiline_flow_depth = flow_balance(multiline_flow_text)
         multiline_flow_min_indent = flow_continuation_indent(raw)
         multiline_flow_root = flow_opening(raw)
         multiline_flow_comment_break = 0
@@ -3281,7 +3263,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     if (clean == "---" || clean ~ /^---[[:space:]]/) {
         marker_content = trim(substr(clean, 4))
         if (marker_content ~ /^[!&]/ && find_mapping_separator(marker_content, 1)) {
-            fail("node properties cannot introduce a mapping on a document marker line " source_line)
+            fail("node properties cannot introduce a mapping on a document marker, on line " source_line)
         }
         fail_pending_explicit_keys(source_line)
         if (document_has_content[document_index] || document_explicit[document_index]) {
@@ -3431,7 +3413,7 @@ function quote_is_open(value, quote,    i, char, escaped) {
             continue
         }
         if (char == quote) {
-            if (quote == sprintf("%c", 39) && substr(value, i + 1, 1) == quote) {
+            if (quote == SQ && substr(value, i + 1, 1) == quote) {
                 i++
                 continue
             }
@@ -3455,7 +3437,7 @@ function multiline_quote_is_open(value, quote,    i, char, escaped, open) {
             continue
         }
         if (char == quote) {
-            if (quote == sprintf("%c", 39) && open && substr(value, i + 1, 1) == quote) {
+            if (quote == SQ && open && substr(value, i + 1, 1) == quote) {
                 i++
                 continue
             }
@@ -3502,7 +3484,7 @@ function multiline_scalar_quote(raw,    first_line, indent, text, clean, separat
     }
 
     quote = substr(candidate, 1, 1)
-    if (quote != "\"" && quote != sprintf("%c", 39)) {
+    if (quote != "\"" && quote != SQ) {
         return ""
     }
     return quote_is_open(candidate, quote) ? quote : ""
@@ -3533,7 +3515,7 @@ function flow_balance(value,    i, char, quote, escaped, braces, brackets, previ
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "#" && (i == 1 || previous ~ /[[:space:]]/)) {
             break
@@ -3773,7 +3755,7 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         return
     }
 
-    quote = sprintf("%c", 39)
+    quote = SQ
     if (char == "\"" || char == quote) {
         start = expression_position
         quote = char
@@ -3923,7 +3905,7 @@ function expression_compile_interpolation(raw,    expression, segment_start, i, 
                 }
                 continue
             }
-            if (char == "\"" || char == sprintf("%c", 39)) {
+            if (char == "\"" || char == SQ) {
                 quote = char
             } else if (char == "(") {
                 depth++
@@ -8306,7 +8288,7 @@ function yaml_scalar_text(node,    value, properties, lowered, quote) {
         return properties value
     }
     if (node_style[node] == "single") {
-        quote = sprintf("%c", 39)
+        quote = SQ
         gsub(quote, quote quote, value)
         return properties quote value quote
     }
@@ -8370,12 +8352,12 @@ function yaml_mapping_line_comment(node) {
     return (node in node_key_line_comment) && node_key_line_comment[node] != "" ? " # " node_key_line_comment[node] : yaml_line_comment(node)
 }
 
-function emit_yaml_comment(value, indent,    count, i) {
-    if (value == "") return
-    count = split(value, yaml_comment_line, /\n/)
+function emit_yaml_comment(value, indent,    count, i, lines, separator) {
+    count = split(value, lines, /\n/)
     for (i = 1; i <= count; i++) {
-        print yaml_spaces(indent) "#" (yaml_comment_line[i] == "" ? "" : " " yaml_comment_line[i])
-        delete yaml_comment_line[i]
+        separator = lines[i] == "" ? "" : " "
+        printf "%s#%s%s\n", yaml_spaces(indent), separator, lines[i]
+        delete lines[i]
     }
 }
 
@@ -8485,6 +8467,10 @@ function emit_yaml(node,    inline, properties) {
     emit_yaml_comment(node_foot_comment[node], 0)
 }
 
+function node_parent_of(node) {
+    return (node in node_parent) ? node_parent[node] : 0
+}
+
 function presentation_comment_position(value,    i, char, previous, quote, escaped, braces, brackets) {
     if (!index(value, "#")) {
         return 0
@@ -8506,7 +8492,7 @@ function presentation_comment_position(value,    i, char, previous, quote, escap
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "{") {
             braces++
@@ -8564,7 +8550,7 @@ function presentation_scalar_text(node, original,    quote, value, properties, r
         rendered = yaml_scalar_text(node)
         return properties == "" ? rendered : properties " " rendered
     }
-    quote = sprintf("%c", 39)
+    quote = SQ
     if (node_style[node] == "single") {
         gsub(quote, quote quote, value)
         rendered = quote value quote
@@ -8676,7 +8662,7 @@ function presentation_track_comment(node, property, as_key, value,    source, st
         presentation_queue_comment_after(line, value, indent)
         return 1
     }
-    parent = (source in node_parent) ? node_parent[source] : 0
+    parent = node_parent_of(source)
     if (!parent) {
         presentation_queue_comment_before(line, value, indent)
     } else if (node_kind[parent] == "sequence") {
@@ -8714,12 +8700,19 @@ function presentation_track_owned_span(node,    line, end, i) {
     return 1
 }
 
-function presentation_track_sequence_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, previous_end) {
-    if (node_kind[target] != "sequence" || node_kind[source] != "sequence" ||
-        sequence_count[target] == 0 || sequence_count[target] != sequence_count[source]) {
+function presentation_track_sequence_reorder(target, source) {
+    return presentation_track_collection_reorder(target, source, "sequence")
+}
+
+function presentation_track_collection_reorder(target, source, kind,    parent, header, raw, text, target_end, serial, count, i, j, child, origin, found, previous_end, key) {
+    if (node_kind[target] != kind || node_kind[source] != kind) {
         return 0
     }
-    parent = (target in node_parent) ? node_parent[target] : 0
+    count = kind == "mapping" ? mapping_count[target] : sequence_count[target]
+    if (count == 0 || count != (kind == "mapping" ? mapping_count[source] : sequence_count[source])) {
+        return 0
+    }
+    parent = node_parent_of(target)
     header = node_line[target]
     if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
         header in presentation_deleted_line || header in presentation_reorder_count) {
@@ -8733,8 +8726,8 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
 
     serial = ++presentation_reorder_serial
     previous_end = header
-    for (i = 1; i <= sequence_count[target]; i++) {
-        child = sequence_child[target, i]
+    for (i = 1; i <= count; i++) {
+        child = kind == "mapping" ? mapping_child[target, i] : sequence_child[target, i]
         if (node_line[child] <= header) {
             return 0
         }
@@ -8742,12 +8735,15 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
         previous_end = presentation_span_end(child)
     }
     target_end = presentation_span_end(target)
-    for (i = 1; i <= sequence_count[source]; i++) {
-        child = sequence_child[source, i]
+    for (i = 1; i <= count; i++) {
+        child = kind == "mapping" ? mapping_child[source, i] : sequence_child[source, i]
         origin = node_origin[child]
+        key = kind == "mapping" ? mapping_key[source, i] : ""
         found = 0
-        for (j = 1; j <= sequence_count[target]; j++) {
-            if (sequence_child[target, j] == origin && !(serial SUBSEP origin in presentation_reorder_seen)) {
+        for (j = 1; j <= count; j++) {
+            if ((kind == "mapping" ? mapping_child[target, j] : sequence_child[target, j]) == origin &&
+                (kind != "mapping" || mapping_key[target, j] == key) &&
+                !(serial SUBSEP origin in presentation_reorder_seen)) {
                 found = j
                 presentation_reorder_seen[serial, origin] = 1
                 break
@@ -8757,13 +8753,13 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
             return 0
         }
         presentation_reorder_start[header, i] = presentation_original_start[serial, origin]
-        if (found < sequence_count[target]) {
-            presentation_reorder_end[header, i] = presentation_original_start[serial, sequence_child[target, found + 1]] - 1
+        if (found < count) {
+            presentation_reorder_end[header, i] = presentation_original_start[serial, kind == "mapping" ? mapping_child[target, found + 1] : sequence_child[target, found + 1]] - 1
         } else {
             presentation_reorder_end[header, i] = target_end
         }
     }
-    presentation_reorder_count[header] = sequence_count[source]
+    presentation_reorder_count[header] = count
     for (i = header + 1; i <= target_end; i++) {
         presentation_deleted_line[i] = 1
         presentation_reorder_owned_line[i] = header
@@ -8776,7 +8772,7 @@ function presentation_track_sequence_append(target, source,    parent, header, f
         sequence_count[target] == 0 || sequence_count[source] <= sequence_count[target]) {
         return 0
     }
-    parent = (target in node_parent) ? node_parent[target] : 0
+    parent = node_parent_of(target)
     header = node_line[target]
     if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
         header in presentation_deleted_line || header in presentation_reorder_count) {
@@ -8811,63 +8807,8 @@ function presentation_track_sequence_append(target, source,    parent, header, f
     return 1
 }
 
-function presentation_track_mapping_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, previous_end, key) {
-    if (node_kind[target] != "mapping" || node_kind[source] != "mapping" ||
-        mapping_count[target] == 0 || mapping_count[target] != mapping_count[source]) {
-        return 0
-    }
-    parent = (target in node_parent) ? node_parent[target] : 0
-    header = node_line[target]
-    if (!parent || node_kind[parent] != "mapping" || header < 1 || header in presentation_line_node ||
-        header in presentation_deleted_line || header in presentation_reorder_count) {
-        return 0
-    }
-    raw = raw_input_line[header]
-    text = substr(raw, indentation(raw, header) + 1)
-    if (!find_mapping_separator(text, 1) || presentation_has_flow_collection(text)) {
-        return 0
-    }
-
-    serial = ++presentation_reorder_serial
-    previous_end = header
-    for (i = 1; i <= mapping_count[target]; i++) {
-        child = mapping_child[target, i]
-        if (node_line[child] <= header) {
-            return 0
-        }
-        presentation_original_start[serial, child] = presentation_attached_start(child, previous_end + 1)
-        previous_end = presentation_span_end(child)
-    }
-    target_end = presentation_span_end(target)
-    for (i = 1; i <= mapping_count[source]; i++) {
-        child = mapping_child[source, i]
-        origin = node_origin[child]
-        key = mapping_key[source, i]
-        found = 0
-        for (j = 1; j <= mapping_count[target]; j++) {
-            if (mapping_key[target, j] == key && mapping_child[target, j] == origin &&
-                !(serial SUBSEP origin in presentation_reorder_seen)) {
-                found = j
-                presentation_reorder_seen[serial, origin] = 1
-                break
-            }
-        }
-        if (!found) {
-            return 0
-        }
-        presentation_reorder_start[header, i] = presentation_original_start[serial, origin]
-        if (found < mapping_count[target]) {
-            presentation_reorder_end[header, i] = presentation_original_start[serial, mapping_child[target, found + 1]] - 1
-        } else {
-            presentation_reorder_end[header, i] = target_end
-        }
-    }
-    presentation_reorder_count[header] = mapping_count[source]
-    for (i = header + 1; i <= target_end; i++) {
-        presentation_deleted_line[i] = 1
-        presentation_reorder_owned_line[i] = header
-    }
-    return 1
+function presentation_track_mapping_reorder(target, source) {
+    return presentation_track_collection_reorder(target, source, "mapping")
 }
 
 function presentation_track_mapping_append(target, source,    first, after, raw, indent, i, child, origin, item, key) {
@@ -9050,7 +8991,7 @@ function presentation_track_delete(target,    parent, line, end, raw, indent, te
         presentation_track_owned_span(flow_owner)
         return
     }
-    parent = (target in node_parent) ? node_parent[target] : 0
+    parent = node_parent_of(target)
     line = node_line[target]
     if (!parent || line < 1 || line in presentation_line_node) {
         presentation_possible = 0
@@ -9225,15 +9166,6 @@ function emit_presented_reorder(line,    item, source_line, start, end, replacem
     }
 }
 
-function emit_presented_comment(value, indent,    count, i, lines, separator) {
-    count = split(value, lines, /\n/)
-    for (i = 1; i <= count; i++) {
-        separator = lines[i] == "" ? "" : " "
-        printf "%s#%s%s\n", yaml_spaces(indent), separator, lines[i]
-        delete lines[i]
-    }
-}
-
 function emit_preserved_input(start_line, end_line,    line, i, replacement_end) {
     if (!start_line) {
         start_line = 1
@@ -9243,7 +9175,7 @@ function emit_preserved_input(start_line, end_line,    line, i, replacement_end)
     }
     for (line = start_line; line <= end_line; line++) {
         for (i = 1; i <= presentation_comment_before_count[line]; i++) {
-            emit_presented_comment(presentation_comment_before_value[line, i], presentation_comment_before_indent[line, i])
+            emit_yaml_comment(presentation_comment_before_value[line, i], presentation_comment_before_indent[line, i])
         }
         if (line in presentation_deleted_line) {
         } else if (line in presentation_line_node) {
@@ -9265,9 +9197,14 @@ function emit_preserved_input(start_line, end_line,    line, i, replacement_end)
             emit_presented_insert(presentation_insert_key[line, i], presentation_insert_node[line, i], presentation_insert_indent[line, i])
         }
         for (i = 1; i <= presentation_comment_after_count[line]; i++) {
-            emit_presented_comment(presentation_comment_after_value[line, i], presentation_comment_after_indent[line, i])
+            emit_yaml_comment(presentation_comment_after_value[line, i], presentation_comment_after_indent[line, i])
         }
     }
+}
+
+function source_edit_abort(file) {
+    source_edit_file_count[file] = 0
+    return 0
 }
 
 function source_edit_add(kind, start, end,    edit) {
@@ -9279,8 +9216,7 @@ function source_edit_add(kind, start, end,    edit) {
 
 function source_edit_compile(start_line, end_line, file,    line, run_start, run_end, replacement_end, i, last_end, comment_replace) {
     if (!presentation_possible) {
-        source_edit_file_count[file] = 0
-        return 0
+        return source_edit_abort(file)
     }
     if (!start_line) {
         start_line = 1
@@ -9299,8 +9235,7 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
                 for (i = line; i <= replacement_end; i++) {
                     if (presentation_reorder_owned_line[i] != presentation_reorder_owned_line[line]) {
                         presentation_possible = 0
-                        source_edit_file_count[file] = 0
-                        return 0
+                        return source_edit_abort(file)
                     }
                 }
                 source_edit_add("nested-replace", line, replacement_end)
@@ -9312,8 +9247,7 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
                     i in presentation_deleted_line || i in presentation_reorder_count ||
                     ((presentation_sequence_insert_count[i] || presentation_insert_count[i]) && i != replacement_end)) {
                     presentation_possible = 0
-                    source_edit_file_count[file] = 0
-                    return 0
+                    return source_edit_abort(file)
                 }
             }
             source_edit_add("replace", line, replacement_end)
@@ -9353,8 +9287,7 @@ function source_edit_compile(start_line, end_line, file,    line, run_start, run
     for (i = 1; i <= source_edit_count; i++) {
         if (source_edit_kind[i] != "insert" && source_edit_start[i] <= last_end) {
             presentation_possible = 0
-            source_edit_file_count[file] = 0
-            return 0
+            return source_edit_abort(file)
         }
         if (source_edit_kind[i] != "insert") {
             last_end = source_edit_end[i]
@@ -9803,6 +9736,7 @@ function output_batch_files(query, output_mode,    file, last_file, document, fo
 }
 
 BEGIN {
+    SQ = sprintf("%c", 39)
     document_index = 0
     codec_initialize()
     expression_dispatch_initialize()
@@ -10016,8 +9950,7 @@ BEGIN {
         flow_position_bind_pending(length(multiline_flow_text) + 2)
         flow_position_append($0, flow_line_clean, NR)
         multiline_flow_text = multiline_flow_text " " flow_line_clean
-        multiline_flow_depth = flow_balance(multiline_flow_text)
-        if (multiline_flow_depth <= 0) {
+        if (flow_balance(multiline_flow_text) <= 0) {
             source_multiline_flow_end[multiline_flow_line] = NR
             process_line(multiline_flow_text, multiline_flow_line)
             flow_position_clear()

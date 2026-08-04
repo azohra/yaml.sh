@@ -1,4 +1,5 @@
 BEGIN {
+    SQ = sprintf("%c", 39)
     document_index = 0
     codec_initialize()
     expression_dispatch_initialize()
@@ -212,8 +213,7 @@ BEGIN {
         flow_position_bind_pending(length(multiline_flow_text) + 2)
         flow_position_append($0, flow_line_clean, NR)
         multiline_flow_text = multiline_flow_text " " flow_line_clean
-        multiline_flow_depth = flow_balance(multiline_flow_text)
-        if (multiline_flow_depth <= 0) {
+        if (flow_balance(multiline_flow_text) <= 0) {
             source_multiline_flow_end[multiline_flow_line] = NR
             process_line(multiline_flow_text, multiline_flow_line)
             flow_position_clear()

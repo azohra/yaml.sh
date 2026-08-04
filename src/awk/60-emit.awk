@@ -164,7 +164,7 @@ function yaml_scalar_text(node,    value, properties, lowered, quote) {
         return properties value
     }
     if (node_style[node] == "single") {
-        quote = sprintf("%c", 39)
+        quote = SQ
         gsub(quote, quote quote, value)
         return properties quote value quote
     }
@@ -228,12 +228,12 @@ function yaml_mapping_line_comment(node) {
     return (node in node_key_line_comment) && node_key_line_comment[node] != "" ? " # " node_key_line_comment[node] : yaml_line_comment(node)
 }
 
-function emit_yaml_comment(value, indent,    count, i) {
-    if (value == "") return
-    count = split(value, yaml_comment_line, /\n/)
+function emit_yaml_comment(value, indent,    count, i, lines, separator) {
+    count = split(value, lines, /\n/)
     for (i = 1; i <= count; i++) {
-        print yaml_spaces(indent) "#" (yaml_comment_line[i] == "" ? "" : " " yaml_comment_line[i])
-        delete yaml_comment_line[i]
+        separator = lines[i] == "" ? "" : " "
+        printf "%s#%s%s\n", yaml_spaces(indent), separator, lines[i]
+        delete lines[i]
     }
 }
 

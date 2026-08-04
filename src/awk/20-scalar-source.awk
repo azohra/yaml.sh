@@ -21,6 +21,27 @@ function unicode_utf8(codepoint,    first, second, third, fourth) {
 }
 
 function decode_double_quoted(value,    result, i, char, next_char, digits, count, codepoint) {
+    if (!escape_table_ready) {
+        escape_literal["n"] = "\n"
+        escape_literal["r"] = "\r"
+        escape_literal["t"] = "\t"
+        escape_literal["b"] = sprintf("%c", 8)
+        escape_literal["0"] = sprintf("%c", 0)
+        escape_literal["a"] = sprintf("%c", 7)
+        escape_literal["v"] = sprintf("%c", 11)
+        escape_literal["f"] = sprintf("%c", 12)
+        escape_literal["e"] = sprintf("%c", 27)
+        escape_literal[" "] = " "
+        escape_literal["\t"] = "\t"
+        escape_literal["_"] = unicode_utf8(160)
+        escape_literal["N"] = unicode_utf8(133)
+        escape_literal["L"] = unicode_utf8(8232)
+        escape_literal["P"] = unicode_utf8(8233)
+        escape_literal["/"] = "/"
+        escape_literal["\\"] = "\\"
+        escape_literal["\""] = "\""
+        escape_table_ready = 1
+    }
     result = ""
     for (i = 1; i <= length(value); i++) {
         char = substr(value, i, 1)
@@ -30,39 +51,8 @@ function decode_double_quoted(value,    result, i, char, next_char, digits, coun
         }
 
         next_char = substr(value, ++i, 1)
-        if (next_char == "n") {
-            result = result "\n"
-        } else if (next_char == "r") {
-            result = result "\r"
-        } else if (next_char == "t") {
-            result = result "\t"
-        } else if (next_char == "b") {
-            result = result sprintf("%c", 8)
-        } else if (next_char == "0") {
-            result = result sprintf("%c", 0)
-        } else if (next_char == "a") {
-            result = result sprintf("%c", 7)
-        } else if (next_char == "v") {
-            result = result sprintf("%c", 11)
-        } else if (next_char == "f") {
-            result = result sprintf("%c", 12)
-        } else if (next_char == "e") {
-            result = result sprintf("%c", 27)
-        } else if (next_char == " " || next_char == "\t") {
-            result = result next_char
-        } else if (next_char == "_" || next_char == "N" || next_char == "L" || next_char == "P") {
-            if (next_char == "_") {
-                codepoint = 160
-            } else if (next_char == "N") {
-                codepoint = 133
-            } else if (next_char == "L") {
-                codepoint = 8232
-            } else {
-                codepoint = 8233
-            }
-            result = result unicode_utf8(codepoint)
-        } else if (next_char == "/" || next_char == "\\" || next_char == "\"") {
-            result = result next_char
+        if (next_char in escape_literal) {
+            result = result escape_literal[next_char]
         } else if (next_char == "x") {
             digits = substr(value, i + 1, 2)
             if (length(digits) != 2 || digits !~ /^[0-9a-fA-F]+$/) {
@@ -89,7 +79,7 @@ function decode_double_quoted(value,    result, i, char, next_char, digits, coun
     return result
 }
 
-function fold_quoted_scalar(value, double_quoted,    count, i, line, result, content, breaks, escaped_break) {
+function fold_quoted_scalar(value, double_quoted,    count, i, line, result, content, breaks, escaped_break, quoted_line) {
     count = split(value, quoted_line, /\n/)
     result = ""
     breaks = 0
@@ -128,7 +118,6 @@ function fold_quoted_scalar(value, double_quoted,    count, i, line, result, con
         } else if (i < count) {
             breaks++
         }
-        delete quoted_line[i]
     }
 
     if (breaks == 1) {
@@ -144,7 +133,7 @@ function fold_quoted_scalar(value, double_quoted,    count, i, line, result, con
 
 function scalar_value(value,    quote, inner) {
     value = trim(value)
-    quote = sprintf("%c", 39)
+    quote = SQ
 
     if (length(value) >= 2 && substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") {
         inner = substr(value, 2, length(value) - 2)
@@ -180,7 +169,7 @@ function scalar_type(raw, tag, value,    lowered, normalized_tag) {
 
     raw = trim(raw)
     if ((substr(raw, 1, 1) == "\"" && substr(raw, length(raw), 1) == "\"") ||
-        (substr(raw, 1, 1) == sprintf("%c", 39) && substr(raw, length(raw), 1) == sprintf("%c", 39))) {
+        (substr(raw, 1, 1) == SQ && substr(raw, length(raw), 1) == SQ)) {
         return "string"
     }
 
@@ -232,7 +221,7 @@ function strip_inline_comment(value,    i, char, previous, quote, escaped, brace
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "{") {
             braces++
@@ -269,7 +258,7 @@ function strip_flow_line_comment(value,    i, char, previous, quote, escaped) {
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "#" && (i == 1 || previous ~ /[[:space:]]/)) {
             return trim(substr(value, 1, i - 1))
@@ -456,7 +445,7 @@ function find_top_level_colon(value, require_space,    i, char, next_char, previ
             }
             continue
         }
-        if ((char == "\"" || char == sprintf("%c", 39)) &&
+        if ((char == "\"" || char == SQ) &&
             (i == 1 || previous ~ /[[:space:]\[{},]/)) {
             quote = char
         } else if (char == "{") {
@@ -530,7 +519,7 @@ function split_flow(value, output, offsets,    count, start, i, char, quote, esc
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "{") {
             braces++

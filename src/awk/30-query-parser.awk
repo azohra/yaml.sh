@@ -110,7 +110,7 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         return
     }
 
-    quote = sprintf("%c", 39)
+    quote = SQ
     if (char == "\"" || char == quote) {
         start = expression_position
         quote = char
@@ -260,7 +260,7 @@ function expression_compile_interpolation(raw,    expression, segment_start, i, 
                 }
                 continue
             }
-            if (char == "\"" || char == sprintf("%c", 39)) {
+            if (char == "\"" || char == SQ) {
                 quote = char
             } else if (char == "(") {
                 depth++
