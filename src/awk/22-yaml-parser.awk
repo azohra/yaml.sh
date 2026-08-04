@@ -1,4 +1,9 @@
-function parse_core(value, source_line, tag, anchor, column_base,    node, inner, count, i, separator, raw_key, raw_value, leading, key, child, alias_name, flow_serial, piece, piece_offset, is_merge) {
+function set_flow_key_position(node, column_base, piece_offset, source_line) {
+    node_key_column[node] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
+    node_key_line[node] = column_base ? flow_position_source_line(column_base + piece_offset, source_line) : source_line
+}
+
+function parse_core(value, source_line, tag, anchor, column_base,    node, inner, count, i, separator, raw_key, raw_value, leading, key, child, alias_name, piece, piece_offset, is_merge, pieces, offsets) {
     if (substr(value, 1, 1) == "*" && valid_anchor_name(substr(value, 2))) {
         if (tag != "" || anchor != "") {
             fail("aliases cannot carry a tag or anchor on line " source_line)
@@ -13,22 +18,13 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
 
     if (substr(value, 1, 1) == "[" && substr(value, length(value), 1) == "]") {
         node = new_node("sequence", source_line, "", "", tag)
-        bind_anchor(anchor, node, source_line)
+        bind_anchor(anchor, node)
         inner = substr(value, 2, length(value) - 2)
-        count = split_flow(inner, flow_piece)
+        count = split_flow(inner, pieces, offsets)
         for (i = 1; i <= count; i++) {
-            flow_piece_saved[flow_piece_serial + 1, i] = flow_piece[i]
-            flow_piece_saved_offset[flow_piece_serial + 1, i] = flow_piece_offset[i]
-            delete flow_piece[i]
-            delete flow_piece_offset[i]
-        }
-        flow_serial = ++flow_piece_serial
-        for (i = 1; i <= count; i++) {
-            piece = flow_piece_saved[flow_serial, i]
-            piece_offset = flow_piece_saved_offset[flow_serial, i]
+            piece = pieces[i]
+            piece_offset = offsets[i]
             if (i == count && piece == "") {
-                delete flow_piece_saved[flow_serial, i]
-                delete flow_piece_saved_offset[flow_serial, i]
                 continue
             }
             if (piece == "") {
@@ -51,37 +47,25 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
                 leading = leading_horizontal_width(raw_value)
                 raw_value = trim(raw_value)
                 add_mapping(child, key, parse_value(raw_value, source_line, -1, 0, column_base ? column_base + piece_offset + separator + leading : 0), source_line, is_merge)
-                node_key_column[mapping_child[child, 1]] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
-                node_key_line[mapping_child[child, 1]] = column_base ? flow_position_source_line(column_base + piece_offset, source_line) : source_line
+                set_flow_key_position(mapping_child[child, 1], column_base, piece_offset, source_line)
             } else {
                 child = parse_value(piece, source_line, -1, 0, column_base ? column_base + piece_offset : 0)
             }
             if (column_base) flow_position_take_comment(column_base + piece_offset, child, 0)
             add_sequence(node, child, source_line)
-            delete flow_piece_saved[flow_serial, i]
-            delete flow_piece_saved_offset[flow_serial, i]
         }
         return node
     }
 
     if (substr(value, 1, 1) == "{" && substr(value, length(value), 1) == "}") {
         node = new_node("mapping", source_line, "", "", tag)
-        bind_anchor(anchor, node, source_line)
+        bind_anchor(anchor, node)
         inner = substr(value, 2, length(value) - 2)
-        count = split_flow(inner, flow_piece)
+        count = split_flow(inner, pieces, offsets)
         for (i = 1; i <= count; i++) {
-            flow_piece_saved[flow_piece_serial + 1, i] = flow_piece[i]
-            flow_piece_saved_offset[flow_piece_serial + 1, i] = flow_piece_offset[i]
-            delete flow_piece[i]
-            delete flow_piece_offset[i]
-        }
-        flow_serial = ++flow_piece_serial
-        for (i = 1; i <= count; i++) {
-            piece = flow_piece_saved[flow_serial, i]
-            piece_offset = flow_piece_saved_offset[flow_serial, i]
+            piece = pieces[i]
+            piece_offset = offsets[i]
             if (i == count && piece == "") {
-                delete flow_piece_saved[flow_serial, i]
-                delete flow_piece_saved_offset[flow_serial, i]
                 continue
             }
             if (piece == "") {
@@ -99,22 +83,15 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
                 leading = leading_horizontal_width(raw_value)
                 raw_value = trim(raw_value)
                 child = parse_value(raw_value, source_line, -1, 0, column_base ? column_base + piece_offset + separator + leading : 0)
-                node_key_column[child] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
-                node_key_line[child] = column_base ? flow_position_source_line(column_base + piece_offset, source_line) : source_line
-                add_mapping(node, key, child, source_line, is_merge)
-                if (column_base) flow_position_take_comment(column_base + piece_offset, child, 1)
             } else {
                 key = parse_scalar_key(piece, source_line)
                 is_merge = parsed_key_is_merge
                 child = new_node("scalar", flow_position_source_line(column_base + piece_offset, source_line), "", "null", "")
                 node_column[child] = column_base ? flow_position_source_column(column_base + piece_offset + length(piece), column_base + piece_offset + length(piece)) : 0
-                node_key_column[child] = column_base ? flow_position_source_column(column_base + piece_offset, column_base + piece_offset) : 0
-                node_key_line[child] = column_base ? flow_position_source_line(column_base + piece_offset, source_line) : source_line
-                add_mapping(node, key, child, source_line, is_merge)
-                if (column_base) flow_position_take_comment(column_base + piece_offset, child, 1)
             }
-            delete flow_piece_saved[flow_serial, i]
-            delete flow_piece_saved_offset[flow_serial, i]
+            set_flow_key_position(child, column_base, piece_offset, source_line)
+            add_mapping(node, key, child, source_line, is_merge)
+            if (column_base) flow_position_take_comment(column_base + piece_offset, child, 1)
         }
         return node
     }
@@ -128,7 +105,7 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
         fail("trailing content after quoted scalar on line " source_line)
     }
     node = new_node("scalar", source_line, scalar_value(value), scalar_type(value, tag, scalar_value(value)), tag)
-    bind_anchor(anchor, node, source_line)
+    bind_anchor(anchor, node)
     return node
 }
 
@@ -162,7 +139,7 @@ function parse_value(value, source_line, indent, allow_block, column_base,    cl
 
     if (remainder == "") {
         node = new_node("pending", source_line, "", "", tag)
-        bind_anchor(anchor, node, source_line)
+        bind_anchor(anchor, node)
         return record_node_presentation(node, remainder, value)
     }
     if (!allow_block && remainder == "-") {
@@ -173,7 +150,7 @@ function parse_value(value, source_line, indent, allow_block, column_base,    cl
     }
     if (allow_block && remainder ~ /^[|>]([-+]?[1-9]?|[1-9][-+]?)$/) {
         node = new_node("scalar", source_line, "", "string", tag)
-        bind_anchor(anchor, node, source_line)
+        bind_anchor(anchor, node)
         start_block(node, remainder, indent, source_line)
         return record_node_presentation(node, remainder, value)
     }
@@ -416,17 +393,20 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     return child
 }
 
-function parse_mapping_line(value, indent, source_line,    parent) {
+function mapping_parent(indent, source_line,    parent) {
     parent = find_parent(indent)
     if (!parent) {
-        parent = ensure_root("mapping", source_line)
-    } else {
-        ensure_container(parent, "mapping", source_line)
+        return ensure_root("mapping", source_line)
     }
-    parse_mapping_into(value, parent, indent, source_line)
+    ensure_container(parent, "mapping", source_line)
+    return parent
 }
 
-function parse_sequence_line(value, indent, source_line,    sequence, parent, original, remainder, tag, anchor, item, separator, raw_key, key, child, nested_indent) {
+function parse_mapping_line(value, indent, source_line) {
+    parse_mapping_into(value, mapping_parent(indent, source_line), indent, source_line)
+}
+
+function parse_sequence_line(value, indent, source_line,    sequence, parent, original, remainder, tag, anchor, item, separator, nested_indent) {
     if (indent > max_indent) {
         max_indent = indent
     }
@@ -476,7 +456,7 @@ function parse_sequence_line(value, indent, source_line,    sequence, parent, or
             item = new_node("mapping", source_line, "", "", tag)
             node_indent[item] = indent
             node_column[item] = nested_indent + 1
-            bind_anchor(anchor, item, source_line)
+            bind_anchor(anchor, item)
             add_sequence(sequence, item, source_line)
             parser_record_content(item, 0)
             context_node[indent] = item
@@ -564,12 +544,7 @@ function add_explicit_value(indent, text, source_line,    parent, child, raw_val
     if (!explicit_key_valid[indent]) {
         fail("explicit mapping value has no scalar key on line " source_line)
     }
-    parent = find_parent(indent)
-    if (!parent) {
-        parent = ensure_root("mapping", source_line)
-    } else {
-        ensure_container(parent, "mapping", source_line)
-    }
+    parent = mapping_parent(indent, source_line)
     raw_value = trim(substr(text, 2))
     if (raw_value ~ /^-[[:space:]]/) {
         child = new_node("sequence", source_line, "", "", "")
@@ -604,12 +579,7 @@ function add_explicit_null(indent, source_line,    parent, child) {
     if (!explicit_key_valid[indent]) {
         return
     }
-    parent = find_parent(indent)
-    if (!parent) {
-        parent = ensure_root("mapping", source_line)
-    } else {
-        ensure_container(parent, "mapping", source_line)
-    }
+    parent = mapping_parent(indent, source_line)
     child = new_node("scalar", source_line, "", "null", "")
     add_mapping(parent, explicit_key[indent], child, source_line, 0)
     node_key_column[child] = indent + 1
@@ -665,7 +635,7 @@ function fill_pending_scalar(node, text, source_line,    cleaned, remainder, tag
         if (node_anchor[node] != "") {
             fail("multiple anchors on one node on line " source_line)
         }
-        bind_anchor(anchor, node, source_line)
+        bind_anchor(anchor, node)
     }
     if (substr(remainder, 1, 1) != "\"" && substr(remainder, 1, 1) != sprintf("%c", 39)) {
         node_plain_continuable[node] = 1
@@ -691,7 +661,7 @@ function extend_pending_properties(node, text, source_line,    remainder, tag, a
         if (node_anchor[node] != "") {
             fail("multiple anchors on one node on line " source_line)
         }
-        bind_anchor(anchor, node, source_line)
+        bind_anchor(anchor, node)
     }
     return 1
 }
@@ -996,11 +966,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     }
     root = parse_value(text, source_line, indent, 1, indent + 1)
     node_column[root] = indent + 1
-    document_root[document_index] = root
-    document_file_index[document_index] = current_input_file_index
-    document_filename[document_index] = current_input_filename
-    document_has_content[document_index] = 1
-    parser_record_content(root, 0)
+    set_document_root(root)
     if (block_active && block_node == root && indent == 0) {
         block_base_indent = -1
     }
@@ -1059,7 +1025,7 @@ function multiline_quote_is_open(value, quote,    i, char, escaped, open) {
     return open
 }
 
-function multiline_scalar_quote(raw,    first_line, indent, text, clean, separator, candidate, space, token, quote) {
+function multiline_scalar_quote(raw,    first_line, indent, text, clean, separator, candidate, space, quote) {
     first_line = raw
     sub(/\n.*/, "", first_line)
     candidate = first_line
@@ -1082,7 +1048,6 @@ function multiline_scalar_quote(raw,    first_line, indent, text, clean, separat
         if (!space) {
             return ""
         }
-        token = substr(candidate, 1, space - 1)
         candidate = trim(substr(candidate, space + 1))
     }
 

@@ -1,6 +1,9 @@
 _gen
 *.todo
 
+# Test and docs-build scratch files
+test/.tmp-*
+.tmp_*
 
 # Emacs
 *~

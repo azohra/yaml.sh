@@ -137,7 +137,7 @@ ysh --json '.metadata | with_entries(.value |= upcase)' config.yml
 ysh --json '.metadata | to_entries | from_entries' config.yml
 ```
 
-Sequence helpers include `sort`, `sort_by`, `group_by`, `unique`, `unique_by`, `reverse`, `flatten`, `array_to_map`, `min`/`max`, `min_by`/`max_by`, and `add`. Quantifiers include `any`, `all`, `any_c`, and `all_c`. String helpers include `upcase`, `downcase`, `trim`, `to_string`, `contains`, `startswith`, `endswith`, `split`, and `join`.
+The [operator reference](operators.md) lists every sequence, quantifier, and string helper with its accepted inputs.
 
 ```sh
 ysh -n --json '[3, 1, 2, 1] | unique'

@@ -1,6 +1,6 @@
 # Security & limits
 
-YAML.sh parses data and runs an explicit query program. Queries cannot execute commands, open network connections, or construct application objects from YAML tags; YAML input is never evaluated as shell.
+YAML.sh parses data and runs an explicit query program. YAML input is never evaluated as shell.
 
 ## Trust the query separately from the document
 

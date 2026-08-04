@@ -6,12 +6,13 @@
 make all
 ```
 
-The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, and verifies that the committed static documentation is generated and internally linked correctly.
+The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and verifies that the committed static documentation is generated and internally linked correctly.
 
 ## Source layout
 
 ```text
 src/ysh.sh              POSIX shell CLI and batch edit coordinator
+build/shbuilder.awk     assembles the modular sources into the single ysh artifact
 src/awk/00-core.awk     common diagnostics and text primitives
 src/awk/10-codecs.awk   configuration and utility codecs
 src/awk/20-*.awk        YAML source, graph, parser, and resolver
@@ -69,7 +70,7 @@ For every supported feature:
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 
-Run `make operator-manifest` and `make parser-boundaries` before expanding the public contract. `make conformance` uses the pinned YAML Test Suite; `make differential` uses yq v4.53.3 and jq. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover replayable grammar properties, exact source retention, hostile shapes, and bounded scale.
+Run `make operator-manifest` and `make parser-boundaries` before expanding the public contract. `make conformance` uses the pinned YAML Test Suite; `make differential` uses yq v4.53.3 and jq; `make toml-conformance`, `make schema-conformance`, and `make json-patch-conformance` use their pinned upstream suites. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover replayable grammar properties, exact source retention, hostile shapes, and bounded scale.
 
 ## Add expression behavior
 
@@ -77,6 +78,6 @@ Expression operators must preserve node references unless they intentionally com
 
 ## Portability
 
-Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
+Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on pull requests and main updates that touch the runtime; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
 
 Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.

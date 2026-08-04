@@ -49,7 +49,7 @@ Or install the checksum-pinned release artifact:
 curl -fsSL https://yaml.azohra.com/install | sh
 ```
 
-Choose another directory with `YSH_INSTALL_DIR="$HOME/.local/bin"`.
+Choose another directory with `curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR="$HOME/.local/bin" sh`.
 
 Read-only queries require `/bin/sh` and AWK. `--check`, `--diff`, and `-i` also use `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc` from the host.
 
@@ -61,7 +61,7 @@ Use paths, pipes, filters, reducers, construction, and updates without flattenin
 
 ```sh
 ysh '.albums | map(select(.rating >= 9)) | map(.title)' music.yml
-ysh -n -o yaml '{name: "Ada", tags: [awk, yaml]}'
+ysh -n -o yaml '{name: "Ada", tags: ["awk", "yaml"]}'
 ysh -o yaml '.count += 1 | del(.draft)' notes.yml
 ysh eval-all '. as $doc ireduce ({}; . * $doc)' defaults.yml local.yml
 ```
@@ -110,7 +110,7 @@ YAML files are data; queries are programs. Queries cannot execute commands or op
 YAML.sh documents what it supports:
 
 - [YAML support](https://yaml.azohra.com/docs/supported_yml/) records accepted and rejected syntax.
-- [Query guide](https://yaml.azohra.com/docs/queries/) defines the expression language.
+- [Queries](https://yaml.azohra.com/docs/queries/) defines the expression language.
 - [Validate, patch, and convert](https://yaml.azohra.com/docs/contracts/) defines schemas, patches, and non-YAML formats.
 - [Security and limits](https://yaml.azohra.com/docs/security/) explains capabilities and resource ceilings.
 

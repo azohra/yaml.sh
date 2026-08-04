@@ -1,4 +1,4 @@
-#!/bin/awk
+#!/usr/bin/awk -f
 
 BEGIN {
     split(version, version_parts, ".")

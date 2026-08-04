@@ -8,7 +8,7 @@ Start from the task. Every example uses the released `ysh` file and ordinary YAM
 ysh '.server.port' config.yml
 ```
 
-Scalar output is unquoted by default. `-r` is an optional spelling for that mode when a script benefits from making the intent explicit:
+Scalar output is unquoted by default; `-r` states that intent explicitly:
 
 ```sh
 host=$(ysh -r '.server.host' config.yml)

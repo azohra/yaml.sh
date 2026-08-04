@@ -20,7 +20,7 @@ function fallback(    prefix, suffix, i) {
     for (i = old_count - suffix + 1; i <= old_count; i++) remember(" ", old_line[i])
 }
 
-function myers(    maximum, d, k, x, y, previous_k, previous_x, previous_y, done, i) {
+function myers(    maximum, d, k, x, y, previous_k, previous_x, previous_y, done, distance, i) {
     maximum = old_count + new_count
     frontier[1] = 0
     for (d = 0; d <= maximum; d++) {
@@ -109,10 +109,10 @@ function emit_hunk(start, finish,    i, old_start, new_start, old_size, new_size
     for (i = start; i <= finish; i++) {
         print diff_type[i] diff_text[i]
         missing_eol = 0
-        if (diff_type[i] != "+" && diff_old_index[i] == old_count && !old_has_eol) {
+        if (diff_type[i] != "+" && diff_old_line[i] == old_count && !old_has_eol) {
             missing_eol = 1
         }
-        if (diff_type[i] != "-" && diff_new_index[i] == new_count && !new_has_eol) {
+        if (diff_type[i] != "-" && diff_new_line[i] == new_count && !new_has_eol) {
             missing_eol = 1
         }
         if (missing_eol) print "\\ No newline at end of file"
@@ -148,8 +148,6 @@ END {
     for (i = 1; i <= diff_count; i++) {
         diff_old_line[i] = old_number
         diff_new_line[i] = new_number
-        diff_old_index[i] = old_number
-        diff_new_index[i] = new_number
         if (diff_type[i] != "+") old_number++
         if (diff_type[i] != "-") new_number++
         if (diff_type[i] != " ") {

@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
+
 suite=${JSON_SCHEMA_TEST_SUITE_DIR:-}
 if [ -z "$suite" ] || [ ! -d "$suite/tests/draft2020-12" ]; then
     printf '%s\n' 'Set JSON_SCHEMA_TEST_SUITE_DIR to the pinned JSON-Schema-Test-Suite checkout.' >&2
@@ -22,7 +26,7 @@ done
 count=0
 while IFS= read -r case; do
     expected=$(printf '%s\n' "$case" | jq -r '.valid')
-    if ! actual=$(printf '%s\n' "$case" | ./ysh -p json --json '.data | schema_valid(root.schema)'); then
+    if ! actual=$(printf '%s\n' "$case" | "$YSH_BINARY" -p json --json '.data | schema_valid(root.schema)'); then
         printf 'JSON Schema fixture could not be evaluated:\n%s\n' "$case" >&2
         exit 1
     fi

@@ -25,7 +25,7 @@ product and architecture guidance for every contributor.
 2. Add or update the smallest exact behavioral test.
 3. Change modular source under `src/` and rebuild the standalone artifact.
 4. Run `make all`; use the focused conformance, differential, presentation,
-   adversarial, fault, and scale gates named in `CONTRIBUTING.md` when relevant.
+   adversarial, and scale gates named in `CONTRIBUTING.md` when relevant.
 5. Update the canonical documentation and changelog for visible behavior.
 6. Check that claims remain consistent across README, docs, website, security
    policy, and story without duplicating whole explanations.

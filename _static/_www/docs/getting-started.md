@@ -22,7 +22,7 @@ Choose another destination without `sudo`:
 curl -fsSL https://yaml.azohra.com/install | YSH_INSTALL_DIR="$HOME/.local/bin" sh
 ```
 
-Read-only commands need a POSIX-compatible `/bin/sh` and AWK. `--check`, `--diff`, and `-i` also use the host's `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc`. Bash, Python, Ruby, Node.js, Go, `jq`, and another language runtime are not required.
+Read-only commands need a POSIX-compatible `/bin/sh` and AWK. `--check`, `--diff`, and `-i` also use the host's `mktemp`, `cp`, `cmp`, `mv`, `rm`, and `wc`. No other language runtime is required.
 
 ## Read YAML
 

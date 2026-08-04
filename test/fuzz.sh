@@ -195,8 +195,10 @@ preserve_failure() {
     cp "$INPUT" "$failure_dir/input.yml"
     cp "$INPUT" "$failure_dir/input-original.yml"
     cp "$ORACLE" "$failure_dir/oracle.json"
-    cp "$EDIT" "$failure_dir/committed.yml"
-    cp "$PREVIEW" "$failure_dir/preview.diff"
+    if [ "$PROPERTY" = mutation ]; then
+        cp "$EDIT" "$failure_dir/committed.yml"
+        cp "$PREVIEW" "$failure_dir/preview.diff"
+    fi
     cp "$ACTUAL" "$failure_dir/actual.json"
     cp "$EXPECTED" "$failure_dir/expected.json"
     level=1
@@ -214,8 +216,10 @@ preserve_failure() {
         "$PROPERTY" "$failed_case" "$failure_reason" "$failure_dir" >&2
     printf '%s\n' '--- generated input' >&2
     sed -n '1,80p' "$failure_dir/input-original.yml" >&2
-    printf '%s\n' '--- committed YAML' >&2
-    sed -n '1,80p' "$failure_dir/committed.yml" >&2
+    if [ -f "$failure_dir/committed.yml" ]; then
+        printf '%s\n' '--- committed YAML' >&2
+        sed -n '1,80p' "$failure_dir/committed.yml" >&2
+    fi
     printf '%s\n' '--- actual canonical JSON' >&2
     sed -n '1,10p' "$failure_dir/actual.json" >&2
     printf '%s\n' '--- expected canonical JSON' >&2
