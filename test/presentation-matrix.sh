@@ -9,6 +9,13 @@ PRESENTATION_PASSES=${YSH_PRESENTATION_PASSES:-1}
 PRESENTATION_REPLAY=${YSH_PRESENTATION_REPLAY:-}
 FAILURE_ROOT=${YSH_PRESENTATION_FAILURE_DIR:-${TMPDIR:-/tmp}}
 
+# Each pass covers the full scalar matrix: every quoting style for the edited
+# scalars (double, single, plain) crossed with every retries variant of the
+# anchored defaults flow map (retries 1, 5, or 9).
+STYLE_COUNT=3
+VARIANT_COUNT=3
+MATRIX_SIZE=$((STYLE_COUNT * VARIANT_COUNT))
+
 INPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-input.XXXXXX")
 EXPECTED=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-expected.XXXXXX")
 EXPECTED_APPEND=$(mktemp "${TMPDIR:-/tmp}/ysh-presentation-append.XXXXXX")
@@ -65,7 +72,7 @@ generate_case() {
         print "metadata: # labels " seed > expected
         print "  owner: platform" > expected
         print "  environment: test" > expected
-        print "  region: \"west\"" > expected
+        print "  region: west" > expected
         print "service: !e!app" > expected
         print "  name: " changed_name "       # public name " seed > expected
         print "  owner: '\''" owner "'\''" > expected
@@ -95,15 +102,15 @@ else
     *[!0-9]*|''|0) printf '%s\n' 'YSH_PRESENTATION_PASSES must be a positive integer.' >&2; exit 2 ;;
     esac
     first_case=1
-    last_case=$((PRESENTATION_PASSES * 9))
+    last_case=$((PRESENTATION_PASSES * MATRIX_SIZE))
 fi
 
 case_id=$first_case
 passed=0
 while [ "$case_id" -le "$last_case" ]; do
-    matrix_case=$(((case_id - 1) % 9))
-    case_mode=$((matrix_case % 3))
-    case_variant=$((matrix_case / 3))
+    matrix_case=$(((case_id - 1) % MATRIX_SIZE))
+    case_mode=$((matrix_case % STYLE_COUNT))
+    case_variant=$((matrix_case / STYLE_COUNT))
     generate_case "$case_id" "$case_mode" "$case_variant"
     if ! "$YSH_BINARY" --preserve-only -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .metadata += {region:"west"}' "$INPUT" >/dev/null 2>&1 ||
         ! cmp -s "$INPUT" "$EXPECTED"; then
@@ -117,7 +124,7 @@ while [ "$case_id" -le "$last_case" ]; do
         exit 1
     fi
 
-    awk '/^footer:/ { print "  - \"added\"" } { print }' "$EXPECTED" > "$EXPECTED_APPEND"
+    awk '/^footer:/ { print "  - added" } { print }' "$EXPECTED" > "$EXPECTED_APPEND"
     cp "$INPUT" "$BEFORE"
     if "$YSH_BINARY" --preserve-only --diff '.items += ["added"]' "$INPUT" > "$DIFF_OUTPUT" 2>/dev/null; then
         diff_status=0
@@ -125,7 +132,7 @@ while [ "$case_id" -le "$last_case" ]; do
         diff_status=$?
     fi
     if [ "$diff_status" -ne 1 ] || ! cmp -s "$INPUT" "$BEFORE" ||
-        ! grep -Fq '+  - "added"' "$DIFF_OUTPUT"; then
+        ! grep -Fq '+  - added' "$DIFF_OUTPUT"; then
         printf 'Strict diff case %s did not preview its exact non-writing edit.\n' "$case_id" >&2
         exit 1
     fi
@@ -159,7 +166,7 @@ printf '%s\n' \
     '  old line' \
     'tail: kept' > "$INPUT"
 printf '%s\n' \
-    'meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail' \
+    'meta: {enabled: true, labels: [one, two, three]} # flow tail' \
     'settings: # header' \
     '  # alpha setting' \
     '  a: 2' \
@@ -190,4 +197,4 @@ if ! "$YSH_BINARY" --preserve-only -i "$owned_query" "$INPUT" >/dev/null 2>&1 ||
     exit 1
 fi
 
-printf 'Presentation mutation matrix: %s scalar cases + source-owned flow, block, reorder, and record spans pass\n' "$passed"
+printf 'Presentation mutation matrix: %s scalar cases (%s styles x %s variants per pass) + source-owned flow, block, reorder, and record spans pass\n' "$passed" "$STYLE_COUNT" "$VARIANT_COUNT"

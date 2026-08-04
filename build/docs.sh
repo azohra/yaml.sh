@@ -7,7 +7,11 @@ SOURCE=$ROOT/_static/_www/docs
 DOCS=${YSH_DOCS_OUTPUT:-$SOURCE}
 RENDERER=$ROOT/build/docs-page.awk
 VERSION=${YSH_DOCS_VERSION:-$(sed -n 's/^YSH_VERSION=//p' "$ROOT/ysh" | head -n 1)}
-PAGES='README getting-started recipes queries contracts operators documents output yq-compatibility supported_yml security migration internals development'
+if [ -z "$VERSION" ]; then
+    printf '%s\n' 'docs.sh: unable to determine the release version; set YSH_DOCS_VERSION or restore YSH_VERSION in ysh.' >&2
+    exit 1
+fi
+PAGES='README getting-started recipes queries contracts operators documents output yq-compatibility yaml-support security migration internals development'
 
 mkdir -p "$DOCS"
 
@@ -22,7 +26,7 @@ description_for() {
     documents) printf '%s\n' 'Work across YAML streams and multiple files.' ;;
     output) printf '%s\n' 'Choose value, JSON, YAML, metadata, AST, or events.' ;;
     yq-compatibility) printf '%s\n' 'What carries over from yq, what differs, and when to use each tool.' ;;
-    supported_yml) printf '%s\n' 'Supported YAML syntax, resolution, and parser boundaries.' ;;
+    yaml-support) printf '%s\n' 'Supported YAML syntax, resolution, and parser boundaries.' ;;
     security) printf '%s\n' 'Bound hostile input and understand the security model.' ;;
     migration) printf '%s\n' 'Move scripts from the pre-v1 interface.' ;;
     internals) printf '%s\n' 'Follow YAML from source text into the node graph.' ;;

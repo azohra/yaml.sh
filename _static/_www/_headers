@@ -1,11 +1,12 @@
+/*
+  Referrer-Policy: strict-origin-when-cross-origin
+
 /install
   Content-Type: text/plain; charset=utf-8
   Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
 
-/css/*
-  Cache-Control: public, max-age=0, must-revalidate
-
-/docs/*.css
+/*.css
   Cache-Control: public, max-age=0, must-revalidate
 
 /docs/*.js

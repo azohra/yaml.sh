@@ -118,7 +118,7 @@ function codec_uri_decode(value,    result, i, char, digits, byte) {
 }
 
 function codec_shell_encode(value,    quote, result, quoted, i, char) {
-    quote = sprintf("%c", 39)
+    quote = SQ
     result = ""
     for (i = 1; i <= length(value); i++) {
         char = substr(value, i, 1)
@@ -217,7 +217,6 @@ function codec_props_assign(root, path, value,    count, parts, current, i, inde
             current = child
         } else fail("conflicting property path: " path)
     }
-    for (i = 1; i <= count; i++) delete parts[i]
 }
 
 function codec_props_decode(value,    root, remaining, newline, line, separator, key, item) {
@@ -1453,8 +1452,7 @@ function codec_yaml_process_line(raw, source_line,    clean, next_char) {
         flow_position_bind_pending(length(multiline_flow_text) + 2)
         flow_position_append(raw, clean, source_line)
         multiline_flow_text = multiline_flow_text " " clean
-        multiline_flow_depth = flow_balance(multiline_flow_text)
-        if (multiline_flow_depth <= 0) {
+        if (flow_balance(multiline_flow_text) <= 0) {
             process_line(multiline_flow_text, multiline_flow_line)
             flow_position_clear()
             multiline_flow_active = 0

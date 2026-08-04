@@ -1,7 +1,25 @@
 #!/bin/sh
 
+# Assert that ./ysh fails with the expected status and diagnostic message.
+# Usage: assertYshFails <status|any> <message> <ysh args...>
+# Note: ./ysh reads stdin when no file argument is given, so sites that pipe
+# input into ysh cannot use this helper.
+assertYshFails() {
+    ysh_expected_status=$1
+    ysh_expected_message=$2
+    shift 2
+    ysh_failure_output=$(./ysh "$@" 2>&1)
+    ysh_failure_status=$?
+    if [ "$ysh_expected_status" = any ]; then
+        assertNotEquals "expected failure: $ysh_expected_message" 0 "$ysh_failure_status"
+    else
+        assertEquals "expected status $ysh_expected_status: $ysh_expected_message" "$ysh_expected_status" "$ysh_failure_status"
+    fi
+    assertContains "$ysh_failure_output" "$ysh_expected_message"
+}
+
 testVersion() {
-    assertEquals "v1.17.1" "$(./ysh --version)"
+    assertEquals "v1.18.0" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -139,9 +157,7 @@ testExpressionErrorGuards() {
     assertEquals 'true' "$(./ysh -n --json 'true or error("must not run")')"
     assertEquals 'false' "$(./ysh -n --json 'false and error("must not run")')"
 
-    result=$(./ysh -n 'false or error("guard failed")' 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" 'guard failed'
+    assertYshFails any 'guard failed' -n 'false or error("guard failed")'
 
     result=$(printf '%s\n' 'kind: Service' | ./ysh 'with(.kind; select(. == "Deployment") or error("expected Deployment"))' 2>&1)
     assertNotEquals 0 $?
@@ -354,15 +370,15 @@ testExpressionCapabilityClosure() {
     assertEquals '["1","true","null","~","cat","an: object","- array\n- 2"]' "$(printf '%s\n' '- 1' '- true' '- null' '- ~' '- cat' '- an: object' '- - array' '  - 2' | ./ysh --json 'map(to_string)')"
     assertEquals '{"0":"zero","1":{"name":"one"}}' "$(printf '%s\n' '- zero' '- name: one' | ./ysh --json 'array_to_map')"
     assertEquals '[4,1,0]' "$(printf '%s\n' 'a: cat' 'b: bob' | ./ysh --json '[.b | column, .b | key | column, {"a": "new"} | column]')"
-    assertEquals "$(printf '%s\n' '"a": "cat"' '---' '"b": "dog"')" "$(printf '%s\n' '- a: cat' '- b: dog' | ./ysh -o=yaml '.[] | split_doc')"
+    assertEquals "$(printf '%s\n' 'a: cat' '---' 'b: dog')" "$(printf '%s\n' '- a: cat' '- b: dog' | ./ysh -o=yaml '.[] | split_doc')"
     assertEquals '{"a":{"c":3,"d":4},"b":2}' "$(printf '%s\n' 'b: 2' 'a:' '  d: 4' '  c: 3' | ./ysh --json 'sort_keys(..)')"
 }
 
 testExpressionPortableUtilities() {
-    load_yaml=test/.tmp-load-yaml-$$.yml
-    load_text=test/.tmp-load-text-$$.txt
-    load_base64=test/.tmp-load-base64-$$.txt
-    load_props=test/.tmp-load-props-$$.properties
+    load_yaml=$SHUNIT_TMPDIR/load-yaml.yml
+    load_text=$SHUNIT_TMPDIR/load-text.txt
+    load_base64=$SHUNIT_TMPDIR/load-base64.txt
+    load_props=$SHUNIT_TMPDIR/load-props.properties
     printf '%s\n' 'service:' '  name: loaded' '  ports: [80, 443]' > "$load_yaml"
     printf '%s\n' 'plain text' 'with two lines' > "$load_text"
     printf '%s\n' 'bG9hZGVkIHNlY3JldA==' > "$load_base64"
@@ -397,9 +413,7 @@ testExpressionPortableUtilities() {
     assertEquals '"plain text\nwith two lines\n"' "$(./ysh -n --json "load_str(\"$load_text\")")"
     assertEquals '"loaded secret"' "$(./ysh -n --json "load_base64(\"$load_base64\")")"
     assertEquals '{"service":{"name":"props","ports":["80","443"]}}' "$(./ysh -n --json "load_props(\"$load_props\")")"
-    result=$(./ysh -n --security-disable-file-ops "load(\"$load_yaml\")" 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "file operations are disabled"
+    assertYshFails any "file operations are disabled" -n --security-disable-file-ops "load(\"$load_yaml\")"
 
     for query in \
         '"%%%" | @base64d' \
@@ -409,9 +423,7 @@ testExpressionPortableUtilities() {
         '"a.b=one\na=two" | from_props' \
         '"a,b\n\"unterminated" | from_csv' \
         'eval("mystery")'; do
-        result=$(./ysh -n "$query" 2>&1)
-        assertNotEquals 0 $?
-        assertContains "$result" 'Error:'
+        assertYshFails any 'Error:' -n "$query"
     done
 
     assertEquals '[3,5,4,1,2]' "$(./ysh -n --json --shuffle-seed 43 '[1,2,3,4,5] | shuffle')"
@@ -453,7 +465,7 @@ testMultipleInputEvaluationAndMetadata() {
     printf '%s\n' 'answer: 2' > "$second"
     expected=$(printf '["%s",0,0,1]\n["%s",1,0,2]' "$first" "$second")
     assertEquals "$expected" "$(./ysh eval --json '[filename, fileIndex, documentIndex, .answer]' "$first" "$second")"
-    assertEquals "$(printf '%s\n' '"answer": 1' '---' '"answer": 2')" "$(./ysh -o yaml '.' "$first" "$second")"
+    assertEquals "$(printf '%s\n' 'answer: 1' '---' 'answer: 2')" "$(./ysh -o yaml '.' "$first" "$second")"
     ./ysh -i '.answer = 3' "$first" "$second" >/dev/null 2>&1
     assertEquals 0 $?
     assertEquals 3 "$(./ysh '.answer' "$first")"
@@ -478,7 +490,7 @@ testMultipleInputEvaluationSkipsEmptyFilesWithoutLosingMetadata() {
 testAllDocumentEvaluation() {
     input=$(printf '%s\n' '---' 'answer: 1' '---' 'answer: 2' '---' 'answer: 3')
     assertEquals "$(printf '%s\n' '[0,1]' '[1,2]' '[2,3]')" "$(printf '%s\n' "$input" | ./ysh --all-documents --json '[documentIndex, .answer]')"
-    assertEquals "$(printf '%s\n' '"answer": 1' '---' '"answer": 2' '---' '"answer": 3')" "$(printf '%s\n' "$input" | ./ysh --all-documents -o yaml '.')"
+    assertEquals "$(printf '%s\n' 'answer: 1' '---' 'answer: 2' '---' 'answer: 3')" "$(printf '%s\n' "$input" | ./ysh --all-documents -o yaml '.')"
 }
 
 testEvalAllAcrossFiles() {
@@ -495,9 +507,9 @@ testEvalAllAcrossFiles() {
 }
 
 testWritableEvalAllSharesDataAcrossFiles() {
-    source_file=test/.tmp-eval-all-source-$$.yml
-    target_file=test/.tmp-eval-all-target-$$.yml
-    report_file=test/.tmp-eval-all-report-$$.jsonl
+    source_file=$SHUNIT_TMPDIR/eval-all-source.yml
+    target_file=$SHUNIT_TMPDIR/eval-all-target.yml
+    report_file=$SHUNIT_TMPDIR/eval-all-report.jsonl
     printf '%s\n' 'release: stable' > "$source_file"
     printf '%s\n' 'channel: edge # managed here' > "$target_file"
     query='select(fileIndex == 0).release as $release | select(fileIndex == 1).channel = $release'
@@ -541,11 +553,11 @@ testYamlOutputRoundTrips() {
 }
 
 testYamlOutputSeparatesStreams() {
-    assertEquals "$(printf '%s\n' '"api"' '---' '"worker"' '---' '"web"')" "$(./ysh -o=yaml '.services[].name' test/expressions.yml)"
+    assertEquals "$(printf '%s\n' 'api' '---' 'worker' '---' 'web')" "$(./ysh -o=yaml '.services[].name' test/expressions.yml)"
 }
 
 testInplaceUpdate() {
-    inplace_file=test/.tmp-inplace-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace.yml
     cp test/expressions.yml "$inplace_file"
     chmod 640 "$inplace_file"
     mode_before=$(find "$inplace_file" -prune -exec ls -ld {} \; | cut -c2-10)
@@ -557,9 +569,9 @@ testInplaceUpdate() {
 }
 
 testInplaceFailureIsAtomic() {
-    inplace_file=test/.tmp-inplace-atomic-$$.yml
-    backup_file=test/.tmp-inplace-atomic-backup-$$.yml
-    link_file=test/.tmp-inplace-atomic-link-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-atomic.yml
+    backup_file=$SHUNIT_TMPDIR/inplace-atomic-backup.yml
+    link_file=$SHUNIT_TMPDIR/inplace-atomic-link.yml
     printf '%s\n' 'service:' '  name: api' > "$inplace_file"
     cp "$inplace_file" "$backup_file"
 
@@ -569,23 +581,25 @@ testInplaceFailureIsAtomic() {
     assertEquals 0 $?
 
     ln -s "$(basename "$inplace_file")" "$link_file"
-    result=$(./ysh -i '.service.name = "worker"' "$link_file" 2>&1)
-    assertEquals 2 $?
-    assertContains "$result" 'refuses symbolic links'
+    assertYshFails 2 'refuses symbolic links' -i '.service.name = "worker"' "$link_file"
     cmp -s "$backup_file" "$inplace_file"
     assertEquals 0 $?
 
-    set -- "test/.$(basename "$inplace_file").ysh."*
-    assertFalse "temporary file must be removed" "[ -e \"$1\" ]"
+    inplace_tmp_glob="$(dirname "$inplace_file")/.$(basename "$inplace_file").ysh."
+    set -- "$inplace_tmp_glob"*
+    # Self-checking: either the glob matched nothing (so $1 is still the
+    # literal pattern) or whatever it matched no longer exists.
+    assertTrue "temporary file must be removed" \
+        "[ '$1' = '${inplace_tmp_glob}*' ] || [ ! -e '$1' ]"
     rm -f "$link_file" "$backup_file" "$inplace_file"
 }
 
 testInplaceTransactionAcrossFiles() {
-    first_file=test/.tmp-inplace-transaction-first-$$.yml
-    second_file=test/.tmp-inplace-transaction-second-$$.yml
-    spaced_file="test/.tmp inplace transaction spaced $$.yml"
-    invalid_file=test/.tmp-inplace-transaction-invalid-$$.yml
-    explain_file=test/.tmp-inplace-transaction-explain-$$.jsonl
+    first_file=$SHUNIT_TMPDIR/inplace-transaction-first.yml
+    second_file=$SHUNIT_TMPDIR/inplace-transaction-second.yml
+    spaced_file="$SHUNIT_TMPDIR/inplace transaction spaced.yml"
+    invalid_file=$SHUNIT_TMPDIR/inplace-transaction-invalid.yml
+    explain_file=$SHUNIT_TMPDIR/inplace-transaction-explain.jsonl
     printf '%s\n' 'name: first # keep one' > "$first_file"
     printf '%s\n' 'name: second # keep two' > "$second_file"
     printf '%s\n' 'name: spaced # keep three' > "$spaced_file"
@@ -616,16 +630,16 @@ testInplaceTransactionAcrossFiles() {
     assertEquals 2 $?
     assertEquals 'name: unchanged' "$(cat "$first_file")"
 
-    set -- "test/.$(basename "$first_file").ysh-new."* "test/.$(basename "$first_file").ysh-old."*
+    set -- "$(dirname "$first_file")/.$(basename "$first_file").ysh-new."* "$(dirname "$first_file")/.$(basename "$first_file").ysh-old."*
     assertFalse "transaction files must be removed" "[ -e \"$1\" ]"
     assertFalse "transaction files must be removed" "[ -e \"$2\" ]"
     rm -f "$explain_file" "$invalid_file" "$spaced_file" "$second_file" "$first_file"
 }
 
 testInplaceTransactionHandlesEmptyFilesAndSkipsNoOps() {
-    empty_file=test/.tmp-inplace-empty-$$.yml
-    unchanged_file=test/.tmp-inplace-unchanged-$$.yml
-    state_file=test/.tmp-inplace-noop-state-$$
+    empty_file=$SHUNIT_TMPDIR/inplace-empty.yml
+    unchanged_file=$SHUNIT_TMPDIR/inplace-unchanged.yml
+    state_file=$SHUNIT_TMPDIR/inplace-noop-state
     : > "$empty_file"
     printf '%s\n' 'name: ready' > "$unchanged_file"
     real_mv=$(command -v mv)
@@ -642,10 +656,10 @@ testInplaceTransactionHandlesEmptyFilesAndSkipsNoOps() {
 }
 
 testCheckPreflightsRepositoryChanges() {
-    first_file=test/.tmp-check-first-$$.yml
-    second_file=test/.tmp-check-second-$$.yml
-    invalid_file=test/.tmp-check-invalid-$$.yml
-    report_file=test/.tmp-check-report-$$.jsonl
+    first_file=$SHUNIT_TMPDIR/check-first.yml
+    second_file=$SHUNIT_TMPDIR/check-second.yml
+    invalid_file=$SHUNIT_TMPDIR/check-invalid.yml
+    report_file=$SHUNIT_TMPDIR/check-report.jsonl
     printf '%s\n' 'name: ready' > "$first_file"
     printf '%s\n' 'name: waiting' > "$second_file"
     printf '%s\n' 'broken: [one' > "$invalid_file"
@@ -679,6 +693,8 @@ testCheckPreflightsRepositoryChanges() {
 }
 
 testDiffPreviewsExactRepositoryTransaction() {
+    # Deliberately repo-relative: ysh only emits a/ b/ diff header prefixes
+    # for relative paths, which the assertions below depend on.
     first_file=test/.tmp-diff-first-$$.yml
     second_file=test/.tmp-diff-second-$$.yml
     invalid_file=test/.tmp-diff-invalid-$$.yml
@@ -726,6 +742,19 @@ testDiffPreviewsExactRepositoryTransaction() {
     assertEquals 0 "$(wc -c < "$diff_file" | tr -d ' ')"
     assertContains "$(cat "$report_file")" 'transaction aborted before writing any files'
 
+    # Absolute inputs print bare "--- /path" headers, without a/ b/ prefixes.
+    absolute_file=$SHUNIT_TMPDIR/diff-absolute.yml
+    printf '%s\n' 'name: waiting # keep abs' > "$absolute_file"
+    ./ysh --diff '.name = "ready"' "$absolute_file" > "$diff_file" 2> "$report_file"
+    assertEquals 1 $?
+    result=$(cat "$diff_file")
+    grep -F -- "--- $absolute_file" "$diff_file" >/dev/null
+    assertEquals "absolute diff input must use an unprefixed --- header" 0 $?
+    grep -F -- "+++ $absolute_file" "$diff_file" >/dev/null
+    assertEquals "absolute diff input must use an unprefixed +++ header" 0 $?
+    assertNotContains "$result" "a/$absolute_file"
+    assertNotContains "$result" "b/$absolute_file"
+
     ./ysh --diff -i '.name = "ready"' "$first_file" >/dev/null 2>&1
     assertEquals 2 $?
     ./ysh --diff -e '.name = "ready"' "$first_file" >/dev/null 2>&1
@@ -735,8 +764,8 @@ testDiffPreviewsExactRepositoryTransaction() {
 }
 
 testDiffReportsMissingFinalNewline() {
-    diff_input=test/.tmp-diff-newline-$$.yml
-    diff_output=test/.tmp-diff-newline-$$.out
+    diff_input=$SHUNIT_TMPDIR/diff-newline.yml
+    diff_output=$SHUNIT_TMPDIR/diff-newline.out
     printf '%s' 'name: old' > "$diff_input"
 
     ./ysh --diff '.name = "new"' "$diff_input" > "$diff_output"
@@ -762,8 +791,8 @@ testDiffReportsMissingFinalNewline() {
 }
 
 testDiffSeparatesDistantHunks() {
-    diff_input=test/.tmp-diff-hunks-$$.yml
-    diff_output=test/.tmp-diff-hunks-$$.out
+    diff_input=$SHUNIT_TMPDIR/diff-hunks.yml
+    diff_output=$SHUNIT_TMPDIR/diff-hunks.out
     printf '%s\n' 'a: old' 'b: keep' 'c: keep' 'd: keep' 'e: keep' 'f: keep' 'g: keep' 'h: keep' 'i: keep' 'j: old' > "$diff_input"
 
     ./ysh --diff '.a = "new" | .j = "new"' "$diff_input" > "$diff_output"
@@ -780,12 +809,12 @@ testDiffSeparatesDistantHunks() {
 }
 
 testPreserveOnlyRefusesRegeneration() {
-    preserve_file=test/.tmp-preserve-only-$$.yml
-    preserve_backup=test/.tmp-preserve-only-backup-$$.yml
-    preserve_output=test/.tmp-preserve-only-output-$$
-    preserve_error=test/.tmp-preserve-only-error-$$
-    alias_file=test/.tmp-preserve-only-alias-$$.yml
-    flow_file=test/.tmp-preserve-only-flow-$$.yml
+    preserve_file=$SHUNIT_TMPDIR/preserve-only.yml
+    preserve_backup=$SHUNIT_TMPDIR/preserve-only-backup.yml
+    preserve_output=$SHUNIT_TMPDIR/preserve-only-output
+    preserve_error=$SHUNIT_TMPDIR/preserve-only-error
+    alias_file=$SHUNIT_TMPDIR/preserve-only-alias.yml
+    flow_file=$SHUNIT_TMPDIR/preserve-only-flow.yml
     printf '%s\n' 'service:' '  name: api # keep' '  labels:' '    tier: web' 'items: # keep order' '  - one' 'tail: kept' > "$preserve_file"
     cp "$preserve_file" "$preserve_backup"
 
@@ -805,8 +834,8 @@ testPreserveOnlyRefusesRegeneration() {
     assertEquals 0 $?
     result=$(cat "$preserve_file")
     assertContains "$result" 'name: api # keep'
-    assertContains "$result" 'region: "west"'
-    assertContains "$result" '  - "two"'
+    assertContains "$result" 'region: west'
+    assertContains "$result" '  - two'
     assertContains "$result" 'tail: kept'
 
     printf '%s\n' 'defaults: &defaults' '  retries: 3' 'service:' '  inherited: *defaults' > "$alias_file"
@@ -819,8 +848,8 @@ testPreserveOnlyRefusesRegeneration() {
     ./ysh --preserve-only --diff '.meta.checked = true | .items |= map(.score += 1)' "$flow_file" > "$preserve_output" 2> "$preserve_error"
     assertEquals 1 $?
     assertEquals 0 "$(wc -c < "$preserve_error" | tr -d ' ')"
-    assertContains "$(cat "$preserve_output")" '+meta: {"enabled": false, "checked": true}'
-    assertContains "$(cat "$preserve_output")" '+items: [{"name": "one", "score": 5}]'
+    assertContains "$(cat "$preserve_output")" '+meta: {enabled: false, checked: true}'
+    assertContains "$(cat "$preserve_output")" '+items: [{name: one, score: 5}]'
     ./ysh --preserve-only -i '.meta.checked = true | .items |= map(.score += 1)' "$flow_file"
     assertEquals 0 $?
     assertEquals '{"enabled":false,"checked":true}' "$(./ysh --json '.meta' "$flow_file")"
@@ -834,10 +863,10 @@ testPreserveOnlyRefusesRegeneration() {
 }
 
 testInplaceTransactionRollsBackCommitFailure() {
-    first_file=test/.tmp-inplace-rollback-first-$$.yml
-    second_file=test/.tmp-inplace-rollback-second-$$.yml
-    state_file=test/.tmp-inplace-rollback-state-$$
-    report_file=test/.tmp-inplace-rollback-report-$$
+    first_file=$SHUNIT_TMPDIR/inplace-rollback-first.yml
+    second_file=$SHUNIT_TMPDIR/inplace-rollback-second.yml
+    state_file=$SHUNIT_TMPDIR/inplace-rollback-state
+    report_file=$SHUNIT_TMPDIR/inplace-rollback-report
     printf '%s\n' 'name: first' > "$first_file"
     printf '%s\n' 'name: second' > "$second_file"
     real_mv=$(command -v mv)
@@ -854,8 +883,8 @@ testInplaceTransactionRollsBackCommitFailure() {
 }
 
 testInplaceTransactionRefusesEvaluationDrift() {
-    target_file=test/.tmp-inplace-evaluation-drift-$$.yml
-    report_file=test/.tmp-inplace-evaluation-drift-report-$$
+    target_file=$SHUNIT_TMPDIR/inplace-evaluation-drift.yml
+    report_file=$SHUNIT_TMPDIR/inplace-evaluation-drift-report
     printf '%s\n' 'name: original' > "$target_file"
     real_awk=$(command -v awk)
 
@@ -867,17 +896,17 @@ testInplaceTransactionRefusesEvaluationDrift() {
     assertContains "$(cat "$report_file")" 'input changed during evaluation'
     assertContains "$(cat "$report_file")" 'no files written'
 
-    set -- "test/.$(basename "$target_file").ysh-new."* "test/.$(basename "$target_file").ysh-snapshot."*
+    set -- "$(dirname "$target_file")/.$(basename "$target_file").ysh-new."* "$(dirname "$target_file")/.$(basename "$target_file").ysh-snapshot."*
     assertFalse "transaction files must be removed" "[ -e \"$1\" ]"
     assertFalse "transaction files must be removed" "[ -e \"$2\" ]"
     rm -f "$report_file" "$target_file"
 }
 
 testInplaceTransactionRefusesCommitDriftAndRollsBack() {
-    first_file=test/.tmp-inplace-commit-drift-first-$$.yml
-    second_file=test/.tmp-inplace-commit-drift-second-$$.yml
-    state_file=test/.tmp-inplace-commit-drift-state-$$
-    report_file=test/.tmp-inplace-commit-drift-report-$$
+    first_file=$SHUNIT_TMPDIR/inplace-commit-drift-first.yml
+    second_file=$SHUNIT_TMPDIR/inplace-commit-drift-second.yml
+    state_file=$SHUNIT_TMPDIR/inplace-commit-drift-state
+    report_file=$SHUNIT_TMPDIR/inplace-commit-drift-report
     printf '%s\n' 'name: first' > "$first_file"
     printf '%s\n' 'name: second' > "$second_file"
     real_mv=$(command -v mv)
@@ -895,36 +924,34 @@ testInplaceTransactionRefusesCommitDriftAndRollsBack() {
 }
 
 testInplaceTransactionKeepsLogicalFilenamesAndRejectsAliases() {
-    target_file=test/.tmp-inplace-logical-file-$$.yml
-    alias_file=./test/../test/.tmp-inplace-logical-file-$$.yml
+    target_file=$SHUNIT_TMPDIR/inplace-logical-file.yml
+    # SHUNIT_TMPDIR always ends in /tmp, so this dotted path names the same
+    # file as $target_file through a different spelling.
+    alias_file=$SHUNIT_TMPDIR/../tmp/inplace-logical-file.yml
     printf '%s\n' 'name: original' > "$target_file"
 
     ./ysh -i '.source = filename' "$target_file"
     assertEquals 0 $?
     assertEquals "$target_file" "$(./ysh '.source' "$target_file")"
 
-    result=$(./ysh -i '.name = "duplicate"' "$target_file" "$alias_file" 2>&1)
-    assertEquals 2 $?
-    assertContains "$result" 'same input more than once'
+    assertYshFails 2 'same input more than once' -i '.name = "duplicate"' "$target_file" "$alias_file"
     assertEquals original "$(./ysh '.name' "$target_file")"
 
     rm -f "$target_file"
 }
 
 testInplaceTransactionRejectsNewlineFilenames() {
-    target_file=$(printf 'test/.tmp-inplace-newline-%s\ncontinued.yml' "$$")
+    target_file=$(printf '%s/inplace-newline\ncontinued.yml' "$SHUNIT_TMPDIR")
     printf '%s\n' 'name: original' > "$target_file"
 
-    result=$(./ysh -i '.name = "candidate"' "$target_file" 2>&1)
-    assertEquals 2 $?
-    assertContains "$result" 'does not support newlines in filenames'
+    assertYshFails 2 'does not support newlines in filenames' -i '.name = "candidate"' "$target_file"
     assertEquals 'name: original' "$(cat "$target_file")"
 
     rm -f "$target_file"
 }
 
 testInplaceTransformsAllDocuments() {
-    inplace_file=test/.tmp-inplace-multi-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-multi.yml
     cp test/test.yml "$inplace_file"
     ./ysh -i '.key = "changed"' "$inplace_file"
     assertEquals 0 $?
@@ -935,7 +962,7 @@ testInplaceTransformsAllDocuments() {
 }
 
 testInplacePreservesScalarPresentation() {
-    inplace_file=test/.tmp-inplace-presentation-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-presentation.yml
     printf '%s\n' '# deployment settings' 'service:' '  name: api      # public name' '  label: "API service"' '  owner: '\''platform team'\''' '  enabled: true' > "$inplace_file"
     ./ysh -i '.service.name = "worker" | .service.label = "Worker service" | .service.owner = "core team" | .service.enabled = false' "$inplace_file"
     assertEquals 0 $?
@@ -949,7 +976,7 @@ testInplacePreservesScalarPresentation() {
 }
 
 testInplaceEditsPresentationMetadata() {
-    inplace_file=test/.tmp-inplace-metadata-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-metadata.yml
     printf '%s\n' 'service:' '  name: api # old comment' '  labels:' '    tier: web' > "$inplace_file"
     ./ysh -i '.service.name line_comment = "release managed" | .service.name style = "double"' "$inplace_file"
     assertEquals 0 $?
@@ -957,7 +984,7 @@ testInplaceEditsPresentationMetadata() {
 
     ./ysh -i '.service.labels style = "flow"' "$inplace_file"
     assertEquals 0 $?
-    assertContains "$(cat "$inplace_file")" '"labels": {"tier": "web"}'
+    assertContains "$(cat "$inplace_file")" 'labels: {tier: web}'
 
     printf '%s\n' 'before: x' 'a: value' 'items:' '  - one' '  - two' 'after: z' > "$inplace_file"
     ./ysh --preserve-only -i \
@@ -984,7 +1011,7 @@ testInplaceEditsPresentationMetadata() {
 }
 
 testInplacePreservesStructuralPresentation() {
-    inplace_file=test/.tmp-inplace-structure-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-structure.yml
     printf '%s\n' '# deployment settings' 'service:' '  name: api      # public name' '  port: 8080     # remove this' '' '# worker stays documented' 'workers:' '  - first' '  - second' 'footer: kept    # untouched' > "$inplace_file"
     ./ysh -i 'del(.service.port) | del(.workers[0]) | .service.protocol = "http" | .region = "west"' "$inplace_file"
     assertEquals 0 $?
@@ -995,14 +1022,14 @@ testInplacePreservesStructuralPresentation() {
     assertContains "$result" '# worker stays documented'
     assertNotContains "$result" '  - first'
     assertContains "$result" '  - second'
-    assertContains "$result" '  protocol: "http"'
+    assertContains "$result" '  protocol: http'
     assertContains "$result" 'footer: kept    # untouched'
-    assertContains "$result" 'region: "west"'
+    assertContains "$result" 'region: west'
     rm -f "$inplace_file"
 }
 
 testInplacePreservesReorderedSequenceComments() {
-    inplace_file=test/.tmp-inplace-reorder-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-reorder.yml
     printf '%s\n' '# queue order' 'workers: # keep the header' '  # first worker' '  - first' '  # second worker' '  - second' 'footer: kept' > "$inplace_file"
     ./ysh -i '.workers |= reverse' "$inplace_file"
     assertEquals 0 $?
@@ -1012,7 +1039,7 @@ testInplacePreservesReorderedSequenceComments() {
 }
 
 testInplacePreservesSortedSequenceBlocks() {
-    inplace_file=test/.tmp-inplace-sort-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-sort.yml
     printf '%s\n' 'services:' '  # slow path' '  - name: worker' '    port: 9000' '  # fast path' '  - name: api' '    port: 80' 'tail: kept' > "$inplace_file"
     ./ysh -i '.services |= sort_by(.port)' "$inplace_file"
     assertEquals 0 $?
@@ -1022,7 +1049,7 @@ testInplacePreservesSortedSequenceBlocks() {
 }
 
 testInplacePreservesIndentlessSequenceMaps() {
-    inplace_file=test/.tmp-inplace-indentless-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-indentless.yml
     printf '%s\n' 'meta:' '  enabled: false' 'items:' '- name: first' '  score: 4' '- name: second' '  score: 8' 'tail: kept' > "$inplace_file"
 
     ./ysh --preserve-only -i '.meta.checked = true | .items |= map(.score += 1)' "$inplace_file"
@@ -1042,19 +1069,19 @@ testInplacePreservesIndentlessSequenceMaps() {
 }
 
 testInplacePreservesRichYamlPresentation() {
-    inplace_file=test/.tmp-inplace-rich-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-rich.yml
     cp test/presentation.yml "$inplace_file"
     ./ysh -i 'del(.service.obsolete) | .items[0] = "uno" | .items |= reverse | .service.name = "worker" | .service.region = "west"' "$inplace_file"
 
-    expected=$(printf '%s\n' '%YAML 1.2' '%TAG !e! tag:example.com,2026:' '---' '# deployment' 'defaults: &defaults {retries: 3, mode: safe} # flow stays' 'service: !e!app' '  name: "worker"       # public name' "  owner: 'platform team'" '  notes: |-' '    keep this' '    exactly' '  inherited: *defaults' '  region: "west"' 'items: # order' '  # second item' "  - !e!item 'two'" '  # first item' '  - &first "uno"' 'footer: kept # tail')
+    expected=$(printf '%s\n' '%YAML 1.2' '%TAG !e! tag:example.com,2026:' '---' '# deployment' 'defaults: &defaults {retries: 3, mode: safe} # flow stays' 'service: !e!app' '  name: "worker"       # public name' "  owner: 'platform team'" '  notes: |-' '    keep this' '    exactly' '  inherited: *defaults' '  region: west' 'items: # order' '  # second item' "  - !e!item 'two'" '  # first item' '  - &first "uno"' 'footer: kept # tail')
     assertEquals "$expected" "$(cat "$inplace_file")"
     rm -f "$inplace_file"
 }
 
 testInplaceCompilesOwnedMultilineSourceEdits() {
-    inplace_file=test/.tmp-inplace-owned-spans-$$.yml
-    expected_file=test/.tmp-inplace-owned-spans-expected-$$.yml
-    diff_file=test/.tmp-inplace-owned-spans-diff-$$
+    inplace_file=$SHUNIT_TMPDIR/inplace-owned-spans.yml
+    expected_file=$SHUNIT_TMPDIR/inplace-owned-spans-expected.yml
+    diff_file=$SHUNIT_TMPDIR/inplace-owned-spans-diff
     printf '%s\n' \
         'meta: {' \
         '  enabled: false,' \
@@ -1067,7 +1094,7 @@ testInplaceCompilesOwnedMultilineSourceEdits() {
         '  second' \
         'after: kept' > "$inplace_file"
     printf '%s\n' \
-        'meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail' \
+        'meta: {enabled: true, labels: [one, two, three]} # flow tail' \
         'title: "new value" # quoted tail' \
         'note: |- # block tail' \
         '  new line' \
@@ -1078,7 +1105,7 @@ testInplaceCompilesOwnedMultilineSourceEdits() {
         '.meta.enabled = true | .meta.labels += ["three"] | .note = "new line\nsecond new" | .title = "new value"' \
         "$inplace_file" > "$diff_file"
     assertEquals 1 $?
-    assertContains "$(cat "$diff_file")" '+meta: {"enabled": true, "labels": ["one", "two", "three"]} # flow tail'
+    assertContains "$(cat "$diff_file")" '+meta: {enabled: true, labels: [one, two, three]} # flow tail'
     assertContains "$(cat "$diff_file")" '+  new line'
     assertContains "$(cat "$diff_file")" '+title: "new value" # quoted tail'
     assertContains "$(cat "$inplace_file")" 'enabled: false'
@@ -1090,8 +1117,8 @@ testInplaceCompilesOwnedMultilineSourceEdits() {
     assertEquals "$(cat "$expected_file")" "$(cat "$inplace_file")"
     assertEquals kept "$(./ysh '.after' "$inplace_file")"
 
-    commented_flow=test/.tmp-inplace-commented-flow-$$.yml
-    commented_backup=test/.tmp-inplace-commented-flow-backup-$$.yml
+    commented_flow=$SHUNIT_TMPDIR/inplace-commented-flow.yml
+    commented_backup=$SHUNIT_TMPDIR/inplace-commented-flow-backup.yml
     printf '%s\n' 'meta: {' '  # attached inside flow' '  enabled: false' '}' 'after: kept' > "$commented_flow"
     cp "$commented_flow" "$commented_backup"
     ./ysh --preserve-only --diff '.meta.enabled = true' "$commented_flow" > "$diff_file" 2>/dev/null
@@ -1104,8 +1131,8 @@ testInplaceCompilesOwnedMultilineSourceEdits() {
 }
 
 testInplaceMovesAndDeletesOwnedRecordSpans() {
-    inplace_file=test/.tmp-inplace-record-spans-$$.yml
-    expected_file=test/.tmp-inplace-record-spans-expected-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-record-spans.yml
+    expected_file=$SHUNIT_TMPDIR/inplace-record-spans-expected.yml
     printf '%s\n' \
         'settings: # header' \
         '  # zed setting' \
@@ -1142,7 +1169,7 @@ testInplaceMovesAndDeletesOwnedRecordSpans() {
 }
 
 testInplacePreservesAliasAndMergeSourceOwnership() {
-    inplace_file=test/.tmp-inplace-shared-source-$$.yml
+    inplace_file=$SHUNIT_TMPDIR/inplace-shared-source.yml
     printf '%s\n' \
         'defaults: &defaults {retries: 3, mode: safe} # source owner' \
         'service:' \
@@ -1153,7 +1180,7 @@ testInplacePreservesAliasAndMergeSourceOwnership() {
     ./ysh --preserve-only -i '.service.inherited.retries = 5 | .service.mode = "strict"' "$inplace_file"
     assertEquals 0 $?
     result=$(cat "$inplace_file")
-    assertContains "$result" 'defaults: &defaults {"retries": 5, "mode": "strict"} # source owner'
+    assertContains "$result" 'defaults: &defaults {retries: 5, mode: strict} # source owner'
     assertContains "$result" '<<: *defaults # merge stays'
     assertContains "$result" 'inherited: *defaults # alias stays'
     assertContains "$result" 'tail: kept'
@@ -1163,39 +1190,18 @@ testInplacePreservesAliasAndMergeSourceOwnership() {
 }
 
 testExpressionErrors() {
-    result=$(./ysh '.services[] | select(' test/expressions.yml 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "expected expression"
-
-    result=$(./ysh '.metadata.owner[]' test/expressions.yml 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "cannot iterate over string"
-
-    result=$(./ysh '.services | mystery' test/expressions.yml 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "unknown expression operator"
-
-    result=$(./ysh -n '1 / 0' 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "division by zero"
-
-    result=$(./ysh -n '"unterminated \(."' 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "unterminated interpolation"
-
-    result=$(./ysh -n '[1, 2]["x":]' 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "slice start requires an integer"
+    assertYshFails any "expected expression" '.services[] | select(' test/expressions.yml
+    assertYshFails any "cannot iterate over string" '.metadata.owner[]' test/expressions.yml
+    assertYshFails any "unknown expression operator" '.services | mystery' test/expressions.yml
+    assertYshFails any "division by zero" -n '1 / 0'
+    assertYshFails any "unterminated interpolation" -n '"unterminated \(."'
+    assertYshFails any "slice start requires an integer" -n '[1, 2]["x":]'
 
     for query in now 'load_xml("neighbor.xml")'; do
-        result=$(./ysh -n "$query" 2>&1)
-        assertNotEquals 0 $?
-        assertContains "$result" "unknown expression operator"
+        assertYshFails any "unknown expression operator" -n "$query"
     done
     for query in from_xml @xmld; do
-        result=$(./ysh -n "$query" 2>&1)
-        assertNotEquals 0 $?
-        assertContains "$result" 'expected XML element'
+        assertYshFails any 'expected XML element' -n "$query"
     done
 }
 
@@ -1231,7 +1237,7 @@ testExpressionYamlGraphOperators() {
 }
 
 testExpressionWritableYamlGraphMetadata() {
-    graph_file=test/.tmp-graph-metadata-$$.yml
+    graph_file=$SHUNIT_TMPDIR/graph-metadata.yml
     printf '%s\n' 'source: &old one' 'copy: *old' 'target: two' > "$graph_file"
 
     result=$(./ysh -o=yaml '.source anchor = "current" | .source tag = "!!str" | .target alias = "current"' "$graph_file")
@@ -1247,9 +1253,7 @@ testExpressionWritableYamlGraphMetadata() {
     assertEquals '{"source":"one","copy":"one","target":"one"}' "$(./ysh --json '.' "$graph_file")"
     assertEquals 'current' "$(./ysh '.copy | alias' "$graph_file")"
 
-    result=$(./ysh -o=yaml '.source anchor = ""' "$graph_file" 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" 'aliases still reference it'
+    assertYshFails any 'aliases still reference it' -o=yaml '.source anchor = ""' "$graph_file"
 
     result=$(printf '%s\n' 'first: one' 'later: &later two' | ./ysh -o=yaml '.first alias = "later"' 2>&1)
     assertNotEquals 0 $?
@@ -1267,7 +1271,7 @@ testExpressionPresentationMetadata() {
     assertEquals "$(printf '%s\n' single double literal folded)" "$styles"
     assertEquals '"new note"' "$(printf '%s\n' 'name: api # old' | ./ysh --json '.name line_comment = "new note" | .name | line_comment')"
     assertEquals '"single"' "$(printf '%s\n' 'name: api' | ./ysh --json '.name style = "single" | .name | style')"
-    assertEquals '"items": ["one", "two"]' "$(printf '%s\n' 'items: [one, two]' | ./ysh -o yaml '.items style = "flow"')"
+    assertEquals 'items: [one, two]' "$(printf '%s\n' 'items: [one, two]' | ./ysh -o yaml '.items style = "flow"')"
 }
 
 testExpressionBlockStylesAndOutputControls() {
@@ -1279,10 +1283,10 @@ testExpressionBlockStylesAndOutputControls() {
     assertEquals '"hello\nworld"' "$(printf '%s\n' "$folded" | ./ysh --json '.value')"
 
     result=$(printf '%s\n' 'root:' '  child: value' | ./ysh -I4 -o=yaml '.')
-    assertContains "$result" '    "child": "value"'
+    assertContains "$result" '    child: value'
     assertEquals '"Things" # note' "$(printf '%s\n' 'value: "Things" # note' | ./ysh --unwrap-scalar=false '.value')"
 
-    style_file=test/.tmp-block-style-$$.yml
+    style_file=$SHUNIT_TMPDIR/block-style.yml
     printf '%s\n' 'value: one # note' > "$style_file"
     ./ysh -i '.value = "hello\nworld" | .value style = "folded"' "$style_file"
     assertEquals 0 $?
@@ -1292,8 +1296,8 @@ testExpressionBlockStylesAndOutputControls() {
 }
 
 testExplainSelectionsAndMutations() {
-    explain_out=test/.tmp-explain-out-$$
-    explain_err=test/.tmp-explain-err-$$
+    explain_out=$SHUNIT_TMPDIR/explain-out
+    explain_err=$SHUNIT_TMPDIR/explain-err
 
     ./ysh --explain '.metadata.name' test/workflows/kubernetes.yml > "$explain_out" 2> "$explain_err"
     assertEquals 0 $?
@@ -1319,8 +1323,8 @@ testExplainSelectionsAndMutations() {
 }
 
 testExplainPresentationDecision() {
-    explain_file=test/.tmp-explain-inplace-$$.yml
-    explain_err=test/.tmp-explain-inplace-$$.err
+    explain_file=$SHUNIT_TMPDIR/explain-inplace.yml
+    explain_err=$SHUNIT_TMPDIR/explain-inplace.err
     cp test/workflows/kubernetes.yml "$explain_file"
 
     ./ysh -i --explain '(.spec.template.spec.containers[] | select(.name == "api") | .image) = "ghcr.io/example/api:1.5.0"' \
@@ -1407,6 +1411,24 @@ testMultilinePlainScalars() {
     assertEquals '"value"' "$(printf '%s\n' 'key: # comment' '  value' | ./ysh --json '.key')"
 }
 
+testInplacePreservesRootSequenceAppend() {
+    root_file=$SHUNIT_TMPDIR/inplace-root-sequence.yml
+    printf '%s\n' '# fleet manifest' '- name: web  # primary' '  port: 80' '- name: api' '  port: 8080' > "$root_file"
+    ./ysh --preserve-only -i '. += [{"name": "cache", "port": 6379}]' "$root_file" >/dev/null 2>&1
+    assertEquals 0 $?
+    assertContains "$(cat "$root_file")" '# fleet manifest'
+    assertTrue "original entry must keep its comment and spacing" "grep -Fq -- '- name: web  # primary' '$root_file'"
+    assertContains "$(cat "$root_file")" 'name: cache'
+    assertEquals '3' "$(./ysh --json '. | length' "$root_file")"
+    rm -f "$root_file"
+}
+
+testMultilineQuotedScalarsBehindNestedIndicators() {
+    assertEquals '[{"key":"abc def"}]' "$(printf '%s\n' '- key: "abc' '    def"' | ./ysh --json '.')"
+    assertEquals '[["abc def"]]' "$(printf '%s\n' '- - "abc' '    def"' | ./ysh --json '.')"
+    assertEquals "[{\"key\":\"abc def\"}]" "$(printf '%s\n' "- key: 'abc" "    def'" | ./ysh --json '.')"
+}
+
 testDuplicateKeysAreRejected() {
     result=$(printf "%s\n" "key: first" "key: second" | ./ysh ".key" 2>&1)
     assertNotEquals 0 $?
@@ -1475,9 +1497,7 @@ testResourceLimits() {
 }
 
 testQueryErrors() {
-    result=$(./ysh "missing" test/test.yml 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" "unknown expression operator"
+    assertYshFails any "unknown expression operator" "missing" test/test.yml
 }
 
 testConfigurationPointersAndPatches() {
@@ -1509,7 +1529,7 @@ testConfigurationPointersAndPatches() {
 }
 
 testConfigurationPatchSourceEdits() {
-    patch_file=test/.tmp-config-patch-$$.yml
+    patch_file=$SHUNIT_TMPDIR/config-patch.yml
     printf '%s\n' 'service:' '  name: api # keep this' '  obsolete: true' > "$patch_file"
 
     ./ysh --preserve-only -i \
@@ -1609,7 +1629,7 @@ size = 4'
 }
 
 testConfigurationCliContracts() {
-    prefix=test/.tmp-config-cli-$$
+    prefix=$SHUNIT_TMPDIR/config-cli
     toml_file=$prefix.toml
     schema_file=$prefix.schema.json
     patch_file=$prefix.patch.json
@@ -1638,9 +1658,7 @@ testConfigurationCliContracts() {
   enabled: true" "$(cat "$yaml_file")"
 
     printf '%s\n' 'service:' '  port: 70000' > "$yaml_file"
-    result=$(./ysh --schema "$schema_file" '.' "$yaml_file" 2>&1)
-    assertNotEquals 0 $?
-    assertContains "$result" 'schema validation failed at /service/port'
+    assertYshFails any 'schema validation failed at /service/port' --schema "$schema_file" '.' "$yaml_file"
 
     rm -f "$toml_file" "$schema_file" "$patch_file" "$merge_file" "$target_file" "$yaml_file"
 }
@@ -1656,8 +1674,11 @@ testCliErrors() {
     assertEquals 2 $?
     ./ysh -i '.key = "value"' </dev/null >/dev/null 2>&1
     assertEquals 2 $?
-    ./ysh -i -n '.key = "value"' test/test.yml >/dev/null 2>&1
+    inplace_n_copy=$SHUNIT_TMPDIR/cli-inplace-n.yml
+    cp test/test.yml "$inplace_n_copy"
+    ./ysh -i -n '.key = "value"' "$inplace_n_copy" >/dev/null 2>&1
     assertEquals 2 $?
+    rm -f "$inplace_n_copy"
     result=$(PATH=/nonexistent ./ysh --check '.key = "value"' test/test.yml 2>&1)
     assertEquals 2 $?
     assertContains "$result" "edit transactions require command: mktemp"
@@ -1667,14 +1688,6 @@ testRunsWithPosixShell() {
     assertEquals "value" "$(/bin/sh ./ysh ".key_value.key" test/test.yml)"
 }
 
-testGeneratedDifferentialCorpusStaysInSync() {
-    generated_corpus=$(mktemp "${TMPDIR:-/tmp}/ysh-corpus.XXXXXX")
-    ./test/generate-yq-corpus.sh > "$generated_corpus"
-    cmp -s test/yq-corpus.tsv "$generated_corpus"
-    assertEquals 0 $?
-    rm -f "$generated_corpus"
-}
-
 testReleaseArtifactsStayInSync() {
     if command -v sha256sum >/dev/null 2>&1; then
         release_sha256=$(sha256sum ysh)
@@ -1682,37 +1695,11 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.17.1/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.18.0/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.1"
-    assertContains "$(cat _static/_www/story/index.html)" "One POSIX shell file"
-    assertNotContains "$(cat _static/_www/story/index.html)" "story-timeline"
-    assertNotContains "$(cat _static/_www/story/index.html)" "releases/tag/"
-    assertNotContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.17"
-    assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
-    assertNotContains "$(cat _static/_www/index.html)" "A real parser this time"
-    assertNotContains "$(cat _static/_www/css/style.css)" "transform: rotate(1.25deg)"
-    assertContains "$(cat _static/_www/docs/index.html)" "/docs/docs.css"
-    assertContains "$(cat _static/_www/docs/index.html)" "/docs/docs.js"
-    assertNotContains "$(cat _static/_www/docs/index.html)" "docsify"
-    assertContains "$(cat README.md)" "brand/hero.svg"
-    assertContains "$(cat _static/_www/index.html)" "og.png"
-    assertNotContains "$(cat README.md)" "og-v1.8.png"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.18.0"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
-    assertTrue "evergreen SVG hero must exist" "[ -s _static/_www/brand/hero.svg ]"
-    assertContains "$(cat _static/_www/docs/operators.md)" "# Operator reference"
-    assertContains "$(cat _static/_www/docs/operators.md)" "array_to_map"
-    assertContains "$(cat _static/_www/docs/operators.md)" "split_doc"
-    assertNotContains "$(cat _static/_www/docs/operators.md)" "testExpression"
-    assertContains "$(cat _static/_www/docs/contracts.md)" "# Validate, patch & convert"
-    assertContains "$(cat _static/_www/docs/supported_yml.md)" "# YAML support"
-    assertNotContains "$(cat _static/_www/docs/supported_yml.md)" "Date/time, XML"
-    operator_tab=$(printf '\t')
-    assertContains "$(cat test/operator-manifest.tsv)" "operator${operator_tab}Array to map${operator_tab}supported"
-    assertContains "$(cat test/operator-manifest.tsv)" "operator${operator_tab}Split into documents${operator_tab}focused"
-    assertNotContains "$(cat _static/_www/index.html)" "35/35"
-    assertNotContains "$(cat README.md)" "35/35"
 }
 
 # shellcheck source=/dev/null

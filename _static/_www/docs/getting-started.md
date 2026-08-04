@@ -110,4 +110,4 @@ ysh -p xml -o json '.catalog.item' catalog.xml
 - [Learn the query language](queries.md)
 - [Edit documents and files safely](documents.md)
 - [Validate, patch, and convert configuration](contracts.md)
-- [See supported YAML syntax](supported_yml.md)
+- [See supported YAML syntax](yaml-support.md)

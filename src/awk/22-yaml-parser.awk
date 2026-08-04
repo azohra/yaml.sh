@@ -31,7 +31,7 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
                 fail("empty entry between flow commas on line " source_line)
             }
             separator = find_mapping_separator(piece, 1)
-            if (!separator && (substr(piece, 1, 1) == "\"" || substr(piece, 1, 1) == sprintf("%c", 39))) {
+            if (!separator && (substr(piece, 1, 1) == "\"" || substr(piece, 1, 1) == SQ)) {
                 separator = find_mapping_separator(piece, 0)
             }
             if (separator) {
@@ -101,7 +101,7 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
     }
 
     if ((substr(value, 1, 1) == "\"" && substr(value, length(value), 1) != "\"") ||
-        (substr(value, 1, 1) == sprintf("%c", 39) && substr(value, length(value), 1) != sprintf("%c", 39))) {
+        (substr(value, 1, 1) == SQ && substr(value, length(value), 1) != SQ)) {
         fail("trailing content after quoted scalar on line " source_line)
     }
     node = new_node("scalar", source_line, scalar_value(value), scalar_type(value, tag, scalar_value(value)), tag)
@@ -112,7 +112,7 @@ function parse_core(value, source_line, tag, anchor, column_base,    node, inner
 function record_node_presentation(node, syntax, original,    first, comment_at) {
     first = substr(syntax, 1, 1)
     if (node_kind[node] != "alias") {
-        if (first == sprintf("%c", 39)) {
+        if (first == SQ) {
             node_style[node] = "single"
         } else if (first == "\"") {
             node_style[node] = "double"
@@ -146,7 +146,7 @@ function parse_value(value, source_line, indent, allow_block, column_base,    cl
         fail("plain dash is not valid in a flow collection on line " source_line)
     }
     if (allow_block && cleaned ~ /^[!&]/ && remainder ~ /^-[[:space:]]/) {
-        fail("block sequence entries must begin on their own line " source_line)
+        fail("block sequence entries must begin on their own line, on line " source_line)
     }
     if (allow_block && remainder ~ /^[|>]([-+]?[1-9]?|[1-9][-+]?)$/) {
         node = new_node("scalar", source_line, "", "string", tag)
@@ -175,7 +175,7 @@ function parse_value(value, source_line, indent, allow_block, column_base,    cl
 function is_plain_scalar_source(value, source_line,    remainder, first) {
     remainder = parse_properties(strip_inline_comment(trim(value)), source_line)
     first = substr(remainder, 1, 1)
-    return remainder != "" && first != "\"" && first != sprintf("%c", 39) &&
+    return remainder != "" && first != "\"" && first != SQ &&
         first != "[" && first != "{" && first != "|" && first != ">"
 }
 
@@ -356,7 +356,7 @@ function parse_mapping_into(value, parent, indent, source_line,    separator, ra
     raw_value = trim(raw_suffix)
     column = raw_value == "" ? indent + separator + 1 : indent + separator + leading_horizontal_width(raw_suffix) + 1
     if (raw_key != "" && raw_value ~ /^-[[:space:]]/) {
-        fail("block sequence entries must begin on their own line " source_line)
+        fail("block sequence entries must begin on their own line, on line " source_line)
     }
     child = parse_value(raw_value, source_line, indent, 1, column)
     node_indent[child] = indent
@@ -499,12 +499,8 @@ function indentation(value, source_line,    copy) {
     return length(copy)
 }
 
-function parse_directive(text, source_line,    count, i, handle, prefix) {
-    for (i = 1; i <= directive_piece_count; i++) {
-        delete directive_piece[i]
-    }
+function parse_directive(text, source_line,    count, handle, prefix) {
     count = split(text, directive_piece, /[[:space:]]+/)
-    directive_piece_count = count
 
     document_directive_pending[document_index] = 1
     if (directive_piece[1] == "%YAML") {
@@ -515,7 +511,6 @@ function parse_directive(text, source_line,    count, i, handle, prefix) {
             fail("duplicate YAML directive on line " source_line)
         }
         document_yaml_directive_seen[document_index] = 1
-        document_yaml_version[document_index] = directive_piece[2]
         return
     }
     if (directive_piece[1] == "%TAG" && count == 3) {
@@ -565,7 +560,7 @@ function add_explicit_value(indent, text, source_line,    parent, child, raw_val
     delete explicit_key[indent]
     delete explicit_key_valid[indent]
     if (node_kind[child] == "pending" || (node_kind[child] == "scalar" && raw_value != "" &&
-        substr(raw_value, 1, 1) != "\"" && substr(raw_value, 1, 1) != sprintf("%c", 39))) {
+        substr(raw_value, 1, 1) != "\"" && substr(raw_value, 1, 1) != SQ)) {
         context_node[indent] = child
         context_valid[indent] = 1
         if (node_kind[child] == "scalar") {
@@ -637,7 +632,7 @@ function fill_pending_scalar(node, text, source_line,    cleaned, remainder, tag
         }
         bind_anchor(anchor, node)
     }
-    if (substr(remainder, 1, 1) != "\"" && substr(remainder, 1, 1) != sprintf("%c", 39)) {
+    if (substr(remainder, 1, 1) != "\"" && substr(remainder, 1, 1) != SQ) {
         node_plain_continuable[node] = 1
         node_last_content_line[node] = source_line
     }
@@ -767,7 +762,6 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
         multiline_flow_line = source_line
         multiline_flow_text = start_flow_line(raw)
         flow_position_start(multiline_flow_text, source_line)
-        multiline_flow_depth = flow_balance(multiline_flow_text)
         multiline_flow_min_indent = flow_continuation_indent(raw)
         multiline_flow_root = flow_opening(raw)
         multiline_flow_comment_break = 0
@@ -841,7 +835,7 @@ function process_line(raw, source_line,    indent, text, clean, key_text, separa
     if (clean == "---" || clean ~ /^---[[:space:]]/) {
         marker_content = trim(substr(clean, 4))
         if (marker_content ~ /^[!&]/ && find_mapping_separator(marker_content, 1)) {
-            fail("node properties cannot introduce a mapping on a document marker line " source_line)
+            fail("node properties cannot introduce a mapping on a document marker, on line " source_line)
         }
         fail_pending_explicit_keys(source_line)
         if (document_has_content[document_index] || document_explicit[document_index]) {
@@ -991,7 +985,7 @@ function quote_is_open(value, quote,    i, char, escaped) {
             continue
         }
         if (char == quote) {
-            if (quote == sprintf("%c", 39) && substr(value, i + 1, 1) == quote) {
+            if (quote == SQ && substr(value, i + 1, 1) == quote) {
                 i++
                 continue
             }
@@ -1015,7 +1009,7 @@ function multiline_quote_is_open(value, quote,    i, char, escaped, open) {
             continue
         }
         if (char == quote) {
-            if (quote == sprintf("%c", 39) && open && substr(value, i + 1, 1) == quote) {
+            if (quote == SQ && open && substr(value, i + 1, 1) == quote) {
                 i++
                 continue
             }
@@ -1035,13 +1029,23 @@ function multiline_scalar_quote(raw,    first_line, indent, text, clean, separat
     clean = trim(text)
 
     if (clean ~ /^---[[:space:]]/) {
-        candidate = trim(substr(clean, 4))
-    } else if (clean ~ /^-[[:space:]]/) {
-        candidate = trim(substr(clean, 2))
-    } else {
-        separator = find_top_level_colon(clean, 1)
-        candidate = separator ? trim(substr(clean, separator + 1)) : clean
+        clean = trim(substr(clean, 4))
     }
+    # Peel nested block indicators: "- - key: \"..." opens a quoted scalar
+    # behind any number of sequence dashes and mapping keys.
+    while (1) {
+        if (clean ~ /^-[[:space:]]/) {
+            clean = trim(substr(clean, 2))
+            continue
+        }
+        separator = find_top_level_colon(clean, 1)
+        if (separator) {
+            clean = trim(substr(clean, separator + 1))
+            continue
+        }
+        break
+    }
+    candidate = clean
 
     while (substr(candidate, 1, 1) == "&" || substr(candidate, 1, 1) == "!") {
         space = match(candidate, /[[:space:]]/)
@@ -1052,7 +1056,7 @@ function multiline_scalar_quote(raw,    first_line, indent, text, clean, separat
     }
 
     quote = substr(candidate, 1, 1)
-    if (quote != "\"" && quote != sprintf("%c", 39)) {
+    if (quote != "\"" && quote != SQ) {
         return ""
     }
     return quote_is_open(candidate, quote) ? quote : ""
@@ -1083,7 +1087,7 @@ function flow_balance(value,    i, char, quote, escaped, braces, brackets, previ
             }
             continue
         }
-        if (char == "\"" || char == sprintf("%c", 39)) {
+        if (char == "\"" || char == SQ) {
             quote = char
         } else if (char == "#" && (i == 1 || previous ~ /[[:space:]]/)) {
             break

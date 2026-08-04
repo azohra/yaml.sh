@@ -79,3 +79,5 @@ jobs:
           PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make fuzz
       - name: Verify scale contract
         run: make scale
+      - name: Verify benchmark budgets
+        run: YSH_BENCHMARK_SCALE=2 make benchmark

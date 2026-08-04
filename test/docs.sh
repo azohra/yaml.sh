@@ -41,9 +41,13 @@ if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROO
     exit 1
 fi
 
-if ! grep -Fq 'css/style.css?v=4.1' "$ROOT/_static/_www/index.html" ||
-    ! grep -Fq 'css/style.css?v=4.1' "$STORY/index.html"; then
-    printf '%s\n' 'Homepage and story stylesheet cache keys are not synchronized.' >&2
+CACHE_KEY=$(sed -n 's|.*css/style\.css?\(v=[0-9.][0-9.]*\).*|\1|p' "$ROOT/_static/_www/index.html" | head -n 1)
+if [ -z "$CACHE_KEY" ]; then
+    printf '%s\n' 'Homepage no longer carries a stylesheet cache key (css/style.css?v=...).' >&2
+    exit 1
+fi
+if ! grep -Fq "css/style.css?$CACHE_KEY" "$STORY/index.html"; then
+    printf 'Story stylesheet cache key does not match the homepage key %s.\n' "$CACHE_KEY" >&2
     exit 1
 fi
 
@@ -54,6 +58,82 @@ fi
 
 if grep -En 'href="[[:alnum:]_-]+\.md([#"]|$)' "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html >/dev/null; then
     printf '%s\n' 'Generated documentation contains a source Markdown link.' >&2
+    exit 1
+fi
+
+# Content tripwires (moved from test/test.sh): retired copy, layouts, and
+# release-specific artifacts must not return, and required copy must stay.
+if ! grep -Fq 'One POSIX shell file' "$STORY/index.html"; then
+    printf '%s\n' 'Story page lost its "One POSIX shell file" framing.' >&2
+    exit 1
+fi
+if grep -Fq 'story-timeline' "$STORY/index.html"; then
+    printf '%s\n' 'Story page reintroduced the retired story-timeline layout.' >&2
+    exit 1
+fi
+if grep -Fq 'releases/tag/' "$STORY/index.html"; then
+    printf '%s\n' 'Story page links to a release tag again.' >&2
+    exit 1
+fi
+if grep -Fq 'YAML.sh v1.17' "$STORY/index.html"; then
+    printf '%s\n' 'Story page hardcodes a release version.' >&2
+    exit 1
+fi
+if grep -Fq 'class="cursor"' "$ROOT/_static/_www/index.html"; then
+    printf '%s\n' 'Homepage reintroduced the retired cursor animation.' >&2
+    exit 1
+fi
+if grep -Fq 'A real parser this time' "$ROOT/_static/_www/index.html"; then
+    printf '%s\n' 'Homepage reintroduced retired tagline copy.' >&2
+    exit 1
+fi
+if grep -Fq 'transform: rotate(1.25deg)' "$ROOT/_static/_www/css/style.css"; then
+    printf '%s\n' 'Stylesheet reintroduced the retired rotated-card transform.' >&2
+    exit 1
+fi
+if ! grep -Fq '/docs/docs.css' "$PUBLISHED/index.html" ||
+    ! grep -Fq '/docs/docs.js' "$PUBLISHED/index.html"; then
+    printf '%s\n' 'Documentation index lost its generated docs.css or docs.js link.' >&2
+    exit 1
+fi
+if ! grep -Fq 'brand/hero.svg' "$ROOT/README.md"; then
+    printf '%s\n' 'README no longer shows the evergreen hero image.' >&2
+    exit 1
+fi
+if ! grep -Fq 'og.png' "$ROOT/_static/_www/index.html"; then
+    printf '%s\n' 'Homepage no longer references the social preview image.' >&2
+    exit 1
+fi
+if ! grep -Fq '# Operator reference' "$PUBLISHED/operators.md" ||
+    ! grep -Fq 'array_to_map' "$PUBLISHED/operators.md" ||
+    ! grep -Fq 'split_doc' "$PUBLISHED/operators.md"; then
+    printf '%s\n' 'Operator reference lost its heading or a portable operator entry.' >&2
+    exit 1
+fi
+if grep -Fq 'testExpression' "$PUBLISHED/operators.md"; then
+    printf '%s\n' 'Operator reference leaks internal test function names.' >&2
+    exit 1
+fi
+if ! grep -Fq '# Validate, patch & convert' "$PUBLISHED/contracts.md"; then
+    printf '%s\n' 'Contracts page lost its heading.' >&2
+    exit 1
+fi
+if ! grep -Fq '# YAML support' "$PUBLISHED/yaml-support.md"; then
+    printf '%s\n' 'YAML support page lost its heading.' >&2
+    exit 1
+fi
+if grep -Fq 'Date/time, XML' "$PUBLISHED/yaml-support.md"; then
+    printf '%s\n' 'YAML support page reintroduced retired capability copy.' >&2
+    exit 1
+fi
+OPERATOR_TAB=$(printf '\t')
+if ! grep -Fq "operator${OPERATOR_TAB}Array to map${OPERATOR_TAB}supported" "$ROOT/test/operator-manifest.tsv" ||
+    ! grep -Fq "operator${OPERATOR_TAB}Split into documents${OPERATOR_TAB}focused" "$ROOT/test/operator-manifest.tsv"; then
+    printf '%s\n' 'Operator manifest lost its portable operator rows.' >&2
+    exit 1
+fi
+if grep -Fq '35/35' "$ROOT/_static/_www/index.html" || grep -Fq '35/35' "$ROOT/README.md"; then
+    printf '%s\n' 'A retired 35/35 conformance badge returned.' >&2
     exit 1
 fi
 
@@ -138,4 +218,5 @@ if grep -En 'og-v[0-9]|v[0-9]+\.[0-9]+.*(\.png|\.svg)' "$ROOT/README.md" "$ROOT/
 fi
 
 page_count=$(printf '%s\n' "$PAGES" | wc -w | tr -d ' ')
+# The +1 counts the generated landing index page, which is not in $PAGES.
 printf 'Static documentation: %s generated pages, local links, stable anchors, evergreen identity.\n' "$((page_count + 1))"

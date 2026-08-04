@@ -28,7 +28,7 @@ The released `ysh` contains the complete shell launcher and AWK engine. Copy one
 
 ## Know the boundary
 
-- [YAML support](supported_yml.md) records accepted and rejected syntax.
+- [YAML support](yaml-support.md) records accepted and rejected syntax.
 - [Queries](queries.md) defines the expression language.
 - [Validate, patch, and convert](contracts.md) defines schemas, patches, and non-YAML formats.
 - [Security and limits](security.md) explains optional capabilities, resource ceilings, and write behavior.

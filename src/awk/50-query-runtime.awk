@@ -1,4 +1,4 @@
-function explain_path(node,    depth, current, parent, edge, i, result, key) {
+function explain_path(node,    depth, current, parent, edge, i, result, key, path_edge) {
     depth = 0
     current = node
     while (current) {
@@ -11,12 +11,12 @@ function explain_path(node,    depth, current, parent, edge, i, result, key) {
         } else {
             break
         }
-        explain_path_edge[++depth] = edge
+        path_edge[++depth] = edge
         current = parent
     }
     result = ""
     for (i = depth; i >= 1; i--) {
-        edge = explain_path_edge[i]
+        edge = path_edge[i]
         if (substr(edge, 1, 6) == "index ") {
             result = result "[" substr(edge, 7) "]"
         } else {
@@ -27,7 +27,6 @@ function explain_path(node,    depth, current, parent, edge, i, result, key) {
                 result = result "[" json_quote(key) "]"
             }
         }
-        delete explain_path_edge[i]
     }
     return result == "" ? "." : result
 }
@@ -197,24 +196,22 @@ function expression_envsubst(value, options,    result, i, char, closing, name, 
     return result
 }
 
-function expression_sort_mapping(node,    result, collection, count, i, j, key) {
+function expression_sort_mapping(node,    result, collection, count, i, j, key, sorted_key) {
     result = new_node("mapping", 0, "", "", "")
-    collection = ++collection_serial
-    collect_mapping_keys(node, collection)
+    collection = mapping_key_set(node)
     count = collection_count[collection]
     for (i = 1; i <= count; i++) {
         key = collection_key[collection, i]
         j = i
-        while (j > 1 && key < expression_sorted_key[j - 1]) {
-            expression_sorted_key[j] = expression_sorted_key[j - 1]
+        while (j > 1 && key < sorted_key[j - 1]) {
+            sorted_key[j] = sorted_key[j - 1]
             j--
         }
-        expression_sorted_key[j] = key
+        sorted_key[j] = key
     }
     for (i = 1; i <= count; i++) {
-        key = expression_sorted_key[i]
+        key = sorted_key[i]
         add_mapping(result, key, expression_clone_node(mapping_lookup(node, key)), 0, 0)
-        delete expression_sorted_key[i]
     }
     return result
 }
@@ -261,7 +258,6 @@ function expression_pick_or_omit(node, choices, omit_mode,    result, selected, 
         fail((omit_mode ? "omit" : "pick") " requires a mapping or sequence")
     }
     result = new_node(node_kind[node], 0, "", "", "")
-    selected = ++expression_selection_serial
     for (i = 1; i <= sequence_count[choices]; i++) {
         choice = resolve_alias(sequence_child[choices, i])
         if (node_kind[choice] != "scalar") {
@@ -270,8 +266,8 @@ function expression_pick_or_omit(node, choices, omit_mode,    result, selected, 
         if (node_kind[node] == "mapping") {
             key = node_value[choice]
             child = mapping_lookup(node, key)
-            if (child && !(selected SUBSEP key in expression_selected)) {
-                expression_selected[selected, key] = 1
+            if (child && !(key in selected)) {
+                selected[key] = 1
                 if (!omit_mode) {
                     add_mapping(result, key, expression_clone_node(child), 0, 0)
                 }
@@ -279,7 +275,7 @@ function expression_pick_or_omit(node, choices, omit_mode,    result, selected, 
         } else if (node_type[choice] == "int") {
             j = node_value[choice] + 0
             if (j >= 0 && j < sequence_count[node]) {
-                expression_selected[selected, j] = 1
+                selected[j] = 1
                 if (!omit_mode) {
                     add_sequence(result, expression_clone_node(sequence_child[node, j + 1]), 0)
                 }
@@ -287,17 +283,16 @@ function expression_pick_or_omit(node, choices, omit_mode,    result, selected, 
         }
     }
     if (omit_mode && node_kind[node] == "mapping") {
-        collection = ++collection_serial
-        collect_mapping_keys(node, collection)
+        collection = mapping_key_set(node)
         for (i = 1; i <= collection_count[collection]; i++) {
             key = collection_key[collection, i]
-            if (!(selected SUBSEP key in expression_selected)) {
+            if (!(key in selected)) {
                 add_mapping(result, key, expression_clone_node(mapping_lookup(node, key)), 0, 0)
             }
         }
     } else if (omit_mode) {
         for (i = 0; i < sequence_count[node]; i++) {
-            if (!(selected SUBSEP i in expression_selected)) {
+            if (!(i in selected)) {
                 add_sequence(result, expression_clone_node(sequence_child[node, i + 1]), 0)
             }
         }
@@ -339,22 +334,19 @@ function expression_pivot(node,    result, first, mode, max_count, i, j, child, 
         return result
     }
     result = new_node("mapping", 0, "", "", "")
-    seen = ++expression_selection_serial
     for (i = 1; i <= sequence_count[node]; i++) {
         child = resolve_alias(sequence_child[node, i])
-        collection = ++collection_serial
-        collect_mapping_keys(child, collection)
+        collection = mapping_key_set(child)
         for (j = 1; j <= collection_count[collection]; j++) {
             key = collection_key[collection, j]
-            if (!(seen SUBSEP key in expression_selected)) {
-                expression_selected[seen, key] = 1
+            if (!(key in seen)) {
+                seen[key] = 1
                 row = new_node("sequence", 0, "", "", "")
                 add_mapping(result, key, row, 0, 0)
             }
         }
     }
-    collection = ++collection_serial
-    collect_mapping_keys(result, collection)
+    collection = mapping_key_set(result)
     for (j = 1; j <= collection_count[collection]; j++) {
         key = collection_key[collection, j]
         row = mapping_lookup(result, key)
@@ -539,6 +531,12 @@ function collect_keys_from_source(source, collection,    resolved, i) {
     }
 }
 
+function mapping_key_set(node,    collection) {
+    collection = ++collection_serial
+    collect_mapping_keys(node, collection)
+    return collection
+}
+
 function collect_mapping_keys(mapping, collection,    stack_key, seen_key, i, key) {
     mapping = resolve_alias(mapping)
     stack_key = collection SUBSEP mapping
@@ -583,6 +581,22 @@ function expression_stream_append(target, source,    i) {
     for (i = 1; i <= expression_stream_count[source]; i++) {
         expression_stream_push(target, expression_stream_node[source, i])
     }
+}
+
+function expression_stream_first_or_null(stream) {
+    return expression_stream_count[stream] ? expression_stream_node[stream, 1] : expression_null()
+}
+
+function expression_require_sequence(node, label,    resolved) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "sequence") fail(label " requires a sequence")
+    return resolved
+}
+
+function expression_require_collection(node, label,    resolved) {
+    resolved = resolve_alias(node)
+    if (node_kind[resolved] != "sequence" && node_kind[resolved] != "mapping") fail(label " requires a sequence or mapping")
+    return resolved
 }
 
 function expression_scalar(value, value_type) {
@@ -683,8 +697,7 @@ function expression_compare(left, right, operator,    left_node, right_node, lef
 }
 
 function expression_mapping_length(node,    collection) {
-    collection = ++collection_serial
-    collect_mapping_keys(node, collection)
+    collection = mapping_key_set(node)
     return collection_count[collection]
 }
 
@@ -762,8 +775,7 @@ function expression_clone_node(source,    resolved, clone, i, collection, key, c
             add_sequence(clone, expression_clone_node(sequence_child[resolved, i]), 0)
         }
     } else if (node_kind[resolved] == "mapping") {
-        collection = ++collection_serial
-        collect_mapping_keys(resolved, collection)
+        collection = mapping_key_set(resolved)
         for (i = 1; i <= collection_count[collection]; i++) {
             key = collection_key[collection, i]
             child = mapping_lookup(resolved, key)
@@ -1259,24 +1271,26 @@ function expression_set_node_property(node, property, value_node,    resolved, v
     expression_last_property_changed = 1
 }
 
-function expression_collect_recursive(node, stream, serial,    resolved, seen_key, i, collection, key) {
+function expression_collect_recursive_all(node, stream,    seen) {
+    expression_collect_recursive(node, stream, seen)
+}
+
+function expression_collect_recursive(node, stream, seen,    resolved, i, collection, key) {
     resolved = resolve_alias(node)
-    seen_key = serial SUBSEP resolved
-    if (seen_key in expression_recursive_seen) {
+    if (resolved in seen) {
         return
     }
-    expression_recursive_seen[seen_key] = 1
+    seen[resolved] = 1
     expression_stream_push(stream, resolved)
     if (node_kind[resolved] == "sequence") {
         for (i = 1; i <= sequence_count[resolved]; i++) {
-            expression_collect_recursive(sequence_child[resolved, i], stream, serial)
+            expression_collect_recursive(sequence_child[resolved, i], stream, seen)
         }
     } else if (node_kind[resolved] == "mapping") {
-        collection = ++collection_serial
-        collect_mapping_keys(resolved, collection)
+        collection = mapping_key_set(resolved)
         for (i = 1; i <= collection_count[collection]; i++) {
             key = collection_key[collection, i]
-            expression_collect_recursive(mapping_lookup(resolved, key), stream, serial)
+            expression_collect_recursive(mapping_lookup(resolved, key), stream, seen)
         }
     }
 }
@@ -1331,8 +1345,7 @@ function expression_deep_merge(left, right, flags,    left_node, right_node, res
         return only_new ? expression_clone_node(left_node) : expression_clone_node(right_node)
     }
     result = expression_clone_node(left_node)
-    collection = ++collection_serial
-    collect_mapping_keys(right_node, collection)
+    collection = mapping_key_set(right_node)
     for (i = 1; i <= collection_count[collection]; i++) {
         key = collection_key[collection, i]
         child = mapping_lookup(right_node, key)
@@ -1405,8 +1418,7 @@ function expression_arithmetic(left, right, operator,    left_node, right_node, 
     }
     if (operator == "+" && node_kind[left_node] == "mapping" && node_kind[right_node] == "mapping") {
         result = expression_clone_node(left_node)
-        collection = ++collection_serial
-        collect_mapping_keys(right_node, collection)
+        collection = mapping_key_set(right_node)
         for (i = 1; i <= collection_count[collection]; i++) {
             key = collection_key[collection, i]
             child = mapping_lookup(right_node, key)
@@ -1440,8 +1452,7 @@ function expression_fingerprint(node,    resolved, result, i, collection, key, c
         }
         return result
     }
-    collection = ++collection_serial
-    collect_mapping_keys(resolved, collection)
+    collection = mapping_key_set(resolved)
     result = "m" collection_count[collection] ":"
     for (i = 1; i <= collection_count[collection]; i++) {
         key = collection_key[collection, i]
@@ -1533,8 +1544,7 @@ function expression_json_text(node,    resolved, result, i, collection, key) {
         }
         return result "]"
     }
-    collection = ++collection_serial
-    collect_mapping_keys(resolved, collection)
+    collection = mapping_key_set(resolved)
     result = "{"
     for (i = 1; i <= collection_count[collection]; i++) {
         key = collection_key[collection, i]
@@ -1561,8 +1571,7 @@ function expression_json_pretty_text(node, step, level,    resolved, result, i, 
         }
         return result "\n" prefix "]"
     }
-    collection = ++collection_serial
-    collect_mapping_keys(resolved, collection)
+    collection = mapping_key_set(resolved)
     if (!collection_count[collection]) return "{}"
     result = "{\n"
     for (i = 1; i <= collection_count[collection]; i++) {
@@ -1868,7 +1877,7 @@ function expression_evaluate_string(kind, expression, input,    output, i, j, no
         if (!expression_stream_count[argument_stream]) fail(kind " requires an argument")
         argument = expression_string_value(expression_stream_node[argument_stream, 1])
         if (kind == "join") {
-            if (node_kind[node] != "sequence") fail("join requires a sequence")
+            node = expression_require_sequence(node, "join")
             key = ""
             for (j = 1; j <= sequence_count[node]; j++) key = key (j > 1 ? argument : "") expression_string_value(sequence_child[node, j])
             expression_stream_push(output, expression_scalar(key, "string"))
@@ -1899,22 +1908,19 @@ function expression_utility_indent(expression, single, fallback, allow_zero,    
     return value
 }
 
-function expression_shuffle(node,    resolved, result, serial, count, i, j, swap) {
-    resolved = resolve_alias(node)
-    if (node_kind[resolved] != "sequence") fail("shuffle requires a sequence")
+function expression_shuffle(node,    resolved, result, count, i, j, swap, shuffle_index) {
+    resolved = expression_require_sequence(node, "shuffle")
     result = new_node("sequence", 0, "", "", "")
-    serial = ++codec_shuffle_serial
     count = sequence_count[resolved]
-    for (i = 1; i <= count; i++) codec_shuffle_index[serial, i] = i
+    for (i = 1; i <= count; i++) shuffle_index[i] = i
     for (i = count; i > 1; i--) {
         j = (codec_random_next() % i) + 1
-        swap = codec_shuffle_index[serial, i]
-        codec_shuffle_index[serial, i] = codec_shuffle_index[serial, j]
-        codec_shuffle_index[serial, j] = swap
+        swap = shuffle_index[i]
+        shuffle_index[i] = shuffle_index[j]
+        shuffle_index[j] = swap
     }
     for (i = 1; i <= count; i++) {
-        add_sequence(result, expression_clone_node(sequence_child[resolved, codec_shuffle_index[serial, i]]), 0)
-        delete codec_shuffle_index[serial, i]
+        add_sequence(result, expression_clone_node(sequence_child[resolved, shuffle_index[i]]), 0)
     }
     return result
 }
@@ -2056,6 +2062,8 @@ function expression_evaluate_utility(kind, expression, input,    output, i, j, n
             result_node = expression_scalar(value, "string")
         } else if (kind == "shuffle") {
             result_node = expression_shuffle(node)
+        } else {
+            fail("unsupported utility kind: " kind)
         }
         expression_stream_push(output, result_node)
     }
