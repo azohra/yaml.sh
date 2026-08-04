@@ -54,7 +54,7 @@
     <div class="story-layout section-shell">
       <article class="story-body">
         <div class="story-opening">
-          <p>In 2018, I wrote a YAML parser in Bash. It was funny, useful, and—at the centre—a bad parser design.</p>
+          <p>In 2018, I wrote a YAML parser in Bash. It was funny, it was useful, and at its centre sat a genuinely bad idea about parsing.</p>
           <p>Frank Vumbaca helped turn the first experiment into something people could actually use. He added blocks, lists, stdin support, documentation, and years of patient fixes. Then the repository mostly sat still. It kept doing its small job while I went on to other things.</p>
           <p>I came back eight years later intending to tidy it up and ship a respectable release. Then I asked a more dangerous question: if we were willing to break the CLI, how much better could this become?</p>
         </div>
@@ -95,16 +95,16 @@
           <p>The restraint moved elsewhere: every supported behavior needed an exact example or test, and nearby unsupported syntax had to fail clearly instead of producing a plausible mistake. The YAML Test Suite and yq were useful external checks, but neither became the product definition.</p>
         </section>
 
-        <section id="building-with-codex">
+        <section id="second-act">
           <h2>A very fast second act</h2>
-          <p>Codex made this second act move unusually quickly. A design question could become working code, meet external examples, expose the next missing idea, and return to the design while the thought was still fresh.</p>
-          <p>The interesting part was not code volume. It was being able to push much harder on the constraint without relaxing it. The one-file premise kept shaping the tool; the faster loop made it possible to ask more ambitious questions.</p>
+          <p>The second act moved unusually quickly, because I was no longer working alone. With machine collaborators in the loop, a design question could become working code, meet the YAML Test Suite, expose the missing idea, and come back to the drawing board while the thought was still fresh. What used to take a weekend now took the length of a coffee.</p>
+          <p>Speed like that is dangerous in exactly one way: it will cheerfully automate sloppiness. So the rule became that nothing lands without a receipt — an exact test, an external oracle, a property that fails loudly. The interesting part was never code volume. It was learning how hard the one-file constraint could be pushed when the boring verification kept pace with the fun.</p>
         </section>
 
         <section id="where-it-fits">
           <h2>Where it fits</h2>
           <p>The unreasonable constraint eventually became a useful shape of its own.</p>
-          <p>YAML.sh is a serious YAML tool in a mischievous medium. It arrives as readable source, keeps the character of a YAML file, previews changes, refuses formatting loss on demand, updates several files from shared data, and rolls back failed writes. Those properties grew naturally from taking the one-file shell constraint further than seemed sensible.</p>
+          <p>YAML.sh is a serious YAML tool in a mischievous medium. It arrives as readable source, keeps the character of the file you wrote, previews its own changes, refuses formatting loss on demand, and treats a multi-file update as one careful transaction.</p>
           <p>It fits when one readable file, careful edits, and a surprisingly deep language matter at the same time.</p>
         </section>
 
@@ -131,7 +131,7 @@
           <li><a href="#give-yaml-a-shape">Give YAML a shape</a></li>
           <li><a href="#teach-it-to-change-things">Teach it to change things</a></li>
           <li><a href="#one-file-got-ambitious">One file got ambitious</a></li>
-          <li><a href="#building-with-codex">A very fast second act</a></li>
+          <li><a href="#second-act">A very fast second act</a></li>
           <li><a href="#where-it-fits">Where it fits</a></li>
           <li><a href="#constraint">The constraint is the fun part</a></li>
         </ol>
