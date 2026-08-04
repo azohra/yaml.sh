@@ -1407,6 +1407,12 @@ testMultilinePlainScalars() {
     assertEquals '"value"' "$(printf '%s\n' 'key: # comment' '  value' | ./ysh --json '.key')"
 }
 
+testMultilineQuotedScalarsBehindNestedIndicators() {
+    assertEquals '[{"key":"abc def"}]' "$(printf '%s\n' '- key: "abc' '    def"' | ./ysh --json '.')"
+    assertEquals '[["abc def"]]' "$(printf '%s\n' '- - "abc' '    def"' | ./ysh --json '.')"
+    assertEquals "[{\"key\":\"abc def\"}]" "$(printf '%s\n' "- key: 'abc" "    def'" | ./ysh --json '.')"
+}
+
 testDuplicateKeysAreRejected() {
     result=$(printf "%s\n" "key: first" "key: second" | ./ysh ".key" 2>&1)
     assertNotEquals 0 $?

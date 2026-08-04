@@ -1035,13 +1035,23 @@ function multiline_scalar_quote(raw,    first_line, indent, text, clean, separat
     clean = trim(text)
 
     if (clean ~ /^---[[:space:]]/) {
-        candidate = trim(substr(clean, 4))
-    } else if (clean ~ /^-[[:space:]]/) {
-        candidate = trim(substr(clean, 2))
-    } else {
-        separator = find_top_level_colon(clean, 1)
-        candidate = separator ? trim(substr(clean, separator + 1)) : clean
+        clean = trim(substr(clean, 4))
     }
+    # Peel nested block indicators: "- - key: \"..." opens a quoted scalar
+    # behind any number of sequence dashes and mapping keys.
+    while (1) {
+        if (clean ~ /^-[[:space:]]/) {
+            clean = trim(substr(clean, 2))
+            continue
+        }
+        separator = find_top_level_colon(clean, 1)
+        if (separator) {
+            clean = trim(substr(clean, separator + 1))
+            continue
+        }
+        break
+    }
+    candidate = clean
 
     while (substr(candidate, 1, 1) == "&" || substr(candidate, 1, 1) == "!") {
         space = match(candidate, /[[:space:]]/)
