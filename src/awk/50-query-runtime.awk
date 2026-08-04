@@ -49,7 +49,7 @@ function explain_record_mutation(kind, path, node,    file) {
     }
 }
 
-function explain_input_target(node,    current, document) {
+function expression_effective_root(node,    current) {
     current = node
     while (current) {
         if ((current in expression_missing_parent) && !expression_placeholder_attached[current]) {
@@ -60,6 +60,11 @@ function explain_input_target(node,    current, document) {
             break
         }
     }
+    return current
+}
+
+function explain_input_target(node,    current, document) {
+    current = expression_effective_root(node)
     for (document = 0; document <= document_index; document++) {
         if ((document in document_root) && document_root[document] == current) {
             return 1
@@ -69,16 +74,7 @@ function explain_input_target(node,    current, document) {
 }
 
 function expression_input_file(node,    current) {
-    current = node
-    while (current) {
-        if ((current in expression_missing_parent) && !expression_placeholder_attached[current]) {
-            current = expression_missing_parent[current]
-        } else if (current in node_parent) {
-            current = node_parent[current]
-        } else {
-            break
-        }
-    }
+    current = expression_effective_root(node)
     return (current in node_file_index) ? node_file_index[current] : input_file_index + 0
 }
 
@@ -86,6 +82,36 @@ function expression_mark_changed(node,    file) {
     expression_any_change = 1
     file = expression_input_file(node)
     expression_file_changed[file] = 1
+}
+
+# Explain bookkeeping must capture the path before the mutation rewrites the
+# node's ancestry, so these helpers own the mutation call itself.
+function expression_apply_replace(target, source, was_missing,    input_target, mutation_path) {
+    if (explain_mode) {
+        input_target = explain_input_target(target)
+        mutation_path = explain_path(target)
+    }
+    expression_replace_node(target, source)
+    if (expression_last_replace_changed) {
+        expression_mark_changed(target)
+        if (explain_mode && input_target) {
+            explain_record_mutation(was_missing ? "insert" : "replace", mutation_path, target)
+        }
+    }
+}
+
+function expression_apply_delete(target,    input_target, mutation_path) {
+    if (explain_mode) {
+        input_target = explain_input_target(target)
+        mutation_path = explain_path(target)
+    }
+    expression_delete_node(target)
+    if (expression_last_delete_changed) {
+        expression_mark_changed(target)
+        if (explain_mode && input_target) {
+            explain_record_mutation("delete", mutation_path, target)
+        }
+    }
 }
 
 function expression_envsubst(value, options,    result, i, char, closing, name, start, body, suffix, replacement, is_set) {
@@ -1255,7 +1281,7 @@ function expression_collect_recursive(node, stream, serial,    resolved, seen_ke
     }
 }
 
-function expression_arithmetic_number(value, value_type, operator,    rendered) {
+function expression_arithmetic_number(value, value_type,    rendered) {
     rendered = sprintf("%.15g", value)
     if (value_type == "float" && rendered !~ /[.eE]/) {
         rendered = rendered ".0"
@@ -1362,7 +1388,7 @@ function expression_arithmetic(left, right, operator,    left_node, right_node, 
             value = expression_numeric(left_node) % expression_numeric(right_node)
         }
         result_type = (operator == "/" || left_type == "float" || right_type == "float") ? "float" : "int"
-        return expression_arithmetic_number(value, result_type, operator)
+        return expression_arithmetic_number(value, result_type)
     }
     if (operator == "+" && left_type == "string" && right_type == "string") {
         return expression_scalar(node_value[left_node] node_value[right_node], "string")
@@ -1772,7 +1798,7 @@ function expression_evaluate_context(kind, expression, input,    output, middle,
             expression_stream_push(output, expression_scalar(node_head_comment[node], "string"))
         } else if (kind == "node_foot_comment") {
             expression_stream_push(output, expression_scalar(node_foot_comment[node], "string"))
-        } else if (node in node_parent) {
+        } else if (kind == "node_key" && (node in node_parent)) {
             key = node_parent_edge[node]
             result_node = substr(key, 1, 6) == "index " ? expression_scalar(substr(key, 7), "int") : expression_scalar(substr(key, 5), "string")
             node_origin[result_node] = node
@@ -1946,7 +1972,7 @@ function expression_evaluate_schema(kind, expression, input,    output, i, node,
     return output
 }
 
-function expression_evaluate_utility(kind, expression, input,    output, i, j, node, resolved, single, argument_stream, argument_node, value, result_node, dynamic_expression, dynamic_results, step) {
+function expression_evaluate_utility(kind, expression, input,    output, i, j, node, resolved, single, argument_stream, value, result_node, dynamic_expression, dynamic_results, step) {
     output = expression_stream_new()
     if (kind == "eval") {
         if (disable_eval) fail("dynamic eval is disabled")
@@ -1974,8 +2000,8 @@ function expression_evaluate_utility(kind, expression, input,    output, i, j, n
             single = expression_stream_single(expression_stream_node[input, i])
             argument_stream = expression_evaluate(expression_left[expression], single)
             for (j = 1; j <= expression_stream_count[argument_stream]; j++) {
-                value = expression_read_file(expression_string_value(expression_stream_node[argument_stream, j]))
-                if (kind == "load") result_node = expression_parse_yaml_text(value)
+                value = codec_read_file(expression_string_value(expression_stream_node[argument_stream, j]))
+                if (kind == "load") result_node = codec_yaml_decode(value)
                 else if (kind == "load_base64") result_node = expression_scalar(codec_base64_decode(value), "string")
                 else if (kind == "load_props") result_node = codec_props_decode(value)
                 else result_node = expression_scalar(value, "string")
@@ -1998,7 +2024,7 @@ function expression_evaluate_utility(kind, expression, input,    output, i, j, n
             result_node = expression_scalar(expression_yaml_text(node, 0, step) "\n", "string")
         } else if (kind == "from_json" || kind == "from_yaml") {
             value = expression_string_value(node)
-            result_node = kind == "from_json" ? expression_parse_json_text(value) : expression_parse_yaml_text(value)
+            result_node = kind == "from_json" ? codec_json_decode(value) : codec_yaml_decode(value)
         } else if (kind == "to_props") {
             result_node = expression_scalar(codec_props_walk(node, ""), "string")
         } else if (kind == "from_props") {

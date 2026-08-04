@@ -6,48 +6,33 @@
 make all
 ```
 
-The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, and verifies that the committed static documentation is generated and internally linked correctly.
+The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and verifies that the committed static documentation is generated and internally linked correctly.
 
 ## Source layout
 
 ```text
-src/ysh.sh              POSIX shell CLI and batch edit coordinator
-src/awk/00-core.awk     common diagnostics and text primitives
-src/awk/10-codecs.awk   configuration and utility codecs
-src/awk/20-*.awk        YAML source, graph, parser, and resolver
-src/awk/30-*.awk        query parser
-src/awk/40-*.awk        Pointer, Patch, Merge Patch, and Schema
-src/awk/50-*.awk        query runtime
-src/awk/60-*.awk        semantic emitters
-src/awk/70-*.awk        source edit compiler
-src/awk/80-*.awk        output coordination
-src/awk/90-*.awk        AWK input lifecycle
-src/diff.awk            bounded unified-diff renderer
-test/test.sh            behavioral suite
-test/public-contract.tsv named product capabilities, roles, and evidence
-test/public-contract.sh  public-contract integrity gate
-test/operator-manifest.tsv exact operator forms and behavioral owners
-test/conformance.sh     pinned YAML Test Suite gate
-test/conformance-outcomes.tsv exact result for every upstream YAML case
-test/differential.sh    pinned yq comparison gate
-test/operator-manifest.sh operator-manifest integrity gate
-test/yq-corpus-base.tsv hand-written differential cases
-test/generate-yq-corpus.sh stable family labels for the curated differential cases
-test/fuzz.sh            grammar-guided replayable properties
-test/presentation-matrix.sh exact compound-edit matrix
-test/parser-boundaries.sh deliberate accept/reject boundary matrix
-test/adversarial.sh     resource and recursion guards
-bench/benchmark.sh      repeatable throughput sample
-bench/scale.sh          125,000-node resource contract
-build/docs.sh           static documentation build
-build/docs-page.awk     controlled Markdown-to-HTML renderer
-test/docs.sh            generated page, link, anchor, and asset checks
-test/advanced.yml       v1 conformance fixture
-test/expressions.yml    v1 expression and transformation fixture
-_static/_www            unified Cloudflare Pages site
-_static/_www/docs       documentation
-_static/_www/install    installer
+src/ysh.sh     POSIX shell CLI and batch edit coordinator
+src/awk/       ordered engine modules: core primitives, codecs, YAML source
+               and parser and graph, query parser, contracts, query runtime
+               and evaluators, emitters, source-edit compiler, output, main
+src/diff.awk   bounded unified-diff renderer
+build/         shbuilder.awk assembles ysh; docs.sh, docs-page.awk,
+               docs-search.awk, and docbuilder.awk generate the site
+test/          test.sh behavioral suite on a vendored shunit2 (2.1.8pre
+               snapshot of kward/shunit2); focused gate scripts with their
+               TSV corpora; YAML fixtures; workflow fixtures under
+               workflows/; fault-injection PATH shims under fault-bin/;
+               toml-test adapters
+bench/         benchmark.sh throughput sample; scale.sh resource contract
+_static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
+               documentation sources, and install is the installer
 ```
+
+Each gate script reads its sibling TSV corpus: tab-separated columns, blank
+lines and `#` comments skipped, rows grouped under a leading family or
+capability label. Add a row beside its family, rerun the owning gate, and
+update `test/public-contract.tsv` when the supported surface changes; the
+gates assert their own corpus floors and status vocabularies.
 
 ## Build documentation
 
@@ -55,7 +40,7 @@ _static/_www/install    installer
 make docs
 ```
 
-Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork.
+Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs `test/guidance.sh`, which verifies that the build targets, repository paths, local links, version literals, and provenance claims named in the guidance documents still match the repository.
 
 ## Add parser behavior
 
@@ -69,7 +54,7 @@ For every supported feature:
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 
-Run `make operator-manifest` and `make parser-boundaries` before expanding the public contract. `make conformance` uses the pinned YAML Test Suite; `make differential` uses yq v4.53.3 and jq. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover replayable grammar properties, exact source retention, hostile shapes, and bounded scale.
+Run `make operator-manifest` and `make parser-boundaries` before expanding the public contract. `make conformance` uses the pinned YAML Test Suite; `make differential` uses yq v4.53.3 and jq; `make toml-conformance`, `make schema-conformance`, and `make json-patch-conformance` use their pinned upstream suites. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover replayable grammar properties, exact source retention, hostile shapes, and bounded scale.
 
 ## Add expression behavior
 
@@ -77,6 +62,8 @@ Expression operators must preserve node references unless they intentionally com
 
 ## Portability
 
-Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on every pull request and main update; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
+Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on pull requests and main updates that touch the runtime; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
 
-Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.
+Avoid implementation-specific AWK extensions unless the portability contract changes deliberately. House idioms keep the modules portable: declare function locals as extra parameters after the real arguments; pass arrays through parameters, which are per-call and by-reference; write awkward quotes as `sprintf("%c", 39)`; avoid gawk-only builtins such as `gensub` and `asort`. Module text must never contain the build heredoc terminators `YSH_AWK_EOF` or `YSH_DIFF_AWK_EOF`.
+
+One recorded shell gotcha: in `VAR1=... VAR2=$(cmd) program`, many shells apply the assignments left to right, so a leading `PATH=` prefix changes how a later `$(command -v ...)` resolves. Resolve real tool paths into variables before building such command lines, as the `test/fault-bin/` shims require.

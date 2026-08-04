@@ -11,17 +11,22 @@ tab=$(printf '\t')
 total=0
 passed=0
 families=0
-previous_family=
+family_names=
+seen_families=
 
 while IFS="$tab" read -r family id fixture query expected; do
     case "$family" in
     ''|'#'*) continue ;;
     esac
     total=$((total + 1))
-    if [ "$family" != "$previous_family" ]; then
+    case "$seen_families" in
+    *"|$family|"*) ;;
+    *)
+        seen_families="$seen_families|$family|"
+        family_names="$family_names${family_names:+, }$family"
         families=$((families + 1))
-        previous_family=$family
-    fi
+        ;;
+    esac
     if ! actual=$("$YSH_BINARY" --json "$query" "$FIXTURES/$fixture" 2>&1); then
         printf 'Workflow failed: %s/%s\n%s\n' "$family" "$id" "$actual" >&2
         exit 1
@@ -39,4 +44,4 @@ if [ "$families" -lt 5 ] || [ "$total" -lt 24 ]; then
     exit 1
 fi
 
-printf 'Configuration workflows pass: Kubernetes, Compose, GitHub Actions, GitLab CI, and deployment overlays (%s scenarios).\n' "$total"
+printf 'Configuration workflows pass: %s (%s scenarios).\n' "$family_names" "$total"

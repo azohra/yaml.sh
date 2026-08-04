@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
+
 fixture=${JSON_PATCH_TEST_FILE:-}
 if [ -z "$fixture" ] || [ ! -f "$fixture" ]; then
     printf '%s\n' 'Set JSON_PATCH_TEST_FILE to json-patch/json-patch-tests tests.json.' >&2
@@ -16,7 +20,7 @@ jq -c '.[] | select(has("doc") and has("patch")) | select(.disabled != true)' "$
 
 passed=0
 while IFS= read -r case; do
-    if printf '%s\n' "$case" | ./ysh -p json --json '.doc | apply_patch(root.patch)' > "$actual_file" 2>/dev/null; then
+    if printf '%s\n' "$case" | "$YSH_BINARY" -p json --json '.doc | apply_patch(root.patch)' > "$actual_file" 2>/dev/null; then
         if printf '%s\n' "$case" | jq -e 'has("error")' >/dev/null; then
             printf 'JSON Patch fixture expected failure but succeeded:\n%s\n' "$case" >&2
             exit 1

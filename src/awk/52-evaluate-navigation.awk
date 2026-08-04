@@ -1,4 +1,4 @@
-function expression_evaluate_navigation(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+function expression_evaluate_navigation(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, start_index, end_index, size, mutation_path, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
     output = expression_stream_new()
     if (kind == "first" || kind == "filter") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
@@ -282,18 +282,7 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
             }
             child = expression_stream_count[value_stream] ? expression_stream_node[value_stream, 1] : expression_null()
             result_node = expression_follow_path(node, expression_stream_node[path_stream, 1], 1)
-            was_missing = expression_path_was_missing
-            if (explain_mode) {
-                input_target = explain_input_target(result_node)
-                mutation_path = explain_path(result_node)
-            }
-            expression_replace_node(result_node, child)
-            if (expression_last_replace_changed) {
-                expression_mark_changed(result_node)
-            }
-            if (explain_mode && input_target && expression_last_replace_changed) {
-                explain_record_mutation(was_missing ? "insert" : "replace", mutation_path, result_node)
-            }
+            expression_apply_replace(result_node, child, expression_path_was_missing)
             expression_stream_push(output, node)
         }
         return output
@@ -320,18 +309,7 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
                 }
             }
             for (j = target_count; j >= 1; j--) {
-                child = expression_path_target[path_serial, j]
-                if (explain_mode) {
-                    input_target = explain_input_target(child)
-                    mutation_path = explain_path(child)
-                }
-                expression_delete_node(child)
-                if (expression_last_delete_changed) {
-                    expression_mark_changed(child)
-                }
-                if (explain_mode && input_target && expression_last_delete_changed) {
-                    explain_record_mutation("delete", mutation_path, child)
-                }
+                expression_apply_delete(expression_path_target[path_serial, j])
                 delete expression_path_target[path_serial, j]
             }
             expression_stream_push(output, node)
@@ -348,18 +326,8 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
             for (i = 1; i <= expression_stream_count[left_stream]; i++) {
                 j = expression_stream_count[right_stream] == expression_stream_count[left_stream] ? i : 1
                 node = expression_stream_node[left_stream, i]
-                if (explain_mode) {
-                    input_target = explain_input_target(node)
-                    mutation_path = explain_path(node)
-                    was_missing = (node in expression_missing_parent) && !expression_placeholder_attached[node]
-                }
-                expression_replace_node(node, expression_stream_node[right_stream, j])
-                if (expression_last_replace_changed) {
-                    expression_mark_changed(node)
-                }
-                if (explain_mode && input_target && expression_last_replace_changed) {
-                    explain_record_mutation(was_missing ? "insert" : "replace", mutation_path, node)
-                }
+                expression_apply_replace(node, expression_stream_node[right_stream, j],
+                    (node in expression_missing_parent) && !expression_placeholder_attached[node])
             }
         } else {
             for (i = 1; i <= expression_stream_count[left_stream]; i++) {
@@ -367,18 +335,8 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
                 single = expression_stream_single(node)
                 right_stream = expression_evaluate(expression_right[expression], single)
                 child = expression_stream_count[right_stream] ? expression_stream_node[right_stream, 1] : expression_null()
-                if (explain_mode) {
-                    input_target = explain_input_target(node)
-                    mutation_path = explain_path(node)
-                    was_missing = (node in expression_missing_parent) && !expression_placeholder_attached[node]
-                }
-                expression_replace_node(node, child)
-                if (expression_last_replace_changed) {
-                    expression_mark_changed(node)
-                }
-                if (explain_mode && input_target && expression_last_replace_changed) {
-                    explain_record_mutation(was_missing ? "insert" : "replace", mutation_path, node)
-                }
+                expression_apply_replace(node, child,
+                    (node in expression_missing_parent) && !expression_placeholder_attached[node])
             }
         }
         expression_stream_append(output, input)
@@ -387,18 +345,7 @@ function expression_evaluate_navigation(kind, expression, input,    output, midd
     if (kind == "del") {
         middle = expression_evaluate(expression_left[expression], input)
         for (i = expression_stream_count[middle]; i >= 1; i--) {
-            node = expression_stream_node[middle, i]
-            if (explain_mode) {
-                input_target = explain_input_target(node)
-                mutation_path = explain_path(node)
-            }
-            expression_delete_node(node)
-            if (expression_last_delete_changed) {
-                expression_mark_changed(node)
-            }
-            if (explain_mode && input_target && expression_last_delete_changed) {
-                explain_record_mutation("delete", mutation_path, node)
-            }
+            expression_apply_delete(expression_stream_node[middle, i])
         }
         expression_stream_append(output, input)
         return output

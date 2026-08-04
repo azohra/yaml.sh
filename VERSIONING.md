@@ -13,7 +13,7 @@ The compatibility contract includes documented:
 - the one-file POSIX `/bin/sh` plus AWK reader runtime
 - the documented host file utilities used by file-edit modes
 
-Undocumented internals and rejected malformed or unsupported input are outside that contract.
+Undocumented internals and rejected malformed or unsupported input are outside that contract. The machine-readable public contract owns capability status and evidence.
 
 ## Choosing a release number
 
@@ -25,4 +25,12 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 
 ## Release mechanics
 
-Releases come from tested `main` commits and use signed `vMAJOR.MINOR.PATCH` tags. The executable, installer, and generated release text must agree. Brand artwork is evergreen rather than versioned. The machine-readable public contract owns capability status and evidence.
+Releases come from tested `main` commits and use signed `vMAJOR.MINOR.PATCH` tags. The executable, installer, and generated release text must agree.
+
+Bumping the version touches an exact set:
+
+1. `YSH_VERSION` in `src/ysh.sh`.
+2. The three version assertions in `test/test.sh`: `--version`, the installer download URL, and the homepage version marker.
+3. A dated `CHANGELOG.md` entry plus its compare-link definition at the file tail.
+4. `make docs`, which regenerates the installer checksum, homepage version, and documentation pages.
+5. `make all` and the focused gates for whatever changed.

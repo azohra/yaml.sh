@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.17.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.17.1</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -103,7 +103,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.17.1</span></div>
       <article>
           <h1 id="queries">Queries</h1>
           <p>YAML.sh expressions select values, pass them through filters, build new results, and update documents. An expression may produce no result, one result, or a stream of results.</p>
@@ -230,7 +230,7 @@ ysh --json '.metadata | with_entries(.value |= upcase)' config.yml
 ysh --json '.metadata | to_entries | from_entries' config.yml
 </code></pre>
           </div>
-          <p>Sequence helpers include <code>sort</code>, <code>sort_by</code>, <code>group_by</code>, <code>unique</code>, <code>unique_by</code>, <code>reverse</code>, <code>flatten</code>, <code>array_to_map</code>, <code>min</code>/<code>max</code>, <code>min_by</code>/<code>max_by</code>, and <code>add</code>. Quantifiers include <code>any</code>, <code>all</code>, <code>any_c</code>, and <code>all_c</code>. String helpers include <code>upcase</code>, <code>downcase</code>, <code>trim</code>, <code>to_string</code>, <code>contains</code>, <code>startswith</code>, <code>endswith</code>, <code>split</code>, and <code>join</code>.</p>
+          <p>The <a href="/docs/operators/">operator reference</a> lists every sequence, quantifier, and string helper with its accepted inputs.</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
             <pre><code class="language-sh">ysh -n --json '[3, 1, 2, 1] | unique'

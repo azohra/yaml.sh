@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.17.0
+YSH_VERSION=1.17.1
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM
@@ -388,8 +388,7 @@ ysh_interrupt_transaction() {
     exit 1
 }
 
-ysh_close_transaction() {
-    ysh_cleanup_transaction
+ysh_reset_transaction_vars() {
     YSH_TRANSACTION_INPUT_LIST=
     YSH_TRANSACTION_NEW_LIST=
     YSH_TRANSACTION_OLD_LIST=
@@ -402,6 +401,11 @@ ysh_close_transaction() {
     YSH_TRANSACTION_FINAL_CHANGE_LIST=
     YSH_TRANSACTION_COMMITTED_INPUT_LIST=
     YSH_TRANSACTION_COMMITTED_OLD_LIST=
+}
+
+ysh_close_transaction() {
+    ysh_cleanup_transaction
+    ysh_reset_transaction_vars
     trap - 0 1 2 3 15
 }
 
@@ -475,18 +479,7 @@ ysh_require_edit_commands() {
 }
 
 ysh_run_edit_transaction() {
-    YSH_TRANSACTION_INPUT_LIST=
-    YSH_TRANSACTION_NEW_LIST=
-    YSH_TRANSACTION_OLD_LIST=
-    YSH_TRANSACTION_SNAPSHOT_LIST=
-    YSH_TRANSACTION_IDENTITY_LIST=
-    YSH_TRANSACTION_REPORT=
-    YSH_TRANSACTION_CALL_LOG=
-    YSH_TRANSACTION_OUTPUT=
-    YSH_TRANSACTION_CHANGE_LIST=
-    YSH_TRANSACTION_FINAL_CHANGE_LIST=
-    YSH_TRANSACTION_COMMITTED_INPUT_LIST=
-    YSH_TRANSACTION_COMMITTED_OLD_LIST=
+    ysh_reset_transaction_vars
     trap 'ysh_cleanup_transaction' 0
     trap 'ysh_interrupt_transaction' 1 2 3 15
     YSH_TRANSACTION_INPUT_LIST=$(mktemp "${TMPDIR:-/tmp}/ysh-inputs.XXXXXX") || { ysh_close_transaction; return 1; }
@@ -512,7 +505,6 @@ ysh_run_edit_transaction() {
     set +f
     IFS=$YSH_SAVED_IFS
 
-    YSH_FILE_INDEX=0
     YSH_TRANSACTION_FILE_COUNT=0
     YSH_NORMALIZED_INPUT_FILES=
     YSH_OUTPUT_MODE=yaml
@@ -564,16 +556,8 @@ ysh_run_edit_transaction() {
         done < "$YSH_TRANSACTION_IDENTITY_LIST"
         printf '%s\n' "$YSH_TRANSACTION_IDENTITY" >> "$YSH_TRANSACTION_IDENTITY_LIST"
         printf '%s\n' "$YSH_TRANSACTION_INPUT" >> "$YSH_TRANSACTION_INPUT_LIST"
-        case "$YSH_TRANSACTION_INPUT" in
-        */*)
-            YSH_SNAPSHOT_DIR=${YSH_TRANSACTION_INPUT%/*}
-            YSH_SNAPSHOT_NAME=${YSH_TRANSACTION_INPUT##*/}
-            ;;
-        *)
-            YSH_SNAPSHOT_DIR=.
-            YSH_SNAPSHOT_NAME=$YSH_TRANSACTION_INPUT
-            ;;
-        esac
+        YSH_SNAPSHOT_DIR=${YSH_TRANSACTION_INPUT%/*}
+        YSH_SNAPSHOT_NAME=${YSH_TRANSACTION_INPUT##*/}
         if ! YSH_TRANSACTION_SNAPSHOT=$(umask 077 && mktemp "${YSH_SNAPSHOT_DIR}/.${YSH_SNAPSHOT_NAME}.ysh-snapshot.XXXXXX") 2>/dev/null; then
             ysh_error "could not create source snapshot beside: $YSH_TRANSACTION_INPUT"
             return 1
@@ -714,13 +698,7 @@ ysh_main() {
     YSH_INPUT_FILENAME=-
     YSH_FILE_INDEX=0
     YSH_INPUT_FILES=
-    YSH_TRANSACTION_INPUT_LIST=
-    YSH_TRANSACTION_NEW_LIST=
-    YSH_TRANSACTION_OLD_LIST=
-    YSH_TRANSACTION_SNAPSHOT_LIST=
-    YSH_TRANSACTION_IDENTITY_LIST=
-    YSH_TRANSACTION_REPORT=
-    YSH_TRANSACTION_CALL_LOG=
+    ysh_reset_transaction_vars
     YSH_LOGICAL_INPUT_LIST=
     YSH_MAX_INPUT_BYTES=${YSH_MAX_INPUT_BYTES:-16777216}
     YSH_MAX_NODES=${YSH_MAX_NODES:-100000}

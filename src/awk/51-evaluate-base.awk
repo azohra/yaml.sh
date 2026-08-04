@@ -1,4 +1,4 @@
-function expression_evaluate_base(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+function expression_evaluate_base(kind, expression, input,    output, middle, left_stream, right_stream, single, node, child, i, j, collection, key, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, interpolation, partial_count, next_count, partial) {
     output = expression_stream_new()
     if (kind == "identity") {
         expression_stream_append(output, input)
@@ -38,12 +38,6 @@ function expression_evaluate_base(kind, expression, input,    output, middle, le
             }
         }
         return output
-    }
-    if (kind == "filename" || kind == "fileindex" || kind == "documentindex" || kind == "path" || kind == "parent" || kind == "root" ||
-        kind == "node_property" || kind == "node_line" || kind == "node_column" || kind == "node_key" || kind == "node_tag" ||
-        kind == "node_anchor" || kind == "node_alias" || kind == "node_style" || kind == "node_line_comment" ||
-        kind == "node_head_comment" || kind == "node_foot_comment") {
-        return expression_evaluate_context(kind, expression, input)
     }
     if (kind == "to_number" || kind == "envsubst") {
         if (kind == "envsubst" && disable_env_ops) {
@@ -172,7 +166,7 @@ function expression_evaluate_base(kind, expression, input,    output, middle, le
             if (node_type[node] != "int" && node_type[node] != "float") {
                 fail("unary - requires a number")
             }
-            expression_stream_push(output, expression_arithmetic_number(-expression_numeric(node), node_type[node], "-"))
+            expression_stream_push(output, expression_arithmetic_number(-expression_numeric(node), node_type[node]))
         }
         return output
     }

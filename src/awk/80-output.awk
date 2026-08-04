@@ -1,8 +1,22 @@
-function transform_all_documents(query, file_filter,    document, root, expression, input, results) {
+function expression_compiled(query) {
     if (!compiled_expression) {
         compiled_expression = expression_parse(query)
     }
-    expression = compiled_expression
+    return compiled_expression
+}
+
+function expression_all_roots_stream(    input, document) {
+    input = expression_stream_new()
+    for (document = 0; document <= document_index; document++) {
+        if (document in document_root) {
+            expression_stream_push(input, document_root[document])
+        }
+    }
+    return input
+}
+
+function transform_all_documents(query, file_filter,    document, root, expression, input, results) {
+    expression = expression_compiled(query)
     for (document = 0; document <= document_index; document++) {
         if (!(document in document_root) || (file_filter != "" && document_file_index[document] != file_filter)) {
             continue
@@ -14,18 +28,10 @@ function transform_all_documents(query, file_filter,    document, root, expressi
     }
 }
 
-function transform_eval_all_documents(query,    document, expression, input, results, i, file) {
-    if (!compiled_expression) {
-        compiled_expression = expression_parse(query)
-    }
-    expression = compiled_expression
+function transform_eval_all_documents(query,    expression, input, results, i, file) {
+    expression = expression_compiled(query)
     eval_all_top_expression = expression
-    input = expression_stream_new()
-    for (document = 0; document <= document_index; document++) {
-        if (document in document_root) {
-            expression_stream_push(input, document_root[document])
-        }
-    }
+    input = expression_all_roots_stream()
     results = configuration_apply_contracts(expression_evaluate(expression, input))
     explain_result_count += expression_stream_count[results]
     for (i = 1; i <= expression_stream_count[results]; i++) {
@@ -149,11 +155,11 @@ function configuration_file_node(path,    value, lower) {
     # file-ops policy only prevents expressions from selecting paths at runtime.
     value = local_file_read(path)
     lower = tolower(path)
-    if (lower ~ /\.json$/) return expression_parse_json_text(value)
+    if (lower ~ /\.json$/) return codec_json_decode(value)
     if (lower ~ /\.toml$/) return codec_toml_decode(value)
     if (lower ~ /\.ini$/) return codec_ini_decode(value)
     if (lower ~ /\.xml$/) return codec_xml_decode(value)
-    return expression_parse_yaml_text(value)
+    return codec_yaml_decode(value)
 }
 
 function configuration_apply_contracts(results,    output, i, node, errors, first, path, message) {
@@ -176,7 +182,7 @@ function configuration_apply_contracts(results,    output, i, node, errors, firs
             }
         }
         if (patch_target_file != "") {
-            first = new_node("sequence", 0, "", "")
+            first = new_node("sequence", 0, "", "", "")
             patch_diff_into(node, configuration_patch_target_node, "", first)
             expression_stream_push(output, first)
         } else expression_stream_push(output, node)
@@ -377,32 +383,23 @@ function output_result(document, query, output_mode,    root, expression, input,
     }
 
     root = document_root[document]
-    if (!compiled_expression) {
-        compiled_expression = expression_parse(query)
-    }
-    expression = compiled_expression
+    expression = expression_compiled(query)
     input = expression_stream_single(root)
     results = configuration_apply_contracts(expression_evaluate(expression, input))
     output_expression_results(results, output_mode)
 }
 
-function output_eval_all(query, output_mode,    expression, input, results, i) {
-    expression = expression_parse(query)
-    compiled_expression = expression
+function output_eval_all(query, output_mode,    expression, input, results) {
+    expression = expression_compiled(query)
     eval_all_top_expression = expression
-    input = expression_stream_new()
-    for (i = 0; i <= document_index; i++) {
-        if (i in document_root) {
-            expression_stream_push(input, document_root[i])
-        }
-    }
+    input = expression_all_roots_stream()
     results = configuration_apply_contracts(expression_evaluate(expression, input))
     output_expression_results(results, output_mode)
 }
 
 function output_batch_files(query, output_mode,    file, last_file, document, found, file_truthy, file_has_document) {
-    if (!compiled_expression && output_mode != "ast" && output_mode != "events") {
-        compiled_expression = expression_parse(query)
+    if (output_mode != "ast" && output_mode != "events") {
+        expression_compiled(query)
     }
     last_file = declared_input_file_count ? declared_last_input_file_index : current_input_file_index
     for (file = input_file_index + 0; file <= last_file; file++) {
