@@ -116,45 +116,24 @@
           <h2 id="source-layout"><a href="#source-layout">Source layout<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>text</span><button type="button" data-copy>Copy</button></div>
-            <pre><code class="language-text">src/ysh.sh              POSIX shell CLI and batch edit coordinator
-build/shbuilder.awk     assembles the modular sources into the single ysh artifact
-src/awk/00-core.awk     common diagnostics and text primitives
-src/awk/10-codecs.awk   configuration and utility codecs
-src/awk/20-*.awk        YAML source, graph, parser, and resolver
-src/awk/30-*.awk        query parser
-src/awk/40-*.awk        Pointer, Patch, Merge Patch, and Schema
-src/awk/50-*.awk        query runtime
-src/awk/60-*.awk        semantic emitters
-src/awk/70-*.awk        source edit compiler
-src/awk/80-*.awk        output coordination
-src/awk/90-*.awk        AWK input lifecycle
-src/diff.awk            bounded unified-diff renderer
-test/test.sh            behavioral suite
-test/public-contract.tsv named product capabilities, roles, and evidence
-test/public-contract.sh  public-contract integrity gate
-test/operator-manifest.tsv exact operator forms and behavioral owners
-test/conformance.sh     pinned YAML Test Suite gate
-test/conformance-outcomes.tsv exact result for every upstream YAML case
-test/differential.sh    pinned yq comparison gate
-test/operator-manifest.sh operator-manifest integrity gate
-test/yq-corpus-base.tsv hand-written differential cases
-test/generate-yq-corpus.sh stable family labels for the curated differential cases
-test/fuzz.sh            grammar-guided replayable properties
-test/presentation-matrix.sh exact compound-edit matrix
-test/parser-boundaries.sh deliberate accept/reject boundary matrix
-test/adversarial.sh     resource and recursion guards
-bench/benchmark.sh      repeatable throughput sample
-bench/scale.sh          125,000-node resource contract
-build/docs.sh           static documentation build
-build/docs-page.awk     controlled Markdown-to-HTML renderer
-test/docs.sh            generated page, link, anchor, and asset checks
-test/advanced.yml       v1 conformance fixture
-test/expressions.yml    v1 expression and transformation fixture
-_static/_www            unified Cloudflare Pages site
-_static/_www/docs       documentation
-_static/_www/install    installer
+            <pre><code class="language-text">src/ysh.sh     POSIX shell CLI and batch edit coordinator
+src/awk/       ordered engine modules: core primitives, codecs, YAML source
+               and parser and graph, query parser, contracts, query runtime
+               and evaluators, emitters, source-edit compiler, output, main
+src/diff.awk   bounded unified-diff renderer
+build/         shbuilder.awk assembles ysh; docs.sh, docs-page.awk,
+               docs-search.awk, and docbuilder.awk generate the site
+test/          test.sh behavioral suite on a vendored shunit2 (2.1.8pre
+               snapshot of kward/shunit2); focused gate scripts with their
+               TSV corpora; YAML fixtures; workflow fixtures under
+               workflows/; fault-injection PATH shims under fault-bin/;
+               toml-test adapters
+bench/         benchmark.sh throughput sample; scale.sh resource contract
+_static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
+               documentation sources, and install is the installer
 </code></pre>
           </div>
+          <p>Each gate script reads its sibling TSV corpus: tab-separated columns, blank lines and <code>#</code> comments skipped, rows grouped under a leading family or capability label. Add a row beside its family, rerun the owning gate, and update <code>test/public-contract.tsv</code> when the supported surface changes; the gates assert their own corpus floors and status vocabularies.</p>
           <h2 id="build-documentation"><a href="#build-documentation">Build documentation<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
@@ -177,7 +156,8 @@ _static/_www/install    installer
           <p>Expression operators must preserve node references unless they intentionally compute a new value. Add tests for precedence, empty streams, null traversal, scalar and collection inputs, multi-result output, and parity with the equivalent yq expression where one exists.</p>
           <h2 id="portability"><a href="#portability">Portability<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform <code>/bin/sh</code>. That portability matrix runs on pull requests and main updates that touch the runtime; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.</p>
-          <p>Avoid implementation-specific AWK extensions unless the portability contract changes deliberately.</p>
+          <p>Avoid implementation-specific AWK extensions unless the portability contract changes deliberately. House idioms keep the modules portable: declare function locals as extra parameters after the real arguments; pass arrays through parameters, which are per-call and by-reference; write awkward quotes as <code>sprintf(&quot;%c&quot;, 39)</code>; avoid gawk-only builtins such as <code>gensub</code> and <code>asort</code>. Module text must never contain the build heredoc terminators <code>YSH_AWK_EOF</code> or <code>YSH_DIFF_AWK_EOF</code>.</p>
+          <p>One recorded shell gotcha: in <code>VAR1=... VAR2=$(cmd) program</code>, many shells apply the assignments left to right, so a leading <code>PATH=</code> prefix changes how a later <code>$(command -v ...)</code> resolves. Resolve real tool paths into variables before building such command lines, as the <code>test/fault-bin/</code> shims require.</p>
       </article>
       <nav class="page-turn" aria-label="More documentation"><a href="/docs/recipes/"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href="/docs/supported_yml/"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>
     </main>

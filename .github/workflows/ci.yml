@@ -59,7 +59,7 @@ jobs:
                 docs=true
                 docs_portability=true
                 ;;
-              AGENTS.md|CONTRIBUTING.md|DESIGN.md|README.md|SECURITY.md|VERSIONING.md|CHANGELOG.md|_static/*|build/docbuilder.awk)
+              AGENTS.md|CLAUDE.md|CONTRIBUTING.md|DESIGN.md|README.md|SECURITY.md|VERSIONING.md|CHANGELOG.md|_static/*|build/docbuilder.awk)
                 docs=true
                 ;;
               src/*|build/*|test/*|bench/*)
