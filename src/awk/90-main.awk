@@ -203,7 +203,7 @@ END {
     }
     if (!exit_status && input_format != "yaml") {
         document_index = 0
-        if (input_format == "json") document_root[0] = expression_parse_json_text(codec_input_buffer)
+        if (input_format == "json") document_root[0] = codec_json_decode(codec_input_buffer)
         else if (input_format == "toml") document_root[0] = codec_toml_decode(codec_input_buffer)
         else if (input_format == "ini") document_root[0] = codec_ini_decode(codec_input_buffer)
         else if (input_format == "xml") document_root[0] = codec_xml_decode(codec_input_buffer)

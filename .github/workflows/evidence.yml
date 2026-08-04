@@ -76,6 +76,6 @@ jobs:
           make operator-manifest
           make parser-boundaries
           make adversarial
-          PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" YSH_FUZZ_MATRICES=1 make fuzz
+          PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make fuzz
       - name: Verify scale contract
         run: make scale

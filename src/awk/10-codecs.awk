@@ -272,7 +272,7 @@ function codec_delimited_row(node, separator,    resolved, result, i) {
     return result
 }
 
-function codec_delimited_encode(node, separator,    resolved, first, result, i, j, row, child, key) {
+function codec_delimited_encode(node, separator,    resolved, first, result, i, j, row, child, emitted) {
     resolved = resolve_alias(node)
     if (node_kind[resolved] != "sequence") fail("CSV and TSV encoding requires an array")
     if (!sequence_count[resolved]) return ""
@@ -289,13 +289,12 @@ function codec_delimited_encode(node, separator,    resolved, first, result, i, 
             row = resolve_alias(sequence_child[resolved, i])
             if (node_kind[row] != "mapping") fail("CSV and TSV object rows must be homogeneous")
             result = result "\n"
-            child = 0
+            emitted = 0
             for (j = 1; j <= mapping_count[first]; j++) {
                 if (mapping_merge[first, j]) continue
-                if (child++) result = result separator
-                key = mapping_key[first, j]
-                row = resolve_alias(sequence_child[resolved, i])
-                result = result codec_delimited_cell(mapping_lookup(row, key) ? mapping_lookup(row, key) : expression_scalar("", "string"), separator)
+                if (emitted++) result = result separator
+                child = mapping_lookup(row, mapping_key[first, j])
+                result = result codec_delimited_cell(child ? child : expression_scalar("", "string"), separator)
             }
         }
         return result
@@ -305,10 +304,6 @@ function codec_delimited_encode(node, separator,    resolved, first, result, i, 
         result = result codec_delimited_row(sequence_child[resolved, i], separator)
     }
     return result
-}
-
-function codec_delimited_finish_field(row, column, value) {
-    codec_delimited_field[row, column] = value
 }
 
 function codec_delimited_decode(value, separator,    row, column, field, quoted, after_quote, i, char, next_char, rows, columns, root, item, header, type, j, child) {
@@ -334,12 +329,12 @@ function codec_delimited_decode(value, separator,    row, column, field, quoted,
         }
         if (after_quote && char != separator && char != "\n" && char != "\r") fail("unexpected character after quoted CSV field")
         if (char == separator) {
-            codec_delimited_finish_field(row, column++, field)
+            codec_delimited_field[row, column++] = field
             field = ""
             after_quote = 0
         } else if (char == "\n" || char == "\r") {
             if (char == "\r" && next_char == "\n") i++
-            codec_delimited_finish_field(row, column, field)
+            codec_delimited_field[row, column] = field
             codec_delimited_columns[row] = column
             rows = row++
             column = 1
@@ -379,6 +374,12 @@ function codec_delimited_decode(value, separator,    row, column, field, quoted,
     return root
 }
 
+function codec_toml_quote_run(source, position, quote,    count) {
+    count = 3
+    while (count < 5 && substr(source, position + count, 1) == quote) count++
+    return count
+}
+
 function codec_strip_comment(value, marker,    result, i, char, quote, escaped, triple, next_three, quote_count) {
     result = ""
     quote = ""
@@ -387,8 +388,7 @@ function codec_strip_comment(value, marker,    result, i, char, quote, escaped, 
         next_three = substr(value, i, 3)
         if (quote != "") {
             if (triple && next_three == quote quote quote) {
-                quote_count = 3
-                while (quote_count < 5 && substr(value, i + quote_count, 1) == quote) quote_count++
+                quote_count = codec_toml_quote_run(value, i, quote)
                 result = result substr(value, i, quote_count)
                 i += quote_count - 1
                 quote = ""
@@ -426,8 +426,7 @@ function codec_toml_complete(value,    i, char, next_three, quote, triple, escap
         if (quote != "") {
             if (triple) {
                 if (next_three == quote quote quote) {
-                    quote_count = 3
-                    while (quote_count < 5 && substr(value, i + quote_count, 1) == quote) quote_count++
+                    quote_count = codec_toml_quote_run(value, i, quote)
                     quote = ""
                     triple = 0
                     i += quote_count - 1
@@ -459,7 +458,7 @@ function codec_toml_complete(value,    i, char, next_three, quote, triple, escap
     return quote == "" && brackets == 0 && braces == 0
 }
 
-function codec_toml_next_statement(    newline, line, clean, statement, separator, complete) {
+function codec_toml_next_statement(    newline, line, statement, separator, complete) {
     statement = ""
     separator = ""
     while (codec_toml_remaining != "") {
@@ -472,13 +471,12 @@ function codec_toml_next_statement(    newline, line, clean, statement, separato
             codec_toml_remaining = ""
         }
         sub(/\r$/, "", line)
-        # Only strip comments once the whole statement is understood.  A # in a
-        # multiline string is data, and line-at-a-time stripping loses that fact.
-        clean = line
-        if (statement == "" && trim(clean) == "") continue
-        statement = statement separator clean
+        if (statement == "" && trim(line) == "") continue
+        statement = statement separator line
         separator = "\n"
         if (codec_toml_complete(statement)) {
+            # Only strip comments once the whole statement is understood.  A # in a
+            # multiline string is data, and line-at-a-time stripping loses that fact.
             complete = trim(codec_strip_comment(statement, "#"))
             if (complete != "") return complete
             statement = ""
@@ -512,8 +510,7 @@ function codec_toml_inline_has_newline(value, start,    i, char, next_three, quo
         next_three = substr(value, i, 3)
         if (quote != "") {
             if (triple && next_three == quote quote quote) {
-                quote_count = 3
-                while (quote_count < 5 && substr(value, i + quote_count, 1) == quote) quote_count++
+                quote_count = codec_toml_quote_run(value, i, quote)
                 quote = ""
                 triple = 0
                 i += quote_count - 1
@@ -540,7 +537,7 @@ function codec_toml_skip_space() {
     while (codec_toml_position <= length(codec_toml_source) && substr(codec_toml_source, codec_toml_position, 1) ~ /[ \t\r\n]/) codec_toml_position++
 }
 
-function codec_toml_hex_value(char) {
+function codec_hex_value(char) {
     char = toupper(char)
     return char ~ /[0-9]/ ? char + 0 : index("ABCDEF", char) + 9
 }
@@ -552,8 +549,7 @@ function codec_toml_string(quote, triple,    result, char, escaped, digits, code
     else if (triple && substr(codec_toml_source, codec_toml_position, 1) == "\n") codec_toml_position++
     while (codec_toml_position <= length(codec_toml_source)) {
         if (triple && substr(codec_toml_source, codec_toml_position, 3) == quote quote quote) {
-            quote_count = 3
-            while (quote_count < 5 && substr(codec_toml_source, codec_toml_position + quote_count, 1) == quote) quote_count++
+            quote_count = codec_toml_quote_run(codec_toml_source, codec_toml_position, quote)
             extra = quote_count - 3
             while (extra > 0) {
                 result = result quote
@@ -593,7 +589,7 @@ function codec_toml_string(quote, triple,    result, char, escaped, digits, code
             digits = substr(codec_toml_source, codec_toml_position, count)
             if (length(digits) != count || digits !~ /^[0-9A-Fa-f]+$/) fail("invalid TOML Unicode escape")
             codepoint = 0
-            for (escaped = 1; escaped <= count; escaped++) codepoint = codepoint * 16 + codec_toml_hex_value(substr(digits, escaped, 1))
+            for (escaped = 1; escaped <= count; escaped++) codepoint = codepoint * 16 + codec_hex_value(substr(digits, escaped, 1))
             if (codepoint > 1114111 || (codepoint >= 55296 && codepoint <= 57343)) fail("invalid TOML Unicode code point")
             result = result (codepoint == 0 ? codec_toml_nul_marker : unicode_utf8(codepoint))
             codec_toml_position += count
@@ -602,7 +598,7 @@ function codec_toml_string(quote, triple,    result, char, escaped, digits, code
     fail("unterminated TOML string")
 }
 
-function codec_toml_key_parts(value, parts,    position, count, char, quote, start, key, saved_source, saved_position) {
+function codec_toml_key_parts(value, parts,    position, count, char, start, key, saved_source, saved_position) {
     position = 1
     count = 0
     while (position <= length(value)) {
@@ -657,7 +653,7 @@ function codec_toml_date_valid(value,    year, month, day, days, leap) {
     return day <= days
 }
 
-function codec_toml_time_valid(value, offset,    core, fraction, hour, minute, second, sign_at, offset_hour, offset_minute) {
+function codec_toml_time_valid(value,    offset, core, hour, minute, second, sign_at, offset_hour, offset_minute) {
     core = value
     offset = ""
     if (substr(core, length(core), 1) ~ /[Zz]/) {
@@ -684,7 +680,7 @@ function codec_toml_time_valid(value, offset,    core, fraction, hour, minute, s
     return hour <= 23 && minute <= 59 && second <= 60
 }
 
-function codec_toml_datetime(value,    date, time, separator, node, tagged) {
+function codec_toml_datetime(value,    date, time, node, tagged) {
     codec_toml_datetime_tag = ""
     if (length(value) == 10 && codec_toml_date_valid(value)) codec_toml_datetime_tag = "date-local"
     else if (substr(value, 3, 1) == ":" && codec_toml_time_valid(value)) codec_toml_datetime_tag = "time-local"
@@ -847,7 +843,7 @@ function codec_toml_value(    char, triple, node, key_text, key_count, key_parts
     fail("invalid TOML value: " token)
 }
 
-function codec_toml_decode(value,    root, current, statement, body, array_table, count, parts, equals, key_text, child, i, byte) {
+function codec_toml_decode(value,    root, current, statement, body, count, parts, equals, key_text, child, i, byte) {
     if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded TOML size limit exceeded (max " max_input_bytes " bytes)")
     for (i = 1; i <= length(value); i++) {
         byte = codec_byte(substr(value, i, 1))
@@ -861,13 +857,11 @@ function codec_toml_decode(value,    root, current, statement, body, array_table
     while ((statement = codec_toml_next_statement()) != "") {
         if (substr(statement, 1, 2) == "[[" && substr(statement, length(statement) - 1) == "]]" ) {
             if (index(statement, "\n")) fail("TOML table headers must stay on one line")
-            array_table = 1
             body = trim(substr(statement, 3, length(statement) - 4))
             count = codec_toml_key_parts(body, parts)
             current = codec_toml_assign_path(root, parts, count, 0, 1)
         } else if (substr(statement, 1, 1) == "[" && substr(statement, length(statement), 1) == "]") {
             if (index(statement, "\n")) fail("TOML table headers must stay on one line")
-            array_table = 0
             body = trim(substr(statement, 2, length(statement) - 2))
             count = codec_toml_key_parts(body, parts)
             current = codec_toml_assign_path(root, parts, count, 0, 0)
@@ -892,17 +886,11 @@ function codec_toml_key(value) {
     return value ~ /^[A-Za-z0-9_-]+$/ ? value : json_quote(value)
 }
 
-function codec_toml_escape(value,    result) {
-    result = json_escape(value)
-    gsub(/\//, "/", result)
-    return result
-}
-
 function codec_toml_inline(node,    resolved, result, i, key) {
     resolved = resolve_alias(node)
     if (node_kind[resolved] == "scalar") {
         if (substr(node_tag[resolved], 1, 6) == "!toml/") return node_value[resolved]
-        if (node_type[resolved] == "string") return "\"" codec_toml_escape(node_value[resolved]) "\""
+        if (node_type[resolved] == "string") return "\"" json_escape(node_value[resolved]) "\""
         if (node_type[resolved] == "null") fail("TOML has no null value")
         return node_value[resolved]
     }
@@ -926,7 +914,7 @@ function codec_toml_array_tables(node,    resolved, i) {
     return 1
 }
 
-function codec_toml_emit_table(node, path, header,    resolved, result, i, key, child, nested, child_path, j) {
+function codec_toml_emit_table(node, path, header,    resolved, result, i, key, child, child_path, j) {
     resolved = resolve_alias(node)
     result = header == "" ? "" : header "\n"
     for (i = 1; i <= mapping_count[resolved]; i++) {
@@ -1063,7 +1051,7 @@ function codec_ini_emit(node, path,    resolved, result, i, key, child, child_pa
             nested = nested (nested == "" ? "" : "\n") codec_ini_emit(child, child_path)
         } else {
             if (node_kind[child] != "scalar") fail("INI encoding supports scalar values and nested sections")
-            result = result key " = \"" codec_toml_escape(expression_to_string(child)) "\"\n"
+            result = result key " = \"" json_escape(expression_to_string(child)) "\"\n"
         }
     }
     if (nested != "") result = result (result == "" ? "" : "\n") nested
@@ -1121,7 +1109,7 @@ function codec_xml_entity(value,    result, i, semi, entity, codepoint, j, digit
             if (entity == "" || (base == 16 && entity !~ /^[0-9A-Fa-f]+$/) || (base == 10 && entity !~ /^[0-9]+$/)) fail("invalid XML character reference")
             codepoint = 0
             for (j = 1; j <= length(entity); j++) {
-                digit = codec_toml_hex_value(substr(entity, j, 1))
+                digit = codec_hex_value(substr(entity, j, 1))
                 codepoint = codepoint * base + digit
             }
             if (!codec_xml_codepoint_valid(codepoint)) fail("invalid XML character reference")
@@ -1427,7 +1415,7 @@ function codec_json_value(    char, node, key, value, start, number) {
     return expression_scalar(number, (number ~ /[.eE]/ ? "float" : "int"))
 }
 
-function expression_parse_json_text(value,    node) {
+function codec_json_decode(value,    node) {
     if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded JSON size limit exceeded (max " max_input_bytes " bytes)")
     codec_json_source = value
     codec_json_position = 1
@@ -1477,7 +1465,7 @@ function codec_yaml_process_line(raw, source_line,    clean, next_char) {
     process_line(raw, source_line)
 }
 
-function expression_parse_yaml_text(value,    saved_document_index, saved_file_offset, saved_file_index, saved_filename, saved_combined, saved_inplace, embedded_document, source_base, line, next_newline, source_line, root, node, start_node, last_document, anchor_index, key) {
+function codec_yaml_decode(value,    saved_document_index, saved_file_offset, saved_file_index, saved_filename, saved_combined, saved_inplace, embedded_document, source_base, line, next_newline, source_line, root, node, start_node, last_document, anchor_index, key) {
     if (max_input_bytes > 0 && length(value) > max_input_bytes) fail("embedded YAML size limit exceeded (max " max_input_bytes " bytes)")
     saved_document_index = document_index
     saved_file_offset = file_document_offset
@@ -1581,7 +1569,7 @@ function local_file_read(path,    line, result, status, bytes, separator) {
     return result
 }
 
-function expression_read_file(path) {
+function codec_read_file(path) {
     if (disable_file_ops) fail("file operations are disabled")
     return local_file_read(path)
 }

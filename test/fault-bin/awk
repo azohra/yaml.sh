@@ -1,6 +1,7 @@
 #!/bin/sh
 
-YSH_AWK_BINARY=${YSH_REAL_AWK:-/usr/bin/awk}
+: "${YSH_REAL_AWK:?YSH_REAL_AWK is required}"
+YSH_AWK_BINARY=$YSH_REAL_AWK
 
 if [ ! -x "$YSH_AWK_BINARY" ]; then
     printf '%s\n' 'fault wrapper could not find the real awk' >&2

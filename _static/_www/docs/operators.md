@@ -26,7 +26,7 @@ Equality compares scalar values. Mappings and sequences are not structurally equ
 | Construct | arrays, objects, computed object keys |
 | Assign | `=`, `\|=`, `+=`, `-=`, `*=`, `/=`, `%=` |
 | Delete | `del`, `delpaths` |
-| Paths | `setpath`, `delpaths` |
+| Paths | `setpath` |
 | Scoped update | `with(PATH; UPDATE)` |
 | Arithmetic | `+`, `-`, `*`, `/`, `%` |
 | Merge mappings | `*`, plus `*+`, `*d`, `*?`, and `*n` policies |

@@ -184,7 +184,7 @@ function presentation_track_comment(node, property, as_key, value,    source, st
         presentation_queue_comment_before(line, value, indent)
         return 1
     }
-    if (property == "foot_comment" || (as_key && property == "foot_comment")) {
+    if (property == "foot_comment") {
         line = presentation_span_end(source)
         presentation_queue_comment_after(line, value, indent)
         return 1
@@ -227,7 +227,7 @@ function presentation_track_owned_span(node,    line, end, i) {
     return 1
 }
 
-function presentation_track_sequence_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, lower, start, previous_end) {
+function presentation_track_sequence_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, previous_end) {
     if (node_kind[target] != "sequence" || node_kind[source] != "sequence" ||
         sequence_count[target] == 0 || sequence_count[target] != sequence_count[source]) {
         return 0
@@ -245,16 +245,13 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
     }
 
     serial = ++presentation_reorder_serial
-    lower = header + 1
     previous_end = header
     for (i = 1; i <= sequence_count[target]; i++) {
         child = sequence_child[target, i]
         if (node_line[child] <= header) {
             return 0
         }
-        lower = previous_end + 1
-        start = presentation_attached_start(child, lower)
-        presentation_original_start[serial, child] = start
+        presentation_original_start[serial, child] = presentation_attached_start(child, previous_end + 1)
         previous_end = presentation_span_end(child)
     }
     target_end = presentation_span_end(target)
@@ -264,7 +261,7 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
         found = 0
         for (j = 1; j <= sequence_count[target]; j++) {
             if (sequence_child[target, j] == origin && !(serial SUBSEP origin in presentation_reorder_seen)) {
-                found = 1
+                found = j
                 presentation_reorder_seen[serial, origin] = 1
                 break
             }
@@ -273,15 +270,10 @@ function presentation_track_sequence_reorder(target, source,    parent, header, 
             return 0
         }
         presentation_reorder_start[header, i] = presentation_original_start[serial, origin]
-        for (j = 1; j <= sequence_count[target]; j++) {
-            if (sequence_child[target, j] == origin) {
-                if (j < sequence_count[target]) {
-                    presentation_reorder_end[header, i] = presentation_original_start[serial, sequence_child[target, j + 1]] - 1
-                } else {
-                    presentation_reorder_end[header, i] = target_end
-                }
-                break
-            }
+        if (found < sequence_count[target]) {
+            presentation_reorder_end[header, i] = presentation_original_start[serial, sequence_child[target, found + 1]] - 1
+        } else {
+            presentation_reorder_end[header, i] = target_end
         }
     }
     presentation_reorder_count[header] = sequence_count[source]
@@ -332,7 +324,7 @@ function presentation_track_sequence_append(target, source,    parent, header, f
     return 1
 }
 
-function presentation_track_mapping_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, lower, start, previous_end, key) {
+function presentation_track_mapping_reorder(target, source,    parent, header, raw, text, target_end, serial, i, j, child, origin, found, previous_end, key) {
     if (node_kind[target] != "mapping" || node_kind[source] != "mapping" ||
         mapping_count[target] == 0 || mapping_count[target] != mapping_count[source]) {
         return 0
@@ -350,16 +342,13 @@ function presentation_track_mapping_reorder(target, source,    parent, header, r
     }
 
     serial = ++presentation_reorder_serial
-    lower = header + 1
     previous_end = header
     for (i = 1; i <= mapping_count[target]; i++) {
         child = mapping_child[target, i]
         if (node_line[child] <= header) {
             return 0
         }
-        lower = previous_end + 1
-        start = presentation_attached_start(child, lower)
-        presentation_original_start[serial, child] = start
+        presentation_original_start[serial, child] = presentation_attached_start(child, previous_end + 1)
         previous_end = presentation_span_end(child)
     }
     target_end = presentation_span_end(target)

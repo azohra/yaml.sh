@@ -1,6 +1,6 @@
 # Migrate from v0.x
 
-Version 1 intentionally breaks the old CLI. The public transpiled representation and chainable query operations were the architectural constraint preventing YAML.sh from preserving real YAML structure.
+Version 1 intentionally breaks the old CLI. v0.x transpiled YAML into a flat text representation, which prevented real structure, types, and comment-preserving edits.
 
 ## File queries
 

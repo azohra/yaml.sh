@@ -129,9 +129,7 @@ function yaml_properties(node,    result, tag) {
     if (tag != "") {
         if (tag ~ /^tag:yaml.org,2002:/) {
             tag = "!!" substr(tag, length("tag:yaml.org,2002:") + 1)
-        } else if (substr(tag, 1, 1) == "!") {
-            tag = tag
-        } else {
+        } else if (substr(tag, 1, 1) != "!") {
             tag = "!<" tag ">"
         }
         result = tag

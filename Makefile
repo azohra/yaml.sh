@@ -1,4 +1,3 @@
-BUILDERS := $(wildcard build/*)
 AWK_MODULES := $(sort $(wildcard src/awk/*.awk))
 INSTALL_DIR=/usr/local/bin
 
@@ -6,14 +5,14 @@ INSTALL_DIR=/usr/local/bin
 
 all: ysh lint test docs-check
 
-ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile $(BUILDERS)
+ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile build/shbuilder.awk
 	@echo "👷 Building"
-	@awk -v awk_modules="$(AWK_MODULES)" -f build/shbuilder.awk src/ysh.sh > ysh
+	@awk -v awk_modules="$(AWK_MODULES)" -v diff_module=src/diff.awk -f build/shbuilder.awk src/ysh.sh > ysh
 	@chmod 755 ysh
 
 lint: ysh
 	@echo "👖 Linting"
-	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/test.sh test/workflows.sh test/public-contract.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/fault-bin/mv bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/guidance.sh test/test.sh test/workflows.sh test/public-contract.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/fault-bin/mv test/fault-bin/awk bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"
@@ -25,6 +24,7 @@ test: ysh
 docs-check: ysh
 	@echo "📚 Checking static documentation"
 	@./test/docs.sh
+	@./test/guidance.sh
 	@./test/operator-manifest.sh
 
 operator-manifest: ysh

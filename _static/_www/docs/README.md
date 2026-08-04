@@ -21,7 +21,7 @@ ysh --schema settings.schema.json '.' settings.yml
 
 - **Query and transform.** Use paths, pipes, filters, reducers, construction, and updates across files and YAML documents.
 - **Edit carefully.** Preview changes with `--check` or `--diff`; use `--preserve-only` when comments and formatting must stay put.
-- **Validate, patch, and convert.** Apply JSON Schema, JSON Patch, and Merge Patch, or move between YAML, JSON, TOML, INI, XML, properties, CSV, and TSV.
+- **Validate, patch, and convert.** Apply JSON Schema, JSON Patch, and Merge Patch, or move between YAML, JSON, TOML, INI, and XML; expression codecs cover properties, CSV, and TSV.
 - **Inspect strange input.** View types, source locations, parser events, an AST, or an explanation of an edit.
 
 The released `ysh` contains the complete shell launcher and AWK engine. Copy one file, read it, and run it without another language runtime.

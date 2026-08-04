@@ -1,4 +1,4 @@
-function expression_evaluate_collections(kind, expression, input,    output, middle, left_stream, right_stream, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, start_index, end_index, size, interpolation, partial_count, next_count, partial, stage, mutation_path, mutation_kind, was_missing, input_target, path_stream, value_stream, path_node, path_serial, target_count, property_expression, property) {
+function expression_evaluate_collections(kind, expression, input,    output, middle, single, node, resolved, child, i, j, collection, key, predicate, matched, argument_stream, argument, result_node) {
     output = expression_stream_new()
     if (kind == "map" || kind == "map_values") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
@@ -320,11 +320,6 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
             expression_stream_push(output, expression_boolean(matched))
         }
         return output
-    }
-    if (kind == "upcase" || kind == "downcase" || kind == "trim" || kind == "to_string" ||
-        kind == "regex_test" || kind == "regex_sub" || kind == "contains" || kind == "startswith" ||
-        kind == "endswith" || kind == "split" || kind == "join") {
-        return expression_evaluate_string(kind, expression, input)
     }
     if (kind == "length" || kind == "keys" || kind == "kind" || kind == "type" || kind == "has") {
         for (i = 1; i <= expression_stream_count[input]; i++) {

@@ -111,7 +111,7 @@ function patch_sequence_insert(parent, index_value, value,    replacement, i) {
     return expression_last_replace_changed
 }
 
-function patch_add(root, pointer, value,    target, parent, placeholder, changed) {
+function patch_add(root, pointer, value,    target, parent, placeholder) {
     target = patch_pointer_find(root, pointer, 1)
     parent = patch_pointer_parent
     if (!parent) {
@@ -365,7 +365,7 @@ function schema_trial(instance, schema, instance_path, schema_path, root,    err
     return sequence_count[errors] == 0
 }
 
-function schema_validate(instance, schema, errors, instance_path, schema_path, root,    resolved_schema, resolved_instance, valid, keyword, type_node, i, j, child, collection, key, property_schema, instance_child, required, matched, count, trial, minimum, maximum, number, size, pattern, properties, pattern_properties, additional, covered, item_start, contains_count, min_contains, max_contains, ref, referenced, active_key, dependent, dependency, name_node, name_schema, conditional, numeric_text) {
+function schema_validate(instance, schema, errors, instance_path, schema_path, root,    resolved_schema, resolved_instance, valid, keyword, type_node, i, j, child, collection, key, property_schema, instance_child, required, matched, count, keys, divisor, quotient, number, size, pattern, properties, pattern_properties, additional, covered, item_start, contains_count, min_contains, max_contains, ref, referenced, active_key, dependent, dependency, name_node, name_schema, conditional, numeric_text) {
     if (++schema_validation_depth > max_depth) fail("JSON Schema validation depth limit exceeded (max " max_depth ")")
     resolved_schema = resolve_alias(schema)
     resolved_instance = resolve_alias(instance)
@@ -514,10 +514,10 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
                 }
             }
             if (pattern_properties) {
-                trial = ++collection_serial
-                collect_mapping_keys(resolve_alias(pattern_properties), trial)
-                for (j = 1; j <= collection_count[trial]; j++) {
-                    pattern = collection_key[trial, j]
+                keys = ++collection_serial
+                collect_mapping_keys(resolve_alias(pattern_properties), keys)
+                for (j = 1; j <= collection_count[keys]; j++) {
+                    pattern = collection_key[keys, j]
                     if (key ~ pattern) {
                         covered = 1
                         if (!schema_validate(instance_child, mapping_lookup(resolve_alias(pattern_properties), pattern), errors, instance_path "/" patch_pointer_encode(key), schema_path "/patternProperties/" patch_pointer_encode(pattern), root)) valid = 0
@@ -538,10 +538,10 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
         if (dependent) {
             dependent = resolve_alias(dependent)
             if (node_kind[dependent] != "mapping") fail("JSON Schema dependentRequired must be an object")
-            trial = ++collection_serial
-            collect_mapping_keys(dependent, trial)
-            for (i = 1; i <= collection_count[trial]; i++) {
-                key = collection_key[trial, i]
+            keys = ++collection_serial
+            collect_mapping_keys(dependent, keys)
+            for (i = 1; i <= collection_count[keys]; i++) {
+                key = collection_key[keys, i]
                 if (!mapping_lookup(resolved_instance, key)) continue
                 dependency = resolve_alias(mapping_lookup(dependent, key))
                 if (node_kind[dependency] != "sequence") fail("JSON Schema dependentRequired entries must be arrays")
@@ -559,10 +559,10 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
         if (dependent) {
             dependent = resolve_alias(dependent)
             if (node_kind[dependent] != "mapping") fail("JSON Schema dependentSchemas must be an object")
-            trial = ++collection_serial
-            collect_mapping_keys(dependent, trial)
-            for (i = 1; i <= collection_count[trial]; i++) {
-                key = collection_key[trial, i]
+            keys = ++collection_serial
+            collect_mapping_keys(dependent, keys)
+            for (i = 1; i <= collection_count[keys]; i++) {
+                key = collection_key[keys, i]
                 if (mapping_lookup(resolved_instance, key) &&
                     !schema_validate(resolved_instance, mapping_lookup(dependent, key), errors, instance_path, schema_path "/dependentSchemas/" patch_pointer_encode(key), root)) valid = 0
             }
@@ -666,12 +666,13 @@ function schema_validate(instance, schema, errors, instance_path, schema_path, r
         }
         child = mapping_lookup(resolved_schema, "multipleOf")
         if (child) {
-            minimum = schema_number(child, "multipleOf")
-            if (minimum <= 0) fail("JSON Schema multipleOf must be greater than zero")
-            maximum = number / minimum
-            if (maximum < 0) maximum = -maximum
-            numeric_text = tolower(sprintf("%.15g", maximum))
-            if (numeric_text ~ /inf|nan/ || maximum - int(maximum + 0.000000000001) > 0.000000001) {
+            divisor = schema_number(child, "multipleOf")
+            if (divisor <= 0) fail("JSON Schema multipleOf must be greater than zero")
+            quotient = number / divisor
+            if (quotient < 0) quotient = -quotient
+            numeric_text = tolower(sprintf("%.15g", quotient))
+            # Integer check with tolerances for accumulated floating-point error.
+            if (numeric_text ~ /inf|nan/ || quotient - int(quotient + 0.000000000001) > 0.000000001) {
                 schema_add_error(errors, instance_path, schema_path "/multipleOf", "multipleOf", "number is not a multiple of the required value")
                 valid = 0
             }

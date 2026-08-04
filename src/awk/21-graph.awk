@@ -24,7 +24,16 @@ function new_node(kind, source_line, value, value_type, tag,    node) {
     return node
 }
 
-function bind_anchor(name, node, source_line,    key, anchor_index) {
+function set_document_root(root) {
+    document_root[document_index] = root
+    document_file_index[document_index] = current_input_file_index
+    document_filename[document_index] = current_input_filename
+    document_has_content[document_index] = 1
+    parser_record_content(root, 0)
+    return root
+}
+
+function bind_anchor(name, node,    key, anchor_index) {
     if (name == "") {
         return
     }
@@ -52,31 +61,18 @@ function ensure_container(node, kind, source_line) {
     return node
 }
 
-function ensure_root(kind, source_line,    root) {
+function ensure_root(kind, source_line) {
     if (!(document_index in document_root)) {
-        root = new_node(kind, source_line, "", "", "")
-        document_root[document_index] = root
-        document_file_index[document_index] = current_input_file_index
-        document_filename[document_index] = current_input_filename
-        document_has_content[document_index] = 1
-        parser_record_content(root, 0)
-        return root
+        return set_document_root(new_node(kind, source_line, "", "", ""))
     }
-    root = (document_index in document_root) ? document_root[document_index] : 0
-    return ensure_container(root, kind, source_line)
+    return ensure_container(document_root[document_index], kind, source_line)
 }
 
-function create_empty_document(source_line,    root) {
+function create_empty_document(source_line) {
     if (document_index in document_root) {
         return document_root[document_index]
     }
-    root = new_node("scalar", source_line, "", "null", "")
-    document_root[document_index] = root
-    document_file_index[document_index] = current_input_file_index
-    document_filename[document_index] = current_input_filename
-    document_has_content[document_index] = 1
-    parser_record_content(root, 0)
-    return root
+    return set_document_root(new_node("scalar", source_line, "", "null", ""))
 }
 
 function add_mapping(parent, key, child, source_line, is_merge,    seen_key, entry, depth) {

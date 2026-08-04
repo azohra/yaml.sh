@@ -8,14 +8,11 @@ function finalize_nodes(    node) {
     }
 }
 
-function resolve_alias(node,    serial, key) {
-    serial = ++resolution_serial
+function resolve_alias(node,    hops) {
     while (node_kind[node] == "alias") {
-        key = serial SUBSEP node
-        if (key in resolution_seen) {
+        if (++hops > node_count) {
             fail("recursive alias chain at node " node)
         }
-        resolution_seen[key] = 1
         node = alias_target[node]
     }
     return node

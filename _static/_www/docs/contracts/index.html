@@ -22,7 +22,7 @@
       <button class="header-search" type="button" data-search-open aria-label="Search documentation">Search</button>
       <a aria-current="page" href="/docs/">Docs</a>
       <a href="https://github.com/azohra/yaml.sh">GitHub</a>
-      <a class="install" href="/docs/getting-started/">Install <span>v1.17.0</span></a>
+      <a class="install" href="/docs/getting-started/">Install <span>v1.17.1</span></a>
     </nav>
   </header>
   <details class="mobile-docs"><summary>Browse documentation</summary><nav>
@@ -103,7 +103,7 @@
       <p class="nav-foot">One file. <code>/bin/sh</code> + AWK.</p>
     </aside>
     <main id="content" class="doc-content">
-      <div class="eyebrow"><span>Documentation</span><span>v1.17.0</span></div>
+      <div class="eyebrow"><span>Documentation</span><span>v1.17.1</span></div>
       <article>
           <h1 id="validate-patch-convert">Validate, patch &amp; convert</h1>
           <p>Validate a document, apply a standard patch, generate a reviewable change set, or convert configuration formats with the same <code>ysh</code> command.</p>
@@ -127,7 +127,7 @@ ysh -e 'schema_valid(load(&quot;service.schema.json&quot;))' service.yml
 </code></pre>
           </div>
           <p>Each error contains <code>instancePath</code>, <code>schemaPath</code>, <code>keyword</code>, and <code>message</code>. Values are never copied into diagnostics.</p>
-          <p>The JSON Schema 2020-12 profile covers boolean schemas; <code>type</code>, <code>const</code>, and <code>enum</code>; local <code>$ref</code> and <code>$defs</code>; composition and <code>if</code>/<code>then</code>/<code>else</code>; object properties, property names, dependent schemas and keys, patterns, and additional properties; tuple and item validation; array limits; string length and POSIX patterns; and numeric bounds and multiples. Remote and dynamic references are rejected, as are annotation-driven <code>unevaluated*</code> vocabularies.</p>
+          <p>The JSON Schema 2020-12 profile covers the core validation vocabulary: boolean schemas, <code>type</code>/<code>const</code>/<code>enum</code>, local <code>$ref</code> and <code>$defs</code>, composition and <code>if</code>/<code>then</code>/<code>else</code>, object and array shape keywords, string lengths and POSIX patterns, and numeric bounds and multiples. Remote and dynamic references are rejected, as are annotation-driven <code>unevaluated*</code> vocabularies.</p>
           <h2 id="apply-json-patch"><a href="#apply-json-patch">Apply JSON Patch<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>

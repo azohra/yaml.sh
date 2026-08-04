@@ -361,7 +361,18 @@ function expression_compile_interpolation(raw,    expression, segment_start, i, 
     return expression
 }
 
-function expression_parse_primary(    expression, name, step, argument, value, value_type, child, key, key_expression, source, initial, update, variable, slice, start_expression, end_expression) {
+function expression_finish_slice(slice,    end_expression) {
+    expression_lex_next()
+    if (expression_token_type != "right_bracket") {
+        end_expression = expression_parse_stream()
+        expression_child[slice, 2] = end_expression
+        expression_slice_has_end[slice] = 1
+    }
+    expression_expect("right_bracket")
+    return slice
+}
+
+function expression_parse_primary(    expression, name, step, argument, value, value_type, child, key, key_expression, source, initial, update, variable, slice, start_expression) {
     if (expression_token_type == "dot") {
         expression = expression_new("identity", 0, 0, "")
         expression_lex_next()
@@ -517,23 +528,10 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             child = expression_parse_stream()
             expression_expect("right_parenthesis")
             expression = expression_new("setpath", argument, child, "")
-        } else if (name == "delpaths") {
-            expression_expect("left_parenthesis")
-            argument = expression_parse_stream()
-            expression_expect("right_parenthesis")
-            expression = expression_new("delpaths", argument, 0, "")
-        } else if (name == "explode") {
-            expression_expect("left_parenthesis")
-            argument = expression_parse_stream()
-            expression_expect("right_parenthesis")
-            expression = expression_new("explode", argument, 0, "")
-        } else if (name == "error" || name == "eval" || name == "load" || name == "load_str" || name == "load_base64" || name == "load_props" ||
-            name == "pointer" || name == "apply_patch" || name == "merge_patch" || name == "diff_patch") {
-            expression_expect("left_parenthesis")
-            argument = expression_parse_stream()
-            expression_expect("right_parenthesis")
-            expression = expression_new(name, argument, 0, "")
-        } else if (name == "validate" || name == "schema_valid" || name == "schema_errors") {
+        } else if (name == "delpaths" || name == "explode" || name == "error" || name == "eval" ||
+            name == "load" || name == "load_str" || name == "load_base64" || name == "load_props" ||
+            name == "pointer" || name == "apply_patch" || name == "merge_patch" || name == "diff_patch" ||
+            name == "validate" || name == "schema_valid" || name == "schema_errors") {
             expression_expect("left_parenthesis")
             argument = expression_parse_stream()
             expression_expect("right_parenthesis")
@@ -642,15 +640,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
                 expression = expression_new("each", expression, 0, "")
                 expression_lex_next()
             } else if (expression_token_type == "colon") {
-                slice = expression_new("slice", expression, 0, "")
-                expression_lex_next()
-                if (expression_token_type != "right_bracket") {
-                    end_expression = expression_parse_stream()
-                    expression_child[slice, 2] = end_expression
-                    expression_slice_has_end[slice] = 1
-                }
-                expression_expect("right_bracket")
-                expression = slice
+                expression = expression_finish_slice(expression_new("slice", expression, 0, ""))
             } else if (expression_token_type == "number") {
                 value = expression_token_value
                 if (value !~ /^[0-9]+$/) {
@@ -663,14 +653,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
                     slice = expression_new("slice", expression, 0, "")
                     expression_child[slice, 1] = start_expression
                     expression_slice_has_start[slice] = 1
-                    expression_lex_next()
-                    if (expression_token_type != "right_bracket") {
-                        end_expression = expression_parse_stream()
-                        expression_child[slice, 2] = end_expression
-                        expression_slice_has_end[slice] = 1
-                    }
-                    expression_expect("right_bracket")
-                    expression = slice
+                    expression = expression_finish_slice(slice)
                 } else {
                     expression_expect("right_bracket")
                     expression = expression_new("index", expression, 0, value + 0)
@@ -684,14 +667,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
                     slice = expression_new("slice", expression, 0, "")
                     expression_child[slice, 1] = start_expression
                     expression_slice_has_start[slice] = 1
-                    expression_lex_next()
-                    if (expression_token_type != "right_bracket") {
-                        end_expression = expression_parse_stream()
-                        expression_child[slice, 2] = end_expression
-                        expression_slice_has_end[slice] = 1
-                    }
-                    expression_expect("right_bracket")
-                    expression = slice
+                    expression = expression_finish_slice(slice)
                 } else {
                     expression_expect("right_bracket")
                     expression = expression_new("key", expression, 0, value)
@@ -702,14 +678,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
                     slice = expression_new("slice", expression, 0, "")
                     expression_child[slice, 1] = step
                     expression_slice_has_start[slice] = 1
-                    expression_lex_next()
-                    if (expression_token_type != "right_bracket") {
-                        end_expression = expression_parse_stream()
-                        expression_child[slice, 2] = end_expression
-                        expression_slice_has_end[slice] = 1
-                    }
-                    expression_expect("right_bracket")
-                    expression = slice
+                    expression = expression_finish_slice(slice)
                 } else {
                     expression_expect("right_bracket")
                     expression = expression_new("dynamic", expression, step, "")
@@ -734,7 +703,7 @@ function expression_parse_primary(    expression, name, step, argument, value, v
     return expression
 }
 
-function expression_path(node,    result, depth, current, edge, i, value) {
+function expression_path(node,    result, depth, current, edge, i) {
     result = new_node("sequence", 0, "", "", "")
     depth = 0
     current = node

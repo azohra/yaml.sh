@@ -4,6 +4,28 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.17.1] - 2026-08-03
+
+Version 1.17.1 is a refinement round: dead code, duplication, and stale claims are removed without changing documented v1 behavior.
+
+### Fixed
+
+- The README object-construction example now quotes its array values, and the alternate-directory install command shows the full pipe form.
+- Documentation no longer conflates CLI input/output formats with expression-only codecs, and the operator quick reference no longer lists `delpaths` twice.
+
+### Maintenance
+
+- Parser, codec, evaluator, and CLI sources drop unused variables, unreachable branches, a no-op TOML escape wrapper, and the flow-piece save/restore apparatus in favor of per-call locals; repeated slice, quote-run, document-root, and explain-mutation logic moved into shared helpers.
+- Codec entry points follow one `codec_` naming convention, and the unified-diff renderer drops its duplicate line-number arrays.
+- CI lints the docs tooling and the AWK fault shim, verifies the committed `ysh` matches a fresh build from `src/`, and conformance gates honor `YSH_BINARY` like their siblings.
+- Test summaries are computed from what actually ran instead of hard-coded strings, and fuzz failure bundles only include edit artifacts for the mutation property.
+- Contributor guidance is consolidated: `AGENTS.md` defers to `DESIGN.md` and `CONTRIBUTING.md` instead of restating them, `CONTRIBUTING.md` gains a subsystem gate table and a generated-file map, `VERSIONING.md` records the exact release touchpoints, a thin `CLAUDE.md` points coding agents at the same guidance, and the development guide documents corpus conventions and portable AWK and shell idioms.
+- A guidance gate in `make docs-check` verifies that the make targets, repository paths, local links, version literals, changelog compare links, and provenance claims named in the guidance documents still match the repository, so the guidance cannot silently rot.
+
+### Compatibility
+
+- No documented CLI, query, output, or YAML interpretation changes. The rebuilt artifact is behaviorally identical; all release gates were rerun.
+
 ## [1.17.0] - 2026-08-03
 
 Version 1.17 makes YAML.sh easier to understand, restrict, and maintain without changing documented v1 behavior.
@@ -484,6 +506,15 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.17.1]: https://github.com/azohra/yaml.sh/compare/v1.17.0...v1.17.1
+[1.17.0]: https://github.com/azohra/yaml.sh/compare/v1.16.0...v1.17.0
+[1.16.0]: https://github.com/azohra/yaml.sh/compare/v1.15.0...v1.16.0
+[1.15.0]: https://github.com/azohra/yaml.sh/compare/v1.14.0...v1.15.0
+[1.14.0]: https://github.com/azohra/yaml.sh/compare/v1.13.0...v1.14.0
+[1.13.0]: https://github.com/azohra/yaml.sh/compare/v1.12.0...v1.13.0
+[1.12.0]: https://github.com/azohra/yaml.sh/compare/v1.11.0...v1.12.0
+[1.11.0]: https://github.com/azohra/yaml.sh/compare/v1.10.0...v1.11.0
+[1.10.0]: https://github.com/azohra/yaml.sh/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/azohra/yaml.sh/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/azohra/yaml.sh/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/azohra/yaml.sh/compare/v1.6.0...v1.7.0

@@ -1,21 +1,21 @@
 # Working on YAML.sh
 
-Read [DESIGN.md](DESIGN.md) before changing behavior. It is the canonical
-product and architecture guidance for every contributor.
+Read [DESIGN.md](DESIGN.md) first. It owns the product premise, durable
+constraints, decision filter, trust model, evidence standard, and
+documentation voice. [CONTRIBUTING.md](CONTRIBUTING.md) owns the workflow,
+the subsystem gate table, and the generated-file map. This file adds only
+what an automated contributor needs operationally; do not restate the
+canonical documents here.
 
-## Non-negotiable constraints
+## Ground rules
 
-- Keep the released `ysh` artifact to one readable text file.
-- Keep runtime code compatible with POSIX `/bin/sh` and the AWK implementations
-  covered by the portability tests.
-- Edit readable sources; never edit generated `ysh` or generated docs directly.
-- Preserve documented v1 behavior unless a necessary break is explicitly
-  accepted and prepared as a major release candidate.
-- Do not add yq parity for its own sake. Start from a concrete YAML job or a
-  coherent language primitive.
-- Treat queries as programs and YAML as data. Do not add system execution,
-  networking, plugins, or application tag construction.
-- Make unsupported neighboring syntax fail closed.
+- Edit readable sources under `src/`; never edit the generated `ysh` or
+  generated docs. The generated-file map is in `CONTRIBUTING.md`.
+- Preserve documented v1 behavior. Only a necessary, prepared break in the
+  documented contract selects a major release ([VERSIONING.md](VERSIONING.md)).
+- Unsupported neighboring syntax fails closed. Queries are programs and YAML
+  is data; do not add system execution, networking, plugins, or application
+  tag construction.
 - Attach exact evidence to every public claim. Generated case counts are not
   capability counts.
 
@@ -23,22 +23,23 @@ product and architecture guidance for every contributor.
 
 1. Identify the user job, public-contract impact, and subsystem owner.
 2. Add or update the smallest exact behavioral test.
-3. Change modular source under `src/` and rebuild the standalone artifact.
-4. Run `make all`; use the focused conformance, differential, presentation,
-   adversarial, fault, and scale gates named in `CONTRIBUTING.md` when relevant.
+3. Change modular source under `src/` and run `make all`.
+4. Run the focused gates for the subsystem you touched, using the gate table
+   in `CONTRIBUTING.md`.
 5. Update the canonical documentation and changelog for visible behavior.
 6. Check that claims remain consistent across README, docs, website, security
    policy, and story without duplicating whole explanations.
 
 Refactors must preserve the generated artifact's behavior and compare before
-and after performance on representative workloads. Complexity should move into
-clear subsystem boundaries, not merely into more files.
+and after performance on representative workloads (`make scale`,
+`make benchmark`). Complexity should move into clear subsystem boundaries,
+not merely into more files.
 
-## Documentation
+## Operational notes
 
-Lead with useful work and guarantees. Keep prose terse, coherent, and specific.
-YAML.sh should be the subject; mention yq only for familiar syntax, migration,
-or measured compatibility. Let the strange, joyful constraint provide the fun;
-let concrete behavior prove the tool is serious. The story is durable narrative,
-not release state. Verification and release machinery belong in maintainer
-material, not the product identity.
+- After any `src/` change, `testReleaseArtifactsStayInSync` fails until
+  `make docs` refreshes the installer checksum. That is the expected
+  mid-development state, not a regression.
+- Releases follow the exact touchpoint checklist in `VERSIONING.md`.
+- House idioms for portable AWK and shell, plus known gotchas, are recorded
+  in the [development guide](_static/_www/docs/development.md).

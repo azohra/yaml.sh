@@ -1,7 +1,7 @@
 #!/bin/sh
 
 testVersion() {
-    assertEquals "v1.17.0" "$(./ysh --version)"
+    assertEquals "v1.17.1" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -629,8 +629,9 @@ testInplaceTransactionHandlesEmptyFilesAndSkipsNoOps() {
     : > "$empty_file"
     printf '%s\n' 'name: ready' > "$unchanged_file"
     real_mv=$(command -v mv)
+    real_awk=$(command -v awk)
 
-    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_MV=$real_mv YSH_FAIL_MV_AT=1 YSH_MV_STATE=$state_file \
+    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_AWK=$real_awk YSH_REAL_MV=$real_mv YSH_FAIL_MV_AT=1 YSH_MV_STATE=$state_file \
         ./ysh -i '.name = "ready"' "$empty_file" "$unchanged_file" >/dev/null 2>&1
     assertEquals 0 $?
     assertFalse "no-op transaction must not replace a file" "[ -e \"$state_file\" ]"
@@ -840,8 +841,9 @@ testInplaceTransactionRollsBackCommitFailure() {
     printf '%s\n' 'name: first' > "$first_file"
     printf '%s\n' 'name: second' > "$second_file"
     real_mv=$(command -v mv)
+    real_awk=$(command -v awk)
 
-    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_MV=$real_mv YSH_FAIL_MV_AT=2 YSH_MV_STATE=$state_file \
+    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_AWK=$real_awk YSH_REAL_MV=$real_mv YSH_FAIL_MV_AT=2 YSH_MV_STATE=$state_file \
         ./ysh -i --explain=json '.name = "changed"' "$first_file" "$second_file" >/dev/null 2> "$report_file"
     assertNotEquals 0 $?
     assertEquals 'name: first' "$(cat "$first_file")"
@@ -879,8 +881,9 @@ testInplaceTransactionRefusesCommitDriftAndRollsBack() {
     printf '%s\n' 'name: first' > "$first_file"
     printf '%s\n' 'name: second' > "$second_file"
     real_mv=$(command -v mv)
+    real_awk=$(command -v awk)
 
-    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_MV=$real_mv YSH_MV_STATE=$state_file \
+    PATH="$(pwd)/test/fault-bin:$PATH" YSH_REAL_AWK=$real_awk YSH_REAL_MV=$real_mv YSH_MV_STATE=$state_file \
         YSH_MUTATE_AFTER_MV_AT=1 YSH_MUTATE_FILE=$second_file YSH_MUTATE_CONTENT='name: external' \
         ./ysh -i '.name = "candidate"' "$first_file" "$second_file" >/dev/null 2> "$report_file"
     assertNotEquals 0 $?
@@ -1679,15 +1682,14 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.17.0/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.17.1/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.0"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.1"
     assertContains "$(cat _static/_www/story/index.html)" "One POSIX shell file"
     assertNotContains "$(cat _static/_www/story/index.html)" "story-timeline"
     assertNotContains "$(cat _static/_www/story/index.html)" "releases/tag/"
     assertNotContains "$(cat _static/_www/story/index.html)" "YAML.sh v1.17"
-    assertContains "$(cat _static/_www/index.html)" "css/style.css?v=4"
     assertNotContains "$(cat _static/_www/index.html)" "class=\"cursor\""
     assertNotContains "$(cat _static/_www/index.html)" "A real parser this time"
     assertNotContains "$(cat _static/_www/css/style.css)" "transform: rotate(1.25deg)"

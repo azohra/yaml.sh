@@ -23,7 +23,7 @@ ysh -e 'schema_valid(load("service.schema.json"))' service.yml
 
 Each error contains `instancePath`, `schemaPath`, `keyword`, and `message`. Values are never copied into diagnostics.
 
-The JSON Schema 2020-12 profile covers boolean schemas; `type`, `const`, and `enum`; local `$ref` and `$defs`; composition and `if`/`then`/`else`; object properties, property names, dependent schemas and keys, patterns, and additional properties; tuple and item validation; array limits; string length and POSIX patterns; and numeric bounds and multiples. Remote and dynamic references are rejected, as are annotation-driven `unevaluated*` vocabularies.
+The JSON Schema 2020-12 profile covers the core validation vocabulary: boolean schemas, `type`/`const`/`enum`, local `$ref` and `$defs`, composition and `if`/`then`/`else`, object and array shape keywords, string lengths and POSIX patterns, and numeric bounds and multiples. Remote and dynamic references are rejected, as are annotation-driven `unevaluated*` vocabularies.
 
 ## Apply JSON Patch
 

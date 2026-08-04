@@ -55,13 +55,14 @@ jobs:
                 docs=true
                 ;;
               build/docs.sh|build/docs-*.awk|test/docs.sh)
+                runtime=true
                 docs=true
                 docs_portability=true
                 ;;
-              AGENTS.md|CONTRIBUTING.md|DESIGN.md|README.md|SECURITY.md|VERSIONING.md|CHANGELOG.md|_static/*|build/docbuilder.awk)
+              AGENTS.md|CLAUDE.md|CONTRIBUTING.md|DESIGN.md|README.md|SECURITY.md|VERSIONING.md|CHANGELOG.md|_static/*|build/docbuilder.awk)
                 docs=true
                 ;;
-              src/*|build/*|test/*|bench/*|.shellcheckrc)
+              src/*|build/*|test/*|bench/*)
                 runtime=true
                 ;;
             esac
@@ -134,6 +135,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk shellcheck
       - name: Build and test
         run: make ysh test
+      - name: Verify committed artifact matches source
+        run: git diff --exit-code ysh
       - name: Lint
         if: matrix.os == 'ubuntu-latest'
         run: make lint

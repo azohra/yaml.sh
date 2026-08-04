@@ -502,7 +502,7 @@ function find_mapping_separator(value, require_space,    offset, remainder, spac
     return separator ? offset + separator - 1 : 0
 }
 
-function split_flow(value, output,    count, start, i, char, quote, escaped, braces, brackets, raw, leading) {
+function split_flow(value, output, offsets,    count, start, i, char, quote, escaped, braces, brackets, raw, leading) {
     count = 0
     start = 1
     quote = ""
@@ -544,18 +544,18 @@ function split_flow(value, output,    count, start, i, char, quote, escaped, bra
             raw = substr(value, start, i - start)
             leading = leading_horizontal_width(raw)
             output[++count] = trim(raw)
-            flow_piece_offset[count] = start + leading
+            offsets[count] = start + leading
             start = i + 1
         }
     }
     raw = substr(value, start)
     leading = leading_horizontal_width(raw)
     output[++count] = trim(raw)
-    flow_piece_offset[count] = start + leading
+    offsets[count] = start + leading
     return count
 }
 
-function expand_tag(token,    inner, rest, position, handle, suffix, key) {
+function expand_tag(token,    rest, position, handle, suffix, key) {
     if (token == "") {
         return ""
     }
