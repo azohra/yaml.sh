@@ -140,7 +140,7 @@ _static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
             <pre><code class="language-sh">make docs
 </code></pre>
           </div>
-          <p>Markdown remains the readable source under <code>_static/_www/docs</code>. Portable shell and AWK generate committed HTML at real paths such as <code>/docs/queries/</code>; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run <code>make docs-check</code> to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork.</p>
+          <p>Markdown remains the readable source under <code>_static/_www/docs</code>. Portable shell and AWK generate committed HTML at real paths such as <code>/docs/queries/</code>; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run <code>make docs-check</code> to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs <code>test/guidance.sh</code>, which verifies that the build targets, repository paths, local links, version literals, and provenance claims named in the guidance documents still match the repository.</p>
           <h2 id="add-parser-behavior"><a href="#add-parser-behavior">Add parser behavior<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>For every supported feature:</p>
           <ol>

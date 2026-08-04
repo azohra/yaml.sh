@@ -20,6 +20,7 @@ Version 1.17.1 is a refinement round: dead code, duplication, and stale claims a
 - CI lints the docs tooling and the AWK fault shim, verifies the committed `ysh` matches a fresh build from `src/`, and conformance gates honor `YSH_BINARY` like their siblings.
 - Test summaries are computed from what actually ran instead of hard-coded strings, and fuzz failure bundles only include edit artifacts for the mutation property.
 - Contributor guidance is consolidated: `AGENTS.md` defers to `DESIGN.md` and `CONTRIBUTING.md` instead of restating them, `CONTRIBUTING.md` gains a subsystem gate table and a generated-file map, `VERSIONING.md` records the exact release touchpoints, a thin `CLAUDE.md` points coding agents at the same guidance, and the development guide documents corpus conventions and portable AWK and shell idioms.
+- A guidance gate in `make docs-check` verifies that the make targets, repository paths, local links, version literals, changelog compare links, and provenance claims named in the guidance documents still match the repository, so the guidance cannot silently rot.
 
 ### Compatibility
 

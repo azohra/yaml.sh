@@ -40,7 +40,7 @@ gates assert their own corpus floors and status vocabularies.
 make docs
 ```
 
-Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork.
+Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs `test/guidance.sh`, which verifies that the build targets, repository paths, local links, version literals, and provenance claims named in the guidance documents still match the repository.
 
 ## Add parser behavior
 
