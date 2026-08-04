@@ -34,3 +34,9 @@ Bumping the version touches an exact set:
 3. A dated `CHANGELOG.md` entry plus its compare-link definition at the file tail.
 4. `make docs`, which regenerates the installer checksum, homepage version, and documentation pages.
 5. `make all` and the focused gates for whatever changed.
+
+Release notes carry the voice, not just the facts: the title ends with a
+short per-release quip (never the site tagline), the body opens by showing
+the change — one runnable example beats a paragraph — with one idea per
+bullet, and evidence, changelog, and artifact SHA-256 close in a compact
+footer.
