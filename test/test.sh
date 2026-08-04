@@ -19,7 +19,7 @@ assertYshFails() {
 }
 
 testVersion() {
-    assertEquals "v1.17.1" "$(./ysh --version)"
+    assertEquals "v1.17.2" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -1683,10 +1683,10 @@ testReleaseArtifactsStayInSync() {
         release_sha256=$(shasum -a 256 ysh)
     fi
     release_sha256=${release_sha256%% *}
-    assertContains "$(cat _static/_www/install)" "v1.17.1/ysh"
+    assertContains "$(cat _static/_www/install)" "v1.17.2/ysh"
     assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.1"
+    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.17.2"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
 }
 

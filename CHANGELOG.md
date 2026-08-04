@@ -4,6 +4,28 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.17.2] - 2026-08-03
+
+Version 1.17.2 is a second refinement round: one parser repair, a faster scanner path, honest tooling, and structural cleanups with no documented behavior change.
+
+### Fixed
+
+- Multiline quoted scalars opened behind nested block indicators (`- key: "abc` continued on the next line) now parse to the values Ruby's parser and yq produce instead of failing with "trailing content after quoted scalar". Pinned YAML Test Suite outcomes are unchanged.
+- The docs generator no longer lets a one-row table corrupt the table after it, validates delimiter rows, and fails the build with file:line diagnostics on Markdown outside its supported dialect instead of degrading silently.
+- Docs pages stop claiming `aria-current` on pages they are not, page-turn cards no longer link to themselves, and the homepage tab widget gained the keyboard behavior its ARIA roles promised.
+- The installer checks for curl and a writable destination before downloading, names `YSH_INSTALL_DIR` when it cannot write, and reports success and PATH visibility explicitly.
+
+### Maintenance
+
+- Shared helpers replace repeated engine shapes: key-set collection, sequence/collection requirement checks, stream defaults, schema bound checks, a single-character lexer table (expected-token errors now print the literal), codec and context name tables, and one comment emitter and reorder tracker each.
+- Scratch globals became locals across the runtime; two seen-sets no longer grow for the process lifetime, and a hoisted quote constant removes per-character sprintf calls from scanner loops for a measured 3-6% parse improvement.
+- The behavioral suite runs its scratch files in shunit2's per-run temp directory, converts seventeen error assertions to a shared helper, and moves content tripwires from the release test into the docs gate; the derived yq differential corpus is generated at run time instead of committed with a sync test.
+- Fuzz and presentation matrices name their factors once and compute their summaries; the fuzz seed is validated; failure bundles and cache-key checks tightened.
+
+### Compatibility
+
+- No documented CLI, query, output, or YAML interpretation changes. The parser repair only accepts previously rejected valid YAML.
+
 ## [1.17.1] - 2026-08-03
 
 Version 1.17.1 is a refinement round: dead code, duplication, and stale claims are removed without changing documented v1 behavior.
@@ -506,6 +528,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.17.2]: https://github.com/azohra/yaml.sh/compare/v1.17.1...v1.17.2
 [1.17.1]: https://github.com/azohra/yaml.sh/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/azohra/yaml.sh/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/azohra/yaml.sh/compare/v1.15.0...v1.16.0
