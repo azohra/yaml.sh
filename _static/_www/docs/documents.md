@@ -1,4 +1,4 @@
-# Documents & file edits
+# Editing files & documents
 
 YAML.sh reads YAML streams, edits files without losing unrelated source text, and can prepare several file changes before writing any of them.
 
