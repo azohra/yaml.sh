@@ -15,6 +15,12 @@ function trim(value) {
     return value
 }
 
+function fail(message) {
+    printf "%s:%d: %s\n", FILENAME, FNR, message > "/dev/stderr"
+    failed = 1
+    exit 1
+}
+
 function slugify(value,    slug) {
     slug = tolower(value)
     gsub(/<[^>]+>/, "", slug)
@@ -120,7 +126,16 @@ function table_cells(row, cells,    count, cleaned, cell, ch, i, in_code, key) {
 }
 
 function render_table(    row_count, cell_count, cells, r, c, tag) {
-    if (table_count < 2) return
+    if (table_count < 2) {
+        delete table_line
+        table_count = 0
+        return
+    }
+    if (table_line[2] !~ /^\|[[:space:]:|-]+\|?$/) {
+        printf "%s: invalid table delimiter row: %s\n", FILENAME, table_line[2] > "/dev/stderr"
+        failed = 1
+        exit 1
+    }
     cell_count = table_cells(table_line[1], cells)
     print "          <div class=\"table-wrap" (cell_count >= 4 ? " table-wide" : "") "\"><table>"
     print "            <thead><tr>"
@@ -193,7 +208,7 @@ function print_header() {
     print "    <a class=\"wordmark\" href=\"/\" aria-label=\"YAML.sh home\"><span class=\"mark\" aria-hidden=\"true\">Y</span><span>YAML<em>.sh</em></span></a>"
     print "    <nav aria-label=\"Primary\">"
     print "      <button class=\"header-search\" type=\"button\" data-search-open aria-label=\"Search documentation\">Search</button>"
-    print "      <a aria-current=\"page\" href=\"/docs/\">Docs</a>"
+    print "      <a" (page_slug == "index" ? " aria-current=\"page\"" : "") " href=\"/docs/\">Docs</a>"
     print "      <a href=\"https://github.com/azohra/yaml.sh\">GitHub</a>"
     print "      <a class=\"install\" href=\"/docs/getting-started/\">Install <span>v" esc(version) "</span></a>"
     print "    </nav>"
@@ -232,6 +247,11 @@ BEGIN {
         }
         next
     }
+
+    if (line ~ /^####/) fail("heading deeper than ### is not supported")
+    if (line ~ /^!\[/) fail("image syntax is not supported")
+    if (line ~ /^[[:space:]]+[-*][[:space:]]/) fail("indented list items are not supported")
+    if (line ~ /^---+$/) fail("thematic breaks are not supported")
 
     if (line ~ /^```/) {
         close_blocks()
@@ -314,20 +334,27 @@ BEGIN {
 }
 
 END {
+    if (failed) exit 1
+    if (in_code) {
+        printf "%s: unterminated code fence at end of file\n", FILENAME > "/dev/stderr"
+        exit 1
+    }
     close_blocks()
-    if (in_code) print "</code></pre></div>"
     print "      </article>"
-    print "      <nav class=\"page-turn\" aria-label=\"More documentation\"><a href=\"/docs/recipes/\"><span>Try a real task</span><strong>Open the recipe book →</strong></a><a href=\"/docs/supported_yml/\"><span>Check YAML support</span><strong>See exactly what works →</strong></a></nav>"
+    page_turn = "      <nav class=\"page-turn\" aria-label=\"More documentation\">"
+    if (page_slug != "recipes") page_turn = page_turn "<a href=\"/docs/recipes/\"><span>Try a real task</span><strong>Open the recipe book →</strong></a>"
+    if (page_slug != "supported_yml") page_turn = page_turn "<a href=\"/docs/supported_yml/\"><span>Check YAML support</span><strong>See exactly what works →</strong></a>"
+    print page_turn "</nav>"
     print "    </main>"
+    print "    <aside class=\"page-nav\" aria-label=\"On this page\">"
     if (toc_count) {
-        print "    <aside class=\"page-nav\" aria-label=\"On this page\">"
         print "      <strong>On this page</strong>"
         print "      <ol>"
         for (i = 1; i <= toc_count; i++) print "        <li class=\"level-" toc_level[i] "\"><a href=\"#" toc_id[i] "\">" inline(toc_label[i]) "</a></li>"
         print "      </ol>"
-        print "      <a class=\"edit-link\" href=\"https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/" (page_slug == "index" ? "README" : page_slug) ".md\">Edit this page</a>"
-        print "    </aside>"
     }
+    print "      <a class=\"edit-link\" href=\"https://github.com/azohra/yaml.sh/edit/main/_static/_www/docs/" (page_slug == "index" ? "README" : page_slug) ".md\">Edit this page</a>"
+    print "    </aside>"
     print "  </div>"
     print "  <dialog class=\"search-dialog\" data-search-dialog>"
     print "    <form method=\"dialog\" class=\"search-box\"><label for=\"docs-search\">Search the docs</label><button value=\"close\" aria-label=\"Close search\">×</button><input id=\"docs-search\" type=\"search\" autocomplete=\"off\" placeholder=\"Try “merge files” or “envsubst”\"><div class=\"search-results\" aria-live=\"polite\"></div><p><kbd>↑</kbd><kbd>↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close</p></form>"

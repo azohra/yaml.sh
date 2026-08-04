@@ -1,4 +1,4 @@
-function expression_evaluate_base(kind, expression, input,    output, middle, left_stream, right_stream, single, node, child, i, j, collection, key, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, interpolation, partial_count, next_count, partial) {
+function expression_evaluate_base(kind, expression, input,    output, middle, left_stream, right_stream, single, node, child, i, j, collection, key, argument_stream, argument, result_node, variable, previous, had, accumulator, update_stream, partial_count, next_count, partial, partials, nexts) {
     output = expression_stream_new()
     if (kind == "identity") {
         expression_stream_append(output, input)
@@ -69,27 +69,24 @@ function expression_evaluate_base(kind, expression, input,    output, middle, le
     if (kind == "interpolate") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
             single = expression_stream_single(expression_stream_node[input, i])
-            interpolation = ++expression_interpolation_serial
             partial_count = 1
-            expression_interpolation_partial[interpolation, 1] = expression_interpolation_literal[expression, 1]
+            partials[1] = expression_interpolation_literal[expression, 1]
             for (j = 1; j <= expression_child_count[expression]; j++) {
                 argument_stream = expression_evaluate(expression_child[expression, j], single)
                 next_count = 0
                 if (expression_stream_count[argument_stream]) {
                     for (collection = 1; collection <= partial_count; collection++) {
-                        partial = expression_interpolation_partial[interpolation, collection]
-                        expression_interpolation_next[interpolation, ++next_count] = partial expression_interpolation_text(expression_stream_node[argument_stream, 1]) expression_interpolation_literal[expression, j + 1]
+                        partial = partials[collection]
+                        nexts[++next_count] = partial expression_interpolation_text(expression_stream_node[argument_stream, 1]) expression_interpolation_literal[expression, j + 1]
                     }
                 }
                 partial_count = next_count
                 for (collection = 1; collection <= partial_count; collection++) {
-                    expression_interpolation_partial[interpolation, collection] = expression_interpolation_next[interpolation, collection]
-                    delete expression_interpolation_next[interpolation, collection]
+                    partials[collection] = nexts[collection]
                 }
             }
             for (collection = 1; collection <= partial_count; collection++) {
-                expression_stream_push(output, expression_scalar(expression_interpolation_partial[interpolation, collection], "string"))
-                delete expression_interpolation_partial[interpolation, collection]
+                expression_stream_push(output, expression_scalar(partials[collection], "string"))
             }
         }
         return output
@@ -133,7 +130,7 @@ function expression_evaluate_base(kind, expression, input,    output, middle, le
                 result_node = new_node("mapping", 0, "", "", "")
                 for (j = 1; j <= expression_child_count[expression]; j++) {
                     middle = expression_evaluate(expression_child[expression, j], single)
-                    child = expression_stream_count[middle] ? expression_stream_node[middle, 1] : expression_null()
+                    child = expression_stream_first_or_null(middle)
                     key = expression_object_key[expression, j]
                     if (expression_object_key_expression[expression, j]) {
                         argument_stream = expression_evaluate(expression_object_key_expression[expression, j], single)
@@ -155,7 +152,7 @@ function expression_evaluate_base(kind, expression, input,    output, middle, le
     }
     if (kind == "recursive") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            expression_collect_recursive(expression_stream_node[input, i], output, ++expression_recursive_serial)
+            expression_collect_recursive_all(expression_stream_node[input, i], output)
         }
         return output
     }
@@ -233,12 +230,12 @@ function expression_evaluate_base(kind, expression, input,    output, middle, le
         if (eval_all_mode && expression == eval_all_top_expression) {
             left_stream = expression_evaluate(expression_left[expression], input)
             right_stream = expression_evaluate(expression_right[expression], input)
-            accumulator = expression_stream_count[right_stream] ? expression_stream_node[right_stream, 1] : expression_null()
+            accumulator = expression_stream_first_or_null(right_stream)
             for (j = 1; j <= expression_stream_count[left_stream]; j++) {
                 expression_variable_node[variable] = expression_stream_node[left_stream, j]
                 single = expression_stream_single(accumulator)
                 update_stream = expression_evaluate(expression_child[expression, 1], single)
-                accumulator = expression_stream_count[update_stream] ? expression_stream_node[update_stream, 1] : expression_null()
+                accumulator = expression_stream_first_or_null(update_stream)
             }
             expression_stream_push(output, accumulator)
             if (had) {
@@ -252,12 +249,12 @@ function expression_evaluate_base(kind, expression, input,    output, middle, le
             single = expression_stream_single(expression_stream_node[input, i])
             left_stream = expression_evaluate(expression_left[expression], single)
             right_stream = expression_evaluate(expression_right[expression], single)
-            accumulator = expression_stream_count[right_stream] ? expression_stream_node[right_stream, 1] : expression_null()
+            accumulator = expression_stream_first_or_null(right_stream)
             for (j = 1; j <= expression_stream_count[left_stream]; j++) {
                 expression_variable_node[variable] = expression_stream_node[left_stream, j]
                 single = expression_stream_single(accumulator)
                 update_stream = expression_evaluate(expression_child[expression, 1], single)
-                accumulator = expression_stream_count[update_stream] ? expression_stream_node[update_stream, 1] : expression_null()
+                accumulator = expression_stream_first_or_null(update_stream)
             }
             expression_stream_push(output, accumulator)
         }

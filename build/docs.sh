@@ -7,6 +7,10 @@ SOURCE=$ROOT/_static/_www/docs
 DOCS=${YSH_DOCS_OUTPUT:-$SOURCE}
 RENDERER=$ROOT/build/docs-page.awk
 VERSION=${YSH_DOCS_VERSION:-$(sed -n 's/^YSH_VERSION=//p' "$ROOT/ysh" | head -n 1)}
+if [ -z "$VERSION" ]; then
+    printf '%s\n' 'docs.sh: unable to determine the release version; set YSH_DOCS_VERSION or restore YSH_VERSION in ysh.' >&2
+    exit 1
+fi
 PAGES='README getting-started recipes queries contracts operators documents output yq-compatibility supported_yml security migration internals development'
 
 mkdir -p "$DOCS"

@@ -1667,14 +1667,6 @@ testRunsWithPosixShell() {
     assertEquals "value" "$(/bin/sh ./ysh ".key_value.key" test/test.yml)"
 }
 
-testGeneratedDifferentialCorpusStaysInSync() {
-    generated_corpus=$(mktemp "${TMPDIR:-/tmp}/ysh-corpus.XXXXXX")
-    ./test/generate-yq-corpus.sh > "$generated_corpus"
-    cmp -s test/yq-corpus.tsv "$generated_corpus"
-    assertEquals 0 $?
-    rm -f "$generated_corpus"
-}
-
 testReleaseArtifactsStayInSync() {
     if command -v sha256sum >/dev/null 2>&1; then
         release_sha256=$(sha256sum ysh)

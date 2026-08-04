@@ -217,7 +217,6 @@ function codec_props_assign(root, path, value,    count, parts, current, i, inde
             current = child
         } else fail("conflicting property path: " path)
     }
-    for (i = 1; i <= count; i++) delete parts[i]
 }
 
 function codec_props_decode(value,    root, remaining, newline, line, separator, key, item) {

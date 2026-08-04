@@ -159,6 +159,9 @@ input { font: inherit; }
   cursor: pointer;
 }
 
+html:not(.enhanced) .search-trigger,
+html:not(.enhanced) .header-search { display: none; }
+
 kbd {
   min-width: 20px;
   padding: 1px 5px;

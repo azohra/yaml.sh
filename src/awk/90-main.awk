@@ -2,6 +2,57 @@ BEGIN {
     document_index = 0
     codec_initialize()
     expression_dispatch_initialize()
+    expression_single_token["."] = "dot"
+    expression_single_token["|"] = "pipe"
+    expression_single_token["("] = "left_parenthesis"
+    expression_single_token[")"] = "right_parenthesis"
+    expression_single_token["["] = "left_bracket"
+    expression_single_token["]"] = "right_bracket"
+    expression_single_token[","] = "comma"
+    expression_single_token["{"] = "left_brace"
+    expression_single_token["}"] = "right_brace"
+    expression_single_token[":"] = "colon"
+    expression_single_token["?"] = "question"
+    expression_single_token[";"] = "semicolon"
+    expression_single_token[">"] = "compare"
+    expression_single_token["<"] = "compare"
+    expression_single_token["="] = "assign"
+    for (single_token_char in expression_single_token) {
+        if (expression_single_token[single_token_char] != "compare") {
+            expression_token_literal[expression_single_token[single_token_char]] = single_token_char
+        }
+    }
+    expression_codec_kind["@json"] = "to_json"
+    expression_codec_kind["@jsond"] = "from_json"
+    expression_codec_kind["@yaml"] = "to_yaml"
+    expression_codec_kind["@yamld"] = "from_yaml"
+    expression_codec_kind["@props"] = "to_props"
+    expression_codec_kind["@propsd"] = "from_props"
+    expression_codec_kind["@csv"] = "to_csv"
+    expression_codec_kind["@csvd"] = "from_csv"
+    expression_codec_kind["@tsv"] = "to_tsv"
+    expression_codec_kind["@tsvd"] = "from_tsv"
+    expression_codec_kind["@toml"] = "to_toml"
+    expression_codec_kind["@tomld"] = "from_toml"
+    expression_codec_kind["@ini"] = "to_ini"
+    expression_codec_kind["@inid"] = "from_ini"
+    expression_codec_kind["@xml"] = "to_xml"
+    expression_codec_kind["@xmld"] = "from_xml"
+    expression_codec_kind["@base64"] = "codec_base64"
+    expression_codec_kind["@base64d"] = "codec_base64d"
+    expression_codec_kind["@uri"] = "codec_uri"
+    expression_codec_kind["@urid"] = "codec_urid"
+    expression_codec_kind["@sh"] = "codec_sh"
+    parser_table_count = split("length keys kind type to_entries from_entries sort unique flatten reverse " \
+        "upcase downcase trim to_string array_to_map split_doc shuffle min max any all add path " \
+        "parent root to_number documentindex fileindex filename empty pivot", parser_table_names, " ")
+    for (parser_table_index = 1; parser_table_index <= parser_table_count; parser_table_index++) {
+        expression_context_kind[parser_table_names[parser_table_index]] = parser_table_names[parser_table_index]
+    }
+    parser_table_count = split("line column key tag anchor alias style line_comment head_comment foot_comment", parser_table_names, " ")
+    for (parser_table_index = 1; parser_table_index <= parser_table_count; parser_table_index++) {
+        expression_context_kind[parser_table_names[parser_table_index]] = "node_" parser_table_names[parser_table_index]
+    }
     query = ENVIRON["YSH_QUERY_TEXT"]
     if (query == "") {
         query = "."

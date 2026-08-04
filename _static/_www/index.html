@@ -56,14 +56,14 @@
         </ul>
       </div>
 
-      <div class="terminal-card" aria-label="YAML.sh example">
+      <div class="terminal-card" role="img" aria-label="YAML.sh example">
         <div class="terminal-bar">
           <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
           <span>reading.yml — ysh</span>
           <span class="terminal-badge">POSIX</span>
         </div>
         <div class="terminal-body">
-          <div class="yaml-preview" aria-label="Example YAML input">
+          <div class="yaml-preview" role="img" aria-label="Example YAML input">
             <p><span class="line-no">1</span><span class="key">books</span>:</p>
             <p><span class="line-no">2</span>&nbsp;&nbsp;- <span class="key">title</span>: <span class="string">Piranesi</span></p>
             <p><span class="line-no">3</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">read</span>: <span class="number">true</span></p>
@@ -100,7 +100,7 @@
           <h2>Find it. Change it. Keep the comments.</h2>
           <p>Run expressions over YAML structure, preview the result, and write it back without needlessly reformatting the file.</p>
       </div>
-      <div class="pipeline" aria-label="YAML.sh workflow">
+      <div class="pipeline" role="img" aria-label="YAML.sh workflow">
         <article>
           <span class="step">01</span>
           <h3>Query</h3>
@@ -128,10 +128,10 @@
       </div>
       <div class="demo-window">
         <div class="demo-tabs" role="tablist" aria-label="CLI examples">
-          <button id="tab-query" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Query</button>
-          <button id="tab-json" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json">Validate</button>
-          <button id="tab-merge" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge">Update</button>
-          <button id="tab-inspect" role="tab" aria-selected="false" aria-controls="panel-inspect" data-demo="inspect">Inspect</button>
+          <button id="tab-query" type="button" role="tab" aria-selected="true" aria-controls="panel-query" data-demo="query">Query</button>
+          <button id="tab-json" type="button" role="tab" aria-selected="false" aria-controls="panel-json" data-demo="json" tabindex="-1">Validate</button>
+          <button id="tab-merge" type="button" role="tab" aria-selected="false" aria-controls="panel-merge" data-demo="merge" tabindex="-1">Update</button>
+          <button id="tab-inspect" type="button" role="tab" aria-selected="false" aria-controls="panel-inspect" data-demo="inspect" tabindex="-1">Inspect</button>
         </div>
         <div class="demo-panel" id="panel-query" role="tabpanel" aria-labelledby="tab-query">
           <p class="demo-label">Combine two YAML files with one expression.</p>
@@ -171,7 +171,7 @@ node  1  mapping  line=1</code></pre>
       <div class="feature-grid">
         <article class="feature feature-large">
           <p class="feature-index">01 / PORTABLE</p>
-          <h2>Portable on purpose.</h2>
+          <h3>Portable on purpose.</h3>
           <p>Query with <code>/bin/sh</code> and AWK. Check and write with ordinary host file utilities. No extra language runtime required.</p>
           <div class="compat-row"><span>macOS AWK</span><span>mawk + original AWK</span><span>BusyBox + POSIX gawk</span></div>
         </article>
@@ -240,15 +240,30 @@ node  1  mapping  line=1</code></pre>
   </footer>
 
   <script>
-    const tabButtons = document.querySelectorAll('[data-demo]');
+    (() => {
+    const tabButtons = [...document.querySelectorAll('[data-demo]')];
     const demoPanels = document.querySelectorAll('.demo-panel');
 
-    tabButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        tabButtons.forEach((item) => item.setAttribute('aria-selected', String(item === button)));
-        demoPanels.forEach((panel) => {
-          panel.hidden = panel.id !== `panel-${button.dataset.demo}`;
-        });
+    const selectTab = (button) => {
+      tabButtons.forEach((item) => {
+        const selected = item === button;
+        item.setAttribute('aria-selected', String(selected));
+        item.tabIndex = selected ? 0 : -1;
+      });
+      demoPanels.forEach((panel) => {
+        panel.hidden = panel.id !== `panel-${button.dataset.demo}`;
+      });
+    };
+
+    tabButtons.forEach((button, index) => {
+      button.addEventListener('click', () => selectTab(button));
+      button.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const step = event.key === 'ArrowRight' ? 1 : -1;
+        const next = tabButtons[(index + step + tabButtons.length) % tabButtons.length];
+        selectTab(next);
+        next.focus();
       });
     });
 
@@ -266,6 +281,7 @@ node  1  mapping  line=1</code></pre>
         }
       });
     });
+    })();
   </script>
 </body>
 </html>

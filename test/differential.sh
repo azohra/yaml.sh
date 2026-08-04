@@ -4,7 +4,7 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
-CORPUS=${YQ_DIFFERENTIAL_CORPUS:-$SCRIPT_DIR/yq-corpus.tsv}
+CORPUS=${YQ_DIFFERENTIAL_CORPUS:-}
 YSH_BINARY=${YSH_BINARY:-$PROJECT_DIR/ysh}
 YQ_BINARY=${YQ_BINARY:-yq}
 YSH_DIFFERENTIAL_CONFIG='{base: 100}'
@@ -29,7 +29,13 @@ YQ_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-yq.XXXXXX")
 YSH_RAW=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-ysh-raw.XXXXXX")
 YQ_RAW=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-yq-raw.XXXXXX")
 RESULTS=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-results.XXXXXX")
-trap 'rm -f "$YSH_OUTPUT" "$YQ_OUTPUT" "$YSH_RAW" "$YQ_RAW" "$RESULTS"' 0 1 2 3 15
+GENERATED_CORPUS=$(mktemp "${TMPDIR:-/tmp}/ysh-differential-corpus.XXXXXX")
+trap 'rm -f "$YSH_OUTPUT" "$YQ_OUTPUT" "$YSH_RAW" "$YQ_RAW" "$RESULTS" "$GENERATED_CORPUS"' 0 1 2 3 15
+
+if [ -z "$CORPUS" ]; then
+    "$SCRIPT_DIR/generate-yq-corpus.sh" > "$GENERATED_CORPUS"
+    CORPUS=$GENERATED_CORPUS
+fi
 
 total=0
 passed=0

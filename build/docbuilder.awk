@@ -1,10 +1,5 @@
 #!/usr/bin/awk -f
 
-BEGIN {
-    split(version, version_parts, ".")
-    series = version_parts[1] "." version_parts[2]
-}
-
 /^expected_sha256=/ {
     if (sha256 != "") {
         print "expected_sha256=" sha256
@@ -24,8 +19,5 @@ BEGIN {
 }
 /data-ysh-version/ {
     sub(/>v[0-9]+\.[0-9]+\.[0-9]+</, ">v" version "<")
-}
-/data-ysh-series/ {
-    sub(/>v[0-9]+\.[0-9]+</, ">v" series "<")
 }
 {print}

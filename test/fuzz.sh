@@ -9,6 +9,11 @@ FUZZ_MATRICES=${YSH_FUZZ_MATRICES:-1}
 FUZZ_SEED=${YSH_FUZZ_SEED:-1}
 FUZZ_REPLAY=${YSH_FUZZ_REPLAY:-}
 FAILURE_ROOT=${YSH_FUZZ_FAILURE_DIR:-${TMPDIR:-/tmp}}
+FUZZ_LAYOUTS=6
+FUZZ_SIZES=7
+FUZZ_STATES=2
+FUZZ_PROPERTIES=8
+FUZZ_MATRIX_SIZE=$((FUZZ_LAYOUTS * FUZZ_SIZES * FUZZ_STATES * FUZZ_PROPERTIES))
 
 if ! command -v jq >/dev/null 2>&1; then
     printf '%s\n' "The fuzz harness requires jq." >&2
@@ -42,6 +47,8 @@ generate_case() {
     awk -v seed="$generated_case" -v shrink="$shrink_level" -v oracle="$generated_oracle" \
         -v mode="$generated_mode" -v count="$generated_count" -v enabled="$generated_enabled" '
     function truth(value) { return value ? "true" : "false" }
+    function case_score(seed, i) { return (seed * 17 + i * 13) % 1000 }
+    function case_active(seed, i) { return (seed + i) % 3 }
     BEGIN {
         if (shrink >= 1 && count > 3) count = 3
         if (shrink >= 2) { count = 1; mode = 0 }
@@ -72,20 +79,16 @@ generate_case() {
             printf "items: ["
             for (i = 1; i <= count; i++) {
                 if (i > 1) printf ", "
-                score = (seed * 17 + i * 13) % 1000
-                active = (seed + i) % 3
-                printf "{name: item-%d-%d, score: %d, active: %s}", seed, i, score, truth(active)
+                printf "{name: item-%d-%d, score: %d, active: %s}", seed, i, case_score(seed, i), truth(case_active(seed, i))
             }
             print "]"
         } else {
             print "items:"
             for (i = 1; i <= count; i++) {
-                score = (seed * 17 + i * 13) % 1000
-                active = (seed + i) % 3
                 prefix = mode == 5 ? "-" : "  -"
                 print prefix " name: item-" seed "-" i
-                print (mode == 5 ? "  " : "    ") "score: " score
-                print (mode == 5 ? "  " : "    ") "active: " truth(active)
+                print (mode == 5 ? "  " : "    ") "score: " case_score(seed, i)
+                print (mode == 5 ? "  " : "    ") "active: " truth(case_active(seed, i))
             }
         }
         if (mode == 3) {
@@ -101,9 +104,7 @@ generate_case() {
         printf "},\"values\":[%d,%d,null,\"v%d\"],\"items\":[", seed, seed + 1, seed > oracle
         for (i = 1; i <= count; i++) {
             if (i > 1) printf "," > oracle
-            score = (seed * 17 + i * 13) % 1000
-            active = (seed + i) % 3
-            printf "{\"name\":\"item-%d-%d\",\"score\":%d,\"active\":%s}", seed, i, score, truth(active) > oracle
+            printf "{\"name\":\"item-%d-%d\",\"score\":%d,\"active\":%s}", seed, i, case_score(seed, i), truth(case_active(seed, i)) > oracle
         }
         printf "],\"message\":\"generated case %d\\nline %d\"}\n", seed, seed * 3 > oracle
         close(oracle)
@@ -234,10 +235,13 @@ if [ -n "$FUZZ_REPLAY" ]; then
     last_case=$FUZZ_REPLAY
 else
     case "$FUZZ_MATRICES" in
-    *[!0-9]*|' '|''|0) printf '%s\n' 'YSH_FUZZ_MATRICES must be a positive integer.' >&2; exit 2 ;;
+    *[!0-9]*|''|0) printf '%s\n' 'YSH_FUZZ_MATRICES must be a positive integer.' >&2; exit 2 ;;
+    esac
+    case "$FUZZ_SEED" in
+    *[!0-9]*|'') printf '%s\n' 'YSH_FUZZ_SEED must be a non-negative integer.' >&2; exit 2 ;;
     esac
     first_case=$FUZZ_SEED
-    last_case=$((FUZZ_SEED + FUZZ_MATRICES * 672 - 1))
+    last_case=$((FUZZ_SEED + FUZZ_MATRICES * FUZZ_MATRIX_SIZE - 1))
 fi
 
 case_id=$first_case
@@ -248,14 +252,14 @@ while [ "$case_id" -le "$last_case" ]; do
         printf '%s\n' 'YSH_FUZZ_REPLAY must not be lower than YSH_FUZZ_SEED.' >&2
         exit 2
     fi
-    matrix_case=$((case_offset % 672))
-    CASE_MODE=$((matrix_case % 6))
-    matrix_case=$((matrix_case / 6))
-    CASE_COUNT=$((matrix_case % 7 + 1))
-    matrix_case=$((matrix_case / 7))
-    CASE_ENABLED=$((matrix_case % 2))
-    matrix_case=$((matrix_case / 2))
-    CASE_PROPERTY=$((matrix_case % 8))
+    matrix_case=$((case_offset % FUZZ_MATRIX_SIZE))
+    CASE_MODE=$((matrix_case % FUZZ_LAYOUTS))
+    matrix_case=$((matrix_case / FUZZ_LAYOUTS))
+    CASE_COUNT=$((matrix_case % FUZZ_SIZES + 1))
+    matrix_case=$((matrix_case / FUZZ_SIZES))
+    CASE_ENABLED=$((matrix_case % FUZZ_STATES))
+    matrix_case=$((matrix_case / FUZZ_STATES))
+    CASE_PROPERTY=$((matrix_case % FUZZ_PROPERTIES))
     generate_case "$case_id" 0 "$INPUT" "$ORACLE" "$CASE_MODE" "$CASE_COUNT" "$CASE_ENABLED"
     property_for_case "$CASE_PROPERTY"
     if ! run_property "$INPUT" "$ORACLE"; then
@@ -266,5 +270,5 @@ while [ "$case_id" -le "$last_case" ]; do
     case_id=$((case_id + 1))
 done
 
-printf 'Grammar/property matrix: %s cases pass — 6 layouts × 7 sizes × 2 states × 8 properties; %s matrix pass(es), seed %s\n' \
-    "$passed" "$FUZZ_MATRICES" "$FUZZ_SEED"
+printf 'Grammar/property matrix: %s cases pass — %s layouts × %s sizes × %s states × %s properties; %s matrix pass(es), seed %s\n' \
+    "$passed" "$FUZZ_LAYOUTS" "$FUZZ_SIZES" "$FUZZ_STATES" "$FUZZ_PROPERTIES" "$FUZZ_MATRICES" "$FUZZ_SEED"

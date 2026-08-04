@@ -2,11 +2,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
     output = expression_stream_new()
     if (kind == "map" || kind == "map_values") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = expression_stream_node[input, i]
-            resolved = resolve_alias(node)
-            if (node_kind[resolved] != "sequence" && node_kind[resolved] != "mapping") {
-                fail(kind " requires a sequence or mapping")
-            }
+            resolved = expression_require_collection(expression_stream_node[input, i], kind)
             result_node = new_node(kind == "map" ? "sequence" : node_kind[resolved], 0, "", "", "")
             if (node_kind[resolved] == "sequence") {
                 for (j = 1; j <= sequence_count[resolved]; j++) {
@@ -17,8 +13,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
                     }
                 }
             } else {
-                collection = ++collection_serial
-                collect_mapping_keys(resolved, collection)
+                collection = mapping_key_set(resolved)
                 for (j = 1; j <= collection_count[collection]; j++) {
                     key = collection_key[collection, j]
                     single = expression_stream_single(mapping_lookup(resolved, key))
@@ -42,8 +37,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
             if (kind == "to_entries") {
                 result_node = new_node("sequence", 0, "", "", "")
                 if (node_kind[node] == "mapping") {
-                    collection = ++collection_serial
-                    collect_mapping_keys(node, collection)
+                    collection = mapping_key_set(node)
                     for (j = 1; j <= collection_count[collection]; j++) {
                         key = collection_key[collection, j]
                         add_sequence(result_node, expression_entry(key, mapping_lookup(node, key), "string"), 0)
@@ -59,13 +53,10 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
                 continue
             }
             if (kind == "with_entries") {
-                if (node_kind[node] != "mapping" && node_kind[node] != "sequence") {
-                    fail("with_entries requires a mapping or sequence")
-                }
+                node = expression_require_collection(node, "with_entries")
                 middle = expression_stream_new()
                 if (node_kind[node] == "mapping") {
-                    collection = ++collection_serial
-                    collect_mapping_keys(node, collection)
+                    collection = mapping_key_set(node)
                     for (j = 1; j <= collection_count[collection]; j++) {
                         key = collection_key[collection, j]
                         single = expression_stream_single(expression_entry(key, mapping_lookup(node, key), "string"))
@@ -80,9 +71,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
                     }
                 }
             } else {
-                if (node_kind[node] != "sequence") {
-                    fail("from_entries requires a sequence")
-                }
+                node = expression_require_sequence(node, "from_entries")
                 middle = expression_stream_new()
                 for (j = 1; j <= sequence_count[node]; j++) {
                     expression_stream_push(middle, sequence_child[node, j])
@@ -107,10 +96,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
     }
     if (kind == "array_to_map") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "sequence") {
-                fail("array_to_map requires a sequence")
-            }
+            node = expression_require_sequence(expression_stream_node[input, i], "array_to_map")
             result_node = new_node("mapping", 0, "", "", "")
             for (j = 1; j <= sequence_count[node]; j++) {
                 add_mapping(result_node, (j - 1) "", expression_clone_node(sequence_child[node, j]), 0, 0)
@@ -121,10 +107,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
     }
     if (kind == "sort" || kind == "unique" || kind == "reverse" || kind == "flatten") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "sequence") {
-                fail(kind " requires a sequence")
-            }
+            node = expression_require_sequence(expression_stream_node[input, i], kind)
             result_node = new_node("sequence", 0, "", "", "")
             if (kind == "flatten") {
                 expression_flatten_into(node, result_node)
@@ -181,17 +164,14 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
     }
     if (kind == "min_by" || kind == "max_by") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "sequence") {
-                fail(kind " requires a sequence")
-            }
+            node = expression_require_sequence(expression_stream_node[input, i], kind)
             child = 0
             argument = 0
             for (j = 1; j <= sequence_count[node]; j++) {
                 result_node = sequence_child[node, j]
                 single = expression_stream_single(result_node)
                 argument_stream = expression_evaluate(expression_left[expression], single)
-                key = expression_stream_count[argument_stream] ? expression_stream_node[argument_stream, 1] : expression_null()
+                key = expression_stream_first_or_null(argument_stream)
                 if (!child || (kind == "min_by" && expression_sort_less(key, argument)) ||
                     (kind == "max_by" && expression_sort_less(argument, key))) {
                     child = result_node
@@ -206,10 +186,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
     }
     if (kind == "sort_by" || kind == "group_by" || kind == "unique_by") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "sequence") {
-                fail(kind " requires a sequence")
-            }
+            node = expression_require_sequence(expression_stream_node[input, i], kind)
             result_node = new_node("sequence", 0, "", "", "")
             middle = ++expression_sort_serial
             matched = 0
@@ -217,7 +194,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
                 child = sequence_child[node, j]
                 single = expression_stream_single(child)
                 argument_stream = expression_evaluate(expression_left[expression], single)
-                argument = expression_stream_count[argument_stream] ? expression_stream_node[argument_stream, 1] : expression_null()
+                argument = expression_stream_first_or_null(argument_stream)
                 if (kind == "unique_by") {
                     key = middle SUBSEP expression_fingerprint(argument)
                     if (!(key in expression_unique_seen)) {
@@ -256,10 +233,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
     }
     if (kind == "add") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "sequence") {
-                fail("add requires a sequence")
-            }
+            node = expression_require_sequence(expression_stream_node[input, i], "add")
             if (!sequence_count[node]) {
                 expression_stream_push(output, expression_null())
                 continue
@@ -274,10 +248,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
     }
     if (kind == "min" || kind == "max" || kind == "any" || kind == "all" || kind == "any_c" || kind == "all_c") {
         for (i = 1; i <= expression_stream_count[input]; i++) {
-            node = resolve_alias(expression_stream_node[input, i])
-            if (node_kind[node] != "sequence") {
-                fail(kind " requires a sequence")
-            }
+            node = expression_require_sequence(expression_stream_node[input, i], kind)
             if (kind == "min" || kind == "max") {
                 if (!sequence_count[node]) {
                     continue
@@ -343,8 +314,7 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
             } else if (kind == "keys") {
                 result_node = new_node("sequence", 0, "", "", "")
                 if (node_kind[resolved] == "mapping") {
-                    collection = ++collection_serial
-                    collect_mapping_keys(resolved, collection)
+                    collection = mapping_key_set(resolved)
                     for (j = 1; j <= collection_count[collection]; j++) {
                         add_sequence(result_node, expression_scalar(collection_key[collection, j], "string"), 0)
                     }

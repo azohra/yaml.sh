@@ -96,8 +96,7 @@ function emit_json(node,    resolved, stack_key, i, collection, key, child, lowe
         }
         printf "]"
     } else if (node_kind[resolved] == "mapping") {
-        collection = ++collection_serial
-        collect_mapping_keys(resolved, collection)
+        collection = mapping_key_set(resolved)
         printf "{"
         for (i = 1; i <= collection_count[collection]; i++) {
             if (i > 1) {

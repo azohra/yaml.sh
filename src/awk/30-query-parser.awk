@@ -61,86 +61,8 @@ function expression_lex_next(    char, next_char, start, quote, escaped, word, l
         expression_position += 2
         return
     }
-    if (char == ">" || char == "<") {
-        expression_token_type = "compare"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "=") {
-        expression_token_type = "assign"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == ".") {
-        expression_token_type = "dot"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "|") {
-        expression_token_type = "pipe"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "(") {
-        expression_token_type = "left_parenthesis"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == ")") {
-        expression_token_type = "right_parenthesis"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "[") {
-        expression_token_type = "left_bracket"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "]") {
-        expression_token_type = "right_bracket"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == ",") {
-        expression_token_type = "comma"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "{") {
-        expression_token_type = "left_brace"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "}") {
-        expression_token_type = "right_brace"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == ":") {
-        expression_token_type = "colon"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == "?") {
-        expression_token_type = "question"
-        expression_token_value = char
-        expression_position++
-        return
-    }
-    if (char == ";") {
-        expression_token_type = "semicolon"
+    if (char in expression_single_token) {
+        expression_token_type = expression_single_token[char]
         expression_token_value = char
         expression_position++
         return
@@ -272,10 +194,11 @@ function expression_new(kind, left, right, value,    expression) {
     return expression
 }
 
-function expression_expect(type,    actual) {
+function expression_expect(type,    actual, wanted) {
     if (expression_token_type != type) {
         actual = expression_token_name(expression_token_type)
-        fail("expected " type " but found " actual)
+        wanted = (type in expression_token_literal) ? expression_token_literal[type] : type
+        fail("expected " wanted " but found " actual)
     }
     expression_lex_next()
 }
@@ -554,28 +477,8 @@ function expression_parse_primary(    expression, name, step, argument, value, v
                 expression_expect("right_parenthesis")
             }
             expression = expression_new(name, 0, 0, "")
-        } else if (name == "@json" || name == "@jsond" || name == "@yaml" || name == "@yamld" ||
-            name == "@props" || name == "@propsd" || name == "@csv" || name == "@csvd" || name == "@tsv" || name == "@tsvd" ||
-            name == "@toml" || name == "@tomld" || name == "@ini" || name == "@inid" || name == "@xml" || name == "@xmld" ||
-            name == "@base64" || name == "@base64d" ||
-            name == "@uri" || name == "@urid" || name == "@sh") {
-            if (name == "@json") expression = expression_new("to_json", 0, 0, "compact")
-            else if (name == "@jsond") expression = expression_new("from_json", 0, 0, "")
-            else if (name == "@yaml") expression = expression_new("to_yaml", 0, 0, "")
-            else if (name == "@yamld") expression = expression_new("from_yaml", 0, 0, "")
-            else if (name == "@props") expression = expression_new("to_props", 0, 0, "")
-            else if (name == "@propsd") expression = expression_new("from_props", 0, 0, "")
-            else if (name == "@csv") expression = expression_new("to_csv", 0, 0, "")
-            else if (name == "@csvd") expression = expression_new("from_csv", 0, 0, "")
-            else if (name == "@tsv") expression = expression_new("to_tsv", 0, 0, "")
-            else if (name == "@tsvd") expression = expression_new("from_tsv", 0, 0, "")
-            else if (name == "@toml") expression = expression_new("to_toml", 0, 0, "")
-            else if (name == "@tomld") expression = expression_new("from_toml", 0, 0, "")
-            else if (name == "@ini") expression = expression_new("to_ini", 0, 0, "")
-            else if (name == "@inid") expression = expression_new("from_ini", 0, 0, "")
-            else if (name == "@xml") expression = expression_new("to_xml", 0, 0, "")
-            else if (name == "@xmld") expression = expression_new("from_xml", 0, 0, "")
-            else expression = expression_new("codec_" substr(name, 2), 0, 0, "")
+        } else if (name in expression_codec_kind) {
+            expression = expression_new(expression_codec_kind[name], 0, 0, name == "@json" ? "compact" : "")
         } else if (name == "select" || name == "has" || name == "del" || name == "map" || name == "map_values" || name == "with_entries" ||
             name == "contains" || name == "startswith" || name == "endswith" || name == "split" || name == "join" ||
             name == "sort_by" || name == "group_by" || name == "unique_by" || name == "min_by" || name == "max_by" ||
@@ -592,29 +495,12 @@ function expression_parse_primary(    expression, name, step, argument, value, v
             child = expression_parse_stream()
             expression_expect("right_parenthesis")
             expression = expression_new("regex_sub", argument, child, "")
-        } else if (name == "length" || name == "keys" || name == "kind" || name == "type" || name == "to_entries" || name == "from_entries" ||
-            name == "sort" || name == "unique" || name == "flatten" || name == "reverse" || name == "upcase" || name == "downcase" ||
-            name == "trim" || name == "to_string" || name == "array_to_map" || name == "split_doc" || name == "shuffle" ||
-            name == "min" || name == "max" || name == "any" || name == "all" || name == "add" || name == "path" ||
-            name == "parent" || name == "root" || name == "to_number" || name == "documentindex" ||
-            name == "fileindex" || name == "filename" || name == "empty" || name == "line" || name == "key" ||
-            name == "column" || name == "tag" || name == "anchor" || name == "alias" || name == "style" || name == "line_comment" ||
-            name == "head_comment" || name == "foot_comment" || name == "pivot") {
+        } else if (name in expression_context_kind) {
             if (expression_token_type == "left_parenthesis") {
                 expression_lex_next()
                 expression_expect("right_parenthesis")
             }
-            if (name == "line") name = "node_line"
-            else if (name == "column") name = "node_column"
-            else if (name == "key") name = "node_key"
-            else if (name == "tag") name = "node_tag"
-            else if (name == "anchor") name = "node_anchor"
-            else if (name == "alias") name = "node_alias"
-            else if (name == "style") name = "node_style"
-            else if (name == "line_comment") name = "node_line_comment"
-            else if (name == "head_comment") name = "node_head_comment"
-            else if (name == "foot_comment") name = "node_foot_comment"
-            expression = expression_new(name, 0, 0, "")
+            expression = expression_new(expression_context_kind[name], 0, 0, "")
         } else {
             fail("unknown expression operator: " name)
         }
@@ -703,22 +589,21 @@ function expression_parse_primary(    expression, name, step, argument, value, v
     return expression
 }
 
-function expression_path(node,    result, depth, current, edge, i) {
+function expression_path(node,    result, depth, current, edge, i, path_edge) {
     result = new_node("sequence", 0, "", "", "")
     depth = 0
     current = node
     while (current in node_parent) {
-        expression_path_edge[++depth] = node_parent_edge[current]
+        path_edge[++depth] = node_parent_edge[current]
         current = node_parent[current]
     }
     for (i = depth; i >= 1; i--) {
-        edge = expression_path_edge[i]
+        edge = path_edge[i]
         if (substr(edge, 1, 6) == "index ") {
             add_sequence(result, expression_scalar(substr(edge, 7), "int"), 0)
         } else {
             add_sequence(result, expression_scalar(substr(edge, 5), "string"), 0)
         }
-        delete expression_path_edge[i]
     }
     return result
 }
