@@ -1,0 +1,13 @@
+// https://developers.cloudflare.com/workers/wrangler/configuration/
+{
+  "name": "yaml-azohra-com",
+  "account_id": "075fc545fdb23bfb095addc959d84052",
+  "compatibility_date": "2026-08-23",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "yaml.azohra.com", "custom_domain": true }],
+  "assets": {
+    "directory": "_static/_www",
+    "not_found_handling": "404-page"
+  }
+}
