@@ -2,9 +2,14 @@
 # The Makefile keeps the build recipes; these verbs are the fleet-invariant
 # contract over it.
 
+[tool_config]
+# Tools must resolve from the committed mise.lock (version + checksum + url).
+locked = true
+
 [tools]
 wrangler = "4.126.0"
 node = "24"
+make = "4.3"
 
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
