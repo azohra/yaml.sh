@@ -2,19 +2,52 @@
 # The Makefile keeps the build recipes; these verbs are the fleet-invariant
 # contract over it.
 
-[tasks.setup]
-description = "Arm the commit gate"
-run = "mise generate git-pre-commit --write --task=pre-commit"
+[tools]
+node = "24"
 
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
 run = "make all"
 
-[tasks.pre-commit]
-description = "Commit gate: branches author, main never does"
+[tasks.deploy]
+description = "Deploy the site at merged main"
+confirm = "Deploy yaml.azohra.com to production?"
+timeout = "5m"
+usage = 'flag "--dry-run" help="Validate without shipping"'
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
-[ "$(git branch --show-current)" != "main" ] || { echo "pre-commit: refusing — commits are authored on branches, never on main" >&2; exit 1; }
+[ -n "${CLOUDFLARE_API_TOKEN:-}" ] || { echo "deploy: refusing — CLOUDFLARE_API_TOKEN is unset" >&2; exit 1; }
+[ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ] || { echo "deploy: refusing — deploy runs only from the main checkout" >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "deploy: refusing — tree is dirty" >&2; exit 1; }
+git fetch -q origin main
+# FETCH_HEAD, not origin/main: a CI checkout has no remote-tracking ref.
+[ "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)" ] || { echo "deploy: refusing — HEAD is not landed origin/main" >&2; exit 1; }
 mise run check
+if [ "${usage_dry_run:-false}" = "true" ]; then
+  npx wrangler deploy --dry-run
+  echo "deploy: dry run complete — nothing shipped"
+  exit 0
+fi
+tag="$(git rev-parse --short HEAD)"
+npx wrangler deploy --tag "$tag" --message "$(git log -1 --pretty=%s)"
+# Cloudflare is the authority on which version serves traffic. The public URL
+# cannot answer it: bot protection 403s a datacenter IP on some zones and not
+# others, so a status code there means nothing consistent.
+python3 - "$tag" <<'VERIFY'
+import json, subprocess, sys
+
+def wrangler(*args):
+    r = subprocess.run(["npx", "wrangler", *args, "--json"], capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(f"deploy: {' '.join(args)} failed — {r.stderr.strip()[:200]}")
+    return json.loads(r.stdout)
+
+want = sys.argv[1]
+active = wrangler("deployments", "list")[-1]["versions"][0]["version_id"]
+got = next((v["annotations"].get("workers/tag", "") for v in wrangler("versions", "list") if v["id"] == active), "")
+if got != want:
+    sys.exit(f"deploy: refusing — version {active} serving traffic carries tag {got!r}, expected {want!r}")
+print(f"deploy: live — {active} serving 100%, tagged {want}")
+VERIFY
 """
