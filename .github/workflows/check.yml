@@ -1,4 +1,4 @@
-name: CI
+name: Check
 
 on:
   push:
@@ -127,7 +127,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-22.04, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - name: Install portability tools

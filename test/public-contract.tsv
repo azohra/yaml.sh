@@ -1,7 +1,7 @@
 # surface	capability	status	role	evidence
 artifact	one-file-release	supported	core	test:testReleaseArtifactsStayInSync
 runtime	posix-shell-launcher	supported	core	test:testRunsWithPosixShell
-runtime	portable-awk-engine	supported	core	gate:.github/workflows/ci.yml
+runtime	portable-awk-engine	supported	core	gate:.github/workflows/check.yml
 runtime	host-file-utilities	focused	core	test:testCliErrors
 yaml	node-graph	supported	core	test:testAstInspection
 yaml	block-and-flow-collections	supported	core	test:testExpandedYamlSyntax

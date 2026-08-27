@@ -2,19 +2,30 @@
 # The Makefile keeps the build recipes; these verbs are the fleet-invariant
 # contract over it.
 
-[tasks.setup]
-description = "Arm the commit gate"
-run = "mise generate git-pre-commit --write --task=pre-commit"
+[tools]
+wrangler = "4.126.0"
+node = "24"
 
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
 run = "make all"
 
-[tasks.pre-commit]
-description = "Commit gate: branches author, main never does"
+[tasks.deploy]
+description = "Deploy the site at the tip of main"
+confirm = "Deploy yaml.azohra.com to production?"
+timeout = "5m"
+usage = 'flag "--dry-run" help="Validate without shipping"'
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
-[ "$(git branch --show-current)" != "main" ] || { echo "pre-commit: refusing — commits are authored on branches, never on main" >&2; exit 1; }
+[ -n "${CLOUDFLARE_API_TOKEN:-}" ] || { echo "deploy: refusing — CLOUDFLARE_API_TOKEN is unset" >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "deploy: refusing — tree is dirty" >&2; exit 1; }
+git fetch -q origin main
+[ "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)" ] || { echo "deploy: refusing — HEAD is not the tip of origin/main" >&2; exit 1; }
 mise run check
+if [ "${usage_dry_run:-false}" = "true" ]; then
+  wrangler deploy --dry-run
+  exit 0
+fi
+wrangler deploy --tag "$(git rev-parse --short HEAD)" --message "$(git log -1 --pretty=%s)"
 """
