@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   changes:
     name: Classify changes
@@ -92,6 +96,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
       - name: Validate generated pages, links, and assets
         run: make docs-check
       - name: Validate documentation JavaScript
@@ -130,9 +135,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
       - name: Install portability tools
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk shellcheck
+        run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk
       - name: Build and test
         run: make ysh test
       - name: Verify committed artifact matches source

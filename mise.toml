@@ -9,6 +9,8 @@ locked = true
 wrangler = "4.126.0"
 node = "24"
 make = "4.3"
+# make lint runs it; without it `mise run check` fails on a clean machine.
+shellcheck = "0.11.0"
 
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
