@@ -9,3 +9,9 @@ test/.tmp-*
 *~
 \#*\#
 .\#*
+
+# mise
+mise.local.toml
+
+# cloudflare
+.wrangler/
