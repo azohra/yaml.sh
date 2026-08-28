@@ -156,6 +156,13 @@ _static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
           <p>Expression operators must preserve node references unless they intentionally compute a new value. Add tests for precedence, empty streams, null traversal, scalar and collection inputs, multi-result output, and parity with the equivalent yq expression where one exists.</p>
           <h2 id="portability"><a href="#portability">Portability<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform <code>/bin/sh</code>. That portability matrix runs on pull requests and main updates that touch the runtime; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.</p>
+          <p>Run the Linux-only portion on any Docker host:</p>
+          <div class="code-block">
+            <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>
+            <pre><code class="language-sh">mise run check:linux-portability
+</code></pre>
+          </div>
+          <p>The Ubuntu 24.04 container covers BusyBox AWK, POSIX-mode gawk, original AWK, dash, bash POSIX mode, and BusyBox sh. The native CI matrix remains the proof for macOS on Arm and Intel.</p>
           <p>Avoid implementation-specific AWK extensions unless the portability contract changes deliberately. House idioms keep the modules portable: declare function locals as extra parameters after the real arguments; pass arrays through parameters, which are per-call and by-reference; write awkward quotes as <code>sprintf(&quot;%c&quot;, 39)</code>; avoid gawk-only builtins such as <code>gensub</code> and <code>asort</code>. Module text must never contain the build heredoc terminators <code>YSH_AWK_EOF</code> or <code>YSH_DIFF_AWK_EOF</code>.</p>
           <p>One recorded shell gotcha: in <code>VAR1=... VAR2=$(cmd) program</code>, many shells apply the assignments left to right, so a leading <code>PATH=</code> prefix changes how a later <code>$(command -v ...)</code> resolves. Resolve real tool paths into variables before building such command lines, as the <code>test/fault-bin/</code> shims require.</p>
       </article>
