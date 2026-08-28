@@ -24,6 +24,11 @@ Read [the design](DESIGN.md) first. It defines the product premise, invariants, 
 | Resource limits or transactions | `make adversarial`, `make scale` |
 | Docs sources or generators | `make docs`, `make docs-check` |
 
+Before a release, `mise run evidence` runs the full measured battery — conformance
+against the pinned YAML, TOML, JSON Schema and JSON Patch corpora, differential
+agreement with a pinned yq, and the scale and benchmark budgets. It fetches those
+corpora itself; the weekly job runs the same verb.
+
 ## Generated files
 
 `make ysh` and `make docs` own these paths; edit their sources instead:

@@ -10,74 +10,28 @@ permissions:
 
 jobs:
   evidence:
+    name: Evidence
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: Install evidence tools
-        run: sudo apt-get update && sudo apt-get install -y busybox jq time
-      - name: Build
-        run: make ysh
-      - name: Configure BusyBox AWK
+      - uses: jdx/mise-action@v4
+      # The battery, against the pinned corpora it fetches. Identical to what
+      # `mise run evidence` does on a contributor's machine.
+      - run: mise run evidence
+
+      # The same measurements under BusyBox AWK. Left explicit: mise has no
+      # busybox to hand a laptop, and routing these through the verb would
+      # re-measure under the stock AWK and report it as portability evidence.
+      - name: Install BusyBox
+        run: sudo apt-get update && sudo apt-get install -y busybox
+      - name: Measure with BusyBox AWK
         run: |
-          mkdir -p "${RUNNER_TEMP}/ysh-busybox"
-          ln -s "$(command -v busybox)" "${RUNNER_TEMP}/ysh-busybox/awk"
-      - name: Fetch pinned YAML Test Suite
-        run: git clone --depth 1 --branch data-2022-01-17 https://github.com/yaml/yaml-test-suite.git "${RUNNER_TEMP}/yaml-test-suite"
-      - name: Measure conformance with mawk
-        env:
-          YAML_TEST_SUITE_DIR: ${{ runner.temp }}/yaml-test-suite
-        run: make conformance
-      - name: Measure conformance with BusyBox AWK
-        env:
-          YAML_TEST_SUITE_DIR: ${{ runner.temp }}/yaml-test-suite
-        run: PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make conformance
-      - name: Measure pinned TOML 1.0 conformance
-        run: make toml-conformance
-      - name: Fetch pinned JSON Schema Test Suite
-        run: |
-          git init -q "${RUNNER_TEMP}/json-schema-test-suite"
-          git -C "${RUNNER_TEMP}/json-schema-test-suite" remote add origin https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
-          git -C "${RUNNER_TEMP}/json-schema-test-suite" fetch -q --depth 1 origin fb7372e8763a1417bddc65fa4c911b3e79b57b65
-          git -C "${RUNNER_TEMP}/json-schema-test-suite" checkout -q --detach FETCH_HEAD
-      - name: Measure JSON Schema 2020-12 focused conformance
-        env:
-          JSON_SCHEMA_TEST_SUITE_DIR: ${{ runner.temp }}/json-schema-test-suite
-        run: make schema-conformance
-      - name: Fetch pinned JSON Patch corpora
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/json-patch/json-patch-tests/master/tests.json -o "${RUNNER_TEMP}/json-patch-tests.json"
-          printf '%s  %s\n' 'de3dce3d0d5029fed83007e50b54607750dd3d1478d3c59ca35fdc18fb1a04ae' "${RUNNER_TEMP}/json-patch-tests.json" | sha256sum --check
-          curl -fsSL https://raw.githubusercontent.com/json-patch/json-patch-tests/master/spec_tests.json -o "${RUNNER_TEMP}/json-patch-spec-tests.json"
-          printf '%s  %s\n' 'a26b050292207033e5cccc5d6102b7bd6f8add7db0d0680e5d46a7ecf40a8c7b' "${RUNNER_TEMP}/json-patch-spec-tests.json" | sha256sum --check
-      - name: Measure RFC 6902 conformance
-        run: |
-          JSON_PATCH_TEST_FILE="${RUNNER_TEMP}/json-patch-tests.json" make json-patch-conformance
-          JSON_PATCH_TEST_FILE="${RUNNER_TEMP}/json-patch-spec-tests.json" make json-patch-conformance
-      - name: Install pinned yq oracle
-        run: |
-          curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64 -o "${RUNNER_TEMP}/yq"
-          printf '%s  %s\n' 'fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4' "${RUNNER_TEMP}/yq" | sha256sum --check
-          chmod 755 "${RUNNER_TEMP}/yq"
-      - name: Compare with yq
-        env:
-          YQ_BINARY: ${{ runner.temp }}/yq
-        run: |
+          mkdir -p "$RUNNER_TEMP/ysh-busybox"
+          ln -s "$(command -v busybox)" "$RUNNER_TEMP/ysh-busybox/awk"
+          export PATH="$RUNNER_TEMP/ysh-busybox:$PATH"
+          export YAML_TEST_SUITE_DIR="$PWD/.evidence/yaml-test-suite"
+          export YQ_BINARY="$(mise which yq)"
+          make conformance
           make differential
-          PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make differential
-      - name: Run deterministic and adversarial suites
-        env:
-          YSH_FUZZ_MATRICES: 1
-          YSH_FUZZ_SEED: ${{ github.run_number }}
-        run: |
           make fuzz
-          make presentation
-          make public-contract
-          make operator-manifest
-          make parser-boundaries
-          make adversarial
-          PATH="${RUNNER_TEMP}/ysh-busybox:${PATH}" make fuzz
-      - name: Verify scale contract
-        run: make scale
-      - name: Verify benchmark budgets
-        run: YSH_BENCHMARK_SCALE=2 make benchmark

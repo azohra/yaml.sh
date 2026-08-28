@@ -5,6 +5,10 @@
 # Task artifact caching, which check:runtime and check:docs are built on.
 experimental = true
 
+[env]
+# Where the pinned corpora live. Gitignored: fetched, never committed.
+YSH_EVIDENCE_DIR = "{{config_root}}/.evidence"
+
 [tool_config]
 # Tools must resolve from the committed mise.lock (version + checksum + url).
 locked = true
@@ -15,6 +19,9 @@ node = "24"
 make = "4.3"
 # make lint runs it; without it `mise run check` fails on a clean machine.
 shellcheck = "0.11.0"
+# The differential oracle. A pinned tool with a lockfile checksum, rather than a
+# curl and a hand-kept sha256 that only ever ran on a Linux runner.
+yq = "4.53.3"
 
 # What this repository needs in its environment, and which of those
 # disclosure would compromise. Read it; do not restate it.
@@ -62,6 +69,76 @@ sources = [
   "ysh",
 ]
 run = "make ysh docs-check"
+
+# --- evidence --------------------------------------------------------------
+# The measured claims: conformance against external corpora, agreement with the
+# yq oracle, and the scale and benchmark budgets. Slow, networked and weekly, so
+# it is not part of `check` — but it is a verb, so it runs here and not only on
+# a runner.
+
+[tasks."evidence:corpora"]
+description = "Fetch the pinned external corpora the evidence run measures against"
+run = """
+#!/usr/bin/env bash
+# Every corpus is pinned — a tag, a commit, or a sha256. An evidence number
+# measured against a moving corpus is not evidence.
+set -euo pipefail
+dir="${YSH_EVIDENCE_DIR:?}"
+mkdir -p "$dir"
+
+digest() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
+
+pin_repo() {
+  name=$1 url=$2 ref=$3
+  if [ -f "$dir/$name/.pin" ] && [ "$(cat "$dir/$name/.pin")" = "$ref" ]; then return 0; fi
+  rm -rf "$dir/$name"
+  git init -q "$dir/$name"
+  git -C "$dir/$name" remote add origin "$url"
+  git -C "$dir/$name" fetch -q --depth 1 origin "$ref"
+  git -C "$dir/$name" checkout -q --detach FETCH_HEAD
+  printf '%s' "$ref" > "$dir/$name/.pin"
+}
+
+pin_file() {
+  name=$1 url=$2 want=$3
+  if [ -f "$dir/$name" ] && [ "$(digest "$dir/$name")" = "$want" ]; then return 0; fi
+  curl -fsSL "$url" -o "$dir/$name"
+  got=$(digest "$dir/$name")
+  [ "$got" = "$want" ] || { echo "evidence:corpora: refusing — $name is $got, pinned at $want" >&2; rm -f "$dir/$name"; exit 1; }
+}
+
+pin_repo yaml-test-suite https://github.com/yaml/yaml-test-suite.git data-2022-01-17
+pin_repo json-schema-test-suite https://github.com/json-schema-org/JSON-Schema-Test-Suite.git fb7372e8763a1417bddc65fa4c911b3e79b57b65
+pin_file json-patch-tests.json https://raw.githubusercontent.com/json-patch/json-patch-tests/master/tests.json de3dce3d0d5029fed83007e50b54607750dd3d1478d3c59ca35fdc18fb1a04ae
+pin_file json-patch-spec-tests.json https://raw.githubusercontent.com/json-patch/json-patch-tests/master/spec_tests.json a26b050292207033e5cccc5d6102b7bd6f8add7db0d0680e5d46a7ecf40a8c7b
+"""
+
+[tasks.evidence]
+description = "Measure conformance, differential agreement, and the scale and benchmark budgets"
+depends = ["evidence:corpora"]
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+dir="${YSH_EVIDENCE_DIR:?}"
+export YAML_TEST_SUITE_DIR="$dir/yaml-test-suite"
+export JSON_SCHEMA_TEST_SUITE_DIR="$dir/json-schema-test-suite"
+export YQ_BINARY="$(command -v yq)"
+make ysh
+make conformance
+make toml-conformance
+make schema-conformance
+JSON_PATCH_TEST_FILE="$dir/json-patch-tests.json" make json-patch-conformance
+JSON_PATCH_TEST_FILE="$dir/json-patch-spec-tests.json" make json-patch-conformance
+make differential
+make fuzz
+make presentation
+make public-contract
+make operator-manifest
+make parser-boundaries
+make adversarial
+make scale
+YSH_BENCHMARK_SCALE="${YSH_BENCHMARK_SCALE:-2}" make benchmark
+"""
 
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
