@@ -49,7 +49,7 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/*|Makefile)
+              .github/workflows/*|Makefile|mise.toml|mise.lock)
                 runtime=true
                 docs=true
                 docs_portability=true
@@ -97,10 +97,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
-      - name: Validate generated pages, links, and assets
-        run: make docs-check
-      - name: Validate documentation JavaScript
-        run: node --check _static/_www/docs/docs.js
+      - name: Validate generated pages, links, assets, and docs JavaScript
+        run: mise run check:docs
       - name: Install extra AWK implementations
         if: needs.changes.outputs.docs_portability == 'true'
         run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk
@@ -139,15 +137,16 @@ jobs:
       - name: Install portability tools
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y busybox gawk original-awk
-      - name: Build and test
-        run: make ysh test
+      # No task-artifact cache on this job: its whole purpose is running the
+      # same battery on a different OS, and a shared result would skip exactly
+      # the run that proves portability.
+      - name: Build, lint, and test
+        run: mise run check:runtime
       - name: Verify committed artifact matches source
         run: git diff --exit-code ysh
-      - name: Lint
-        if: matrix.os == 'ubuntu-latest'
-        run: make lint
-      - name: Validate POSIX shell syntax
-        run: sh -n ysh
+      # These re-run the suites under another AWK. They call make directly:
+      # PATH is not part of a task's cache key, so `mise run check:runtime`
+      # here would restore the stock-AWK result and prove nothing.
       - name: Test with BusyBox AWK
         if: matrix.os == 'ubuntu-latest'
         run: |

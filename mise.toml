@@ -1,6 +1,10 @@
 # The Makefile keeps the build recipes; these verbs are the fleet-invariant
 # contract over it.
 
+[settings]
+# Task artifact caching, which check:runtime and check:docs are built on.
+experimental = true
+
 [tool_config]
 # Tools must resolve from the committed mise.lock (version + checksum + url).
 locked = true
@@ -23,9 +27,45 @@ secret  CLOUDFLARE_API_TOKEN
 CONTRACT
 """
 
+# Both halves of the battery are content-addressed: a run whose inputs are
+# unchanged restores its result instead of repeating it, on a laptop and on a
+# runner alike. `sources` is an assertion — every file the half reads must
+# appear, or an unchanged-looking tree can go green on work it never did.
+[tasks."check:runtime"]
+outputs = []
+cache = { enabled = true }
+description = "Build ysh, lint every script, run the suites"
+sources = [
+  "src/**",
+  "build/**",
+  "test/**",
+  "bench/**",
+  "_static/_www/install",
+  "Makefile",
+  "ysh",
+]
+run = "make ysh lint test"
+
+[tasks."check:docs"]
+outputs = []
+cache = { enabled = true }
+# guidance.sh reads the prose against the source it documents, so src/ and the
+# root Markdown are inputs here too, not just _static/.
+description = "Build ysh, then validate the site and its generated pages"
+sources = [
+  "src/**",
+  "build/**",
+  "test/**",
+  "_static/**",
+  "*.md",
+  "Makefile",
+  "ysh",
+]
+run = "make ysh docs-check"
+
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
-run = "make all"
+depends = ["check:runtime", "check:docs"]
 
 [tasks.deploy]
 description = "Deploy the site at the tip of main"
