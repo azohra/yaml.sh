@@ -10,7 +10,9 @@ Read [the design](DESIGN.md) first. It defines the product premise, invariants, 
 
 1. Add or update a test in `test/test.sh`. Parser fixtures belong in `test/`.
 2. Edit the readable sources in `src/`. Never edit generated files; the map is below.
-3. Run `make all` to rebuild, lint, and test the project, then run the focused
+3. Run `mise run check` to rebuild, lint, and test the project. Runtime and
+   docs-generator changes also need `mise run check:linux-portability`; Docker
+   supplies the Linux AWK and shell matrix that CI runs. Then run the focused
    gates for the subsystem you touched. Update `test/public-contract.tsv` when
    the supported surface or its product role changes.
 4. Update the documentation and changelog for user-visible changes.

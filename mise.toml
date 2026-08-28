@@ -70,6 +70,20 @@ sources = [
 ]
 run = "make ysh docs-check"
 
+# Linux-only portability runs in Docker so the same proof is available on a
+# laptop and a runner. The native CI matrix remains the macOS portability
+# authority; an Ubuntu container cannot prove those implementations.
+[tasks."check:linux-portability"]
+description = "Test the Linux AWK and shell matrix in Ubuntu 24.04 (requires Docker)"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+command -v docker >/dev/null 2>&1 || { echo "check:linux-portability: refusing — docker is unavailable" >&2; exit 1; }
+docker info >/dev/null 2>&1 || { echo "check:linux-portability: refusing — the docker daemon is unavailable" >&2; exit 1; }
+image=$(docker build --quiet --file test/linux-portability.Dockerfile .)
+docker run --rm --network none "$image"
+"""
+
 # --- evidence --------------------------------------------------------------
 # The measured claims: conformance against external corpora, agreement with the
 # yq oracle, and the scale and benchmark budgets. Slow, networked and weekly, so

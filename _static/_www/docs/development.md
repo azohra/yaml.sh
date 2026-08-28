@@ -64,6 +64,16 @@ Expression operators must preserve node references unless they intentionally com
 
 Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on pull requests and main updates that touch the runtime; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
 
+Run the Linux-only portion on any Docker host:
+
+```sh
+mise run check:linux-portability
+```
+
+The Ubuntu 24.04 container covers BusyBox AWK, POSIX-mode gawk, original AWK,
+dash, bash POSIX mode, and BusyBox sh. The native CI matrix remains the proof
+for macOS on Arm and Intel.
+
 Avoid implementation-specific AWK extensions unless the portability contract changes deliberately. House idioms keep the modules portable: declare function locals as extra parameters after the real arguments; pass arrays through parameters, which are per-call and by-reference; write awkward quotes as `sprintf("%c", 39)`; avoid gawk-only builtins such as `gensub` and `asort`. Module text must never contain the build heredoc terminators `YSH_AWK_EOF` or `YSH_DIFF_AWK_EOF`.
 
 One recorded shell gotcha: in `VAR1=... VAR2=$(cmd) program`, many shells apply the assignments left to right, so a leading `PATH=` prefix changes how a later `$(command -v ...)` resolves. Resolve real tool paths into variables before building such command lines, as the `test/fault-bin/` shims require.
