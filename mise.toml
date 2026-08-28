@@ -12,6 +12,17 @@ make = "4.3"
 # make lint runs it; without it `mise run check` fails on a clean machine.
 shellcheck = "0.11.0"
 
+# What this repository needs in its environment, and which of those
+# disclosure would compromise. Read it; do not restate it.
+[tasks."env:contract"]
+hide = true
+description = "Every variable this repository needs, and whether it is a secret"
+run = """
+cat <<'CONTRACT'
+secret  CLOUDFLARE_API_TOKEN
+CONTRACT
+"""
+
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
 run = "make all"
