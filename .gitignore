@@ -13,8 +13,6 @@ test/.tmp-*
 # mise
 mise.local.toml
 
-/.azohra/
-
 # cloudflare
 .wrangler/
 .evidence/
