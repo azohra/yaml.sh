@@ -13,7 +13,7 @@ ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile build/shbuilder.awk
 lint: ysh
 	@echo "👖 Linting"
 	@sh -n ysh
-	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/guidance.sh test/test.sh test/workflows.sh test/public-contract.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/linux-portability-container.sh test/fault-bin/mv test/fault-bin/awk bench/benchmark.sh bench/scale.sh _static/_www/install
+	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/guidance.sh test/test.sh test/workflows.sh test/public-contract.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/linux-portability-container.sh test/busybox-evidence-container.sh test/fault-bin/mv test/fault-bin/awk bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
 	@echo "🔬 Testing"

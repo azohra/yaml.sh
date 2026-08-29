@@ -26,10 +26,11 @@ Read [the design](DESIGN.md) first. It defines the product premise, invariants, 
 | Resource limits or transactions | `make adversarial`, `make scale` |
 | Docs sources or generators | `make docs`, `make docs-check` |
 
-Before a release, `mise run evidence` runs the full measured battery — conformance
+Before a release, `mise run evidence` runs the full measured battery: conformance
 against the pinned YAML, TOML, JSON Schema and JSON Patch corpora, differential
 agreement with a pinned yq, and the scale and benchmark budgets. It fetches those
-corpora itself; the weekly job runs the same verb.
+corpora itself. `mise run evidence:busybox` repeats the conformance, differential,
+and fuzz measurements with BusyBox AWK in Docker. The weekly job runs both verbs.
 
 ## Generated files
 

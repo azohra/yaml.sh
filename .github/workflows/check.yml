@@ -117,8 +117,6 @@ jobs:
       # the run that proves portability.
       - name: Build, lint, and test
         run: mise run check:runtime
-      - name: Verify committed artifact matches source
-        run: git diff --exit-code ysh
 
   linux-portability:
     name: Linux AWK and shell portability

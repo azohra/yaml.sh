@@ -41,7 +41,7 @@ CONTRACT
 [tasks."check:runtime"]
 outputs = []
 cache = { enabled = true }
-description = "Build ysh, lint every script, run the suites"
+description = "Build ysh, verify the generated artifact, lint every script, run the suites"
 sources = [
   "src/**",
   "build/**",
@@ -51,7 +51,7 @@ sources = [
   "Makefile",
   "ysh",
 ]
-run = "make ysh lint test"
+run = "make ysh lint test && git diff --exit-code -- ysh"
 
 [tasks."check:docs"]
 outputs = []
@@ -80,7 +80,7 @@ run = """
 set -euo pipefail
 command -v docker >/dev/null 2>&1 || { echo "check:linux-portability: refusing — docker is unavailable" >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo "check:linux-portability: refusing — the docker daemon is unavailable" >&2; exit 1; }
-image=$(docker build --quiet --file test/linux-portability.Dockerfile .)
+image=$(docker build --quiet --build-arg "YQ_VERSION=$(mise current yq)" --file test/linux-portability.Dockerfile .)
 docker run --rm --network none "$image"
 """
 
@@ -152,6 +152,20 @@ make parser-boundaries
 make adversarial
 make scale
 YSH_BENCHMARK_SCALE="${YSH_BENCHMARK_SCALE:-2}" make benchmark
+"""
+
+[tasks."evidence:busybox"]
+description = "Repeat the conformance, differential, and fuzz evidence with BusyBox AWK"
+depends = ["evidence:corpora"]
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+command -v docker >/dev/null 2>&1 || { echo "evidence:busybox: refusing — docker is unavailable" >&2; exit 1; }
+docker info >/dev/null 2>&1 || { echo "evidence:busybox: refusing — the docker daemon is unavailable" >&2; exit 1; }
+dir="${YSH_EVIDENCE_DIR:?}"
+[ -d "$dir/yaml-test-suite" ] || { echo "evidence:busybox: refusing — the YAML test suite is unavailable" >&2; exit 1; }
+image=$(docker build --quiet --build-arg "YQ_VERSION=$(mise current yq)" --file test/linux-portability.Dockerfile .)
+docker run --rm --network none --volume "$dir:/evidence:ro" "$image" ./test/busybox-evidence-container.sh
 """
 
 [tasks.check]

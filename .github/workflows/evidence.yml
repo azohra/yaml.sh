@@ -19,19 +19,5 @@ jobs:
       # The battery, against the pinned corpora it fetches. Identical to what
       # `mise run evidence` does on a contributor's machine.
       - run: mise run evidence
-
-      # The same measurements under BusyBox AWK. Left explicit: mise has no
-      # busybox to hand a laptop, and routing these through the verb would
-      # re-measure under the stock AWK and report it as portability evidence.
-      - name: Install BusyBox
-        run: sudo apt-get update && sudo apt-get install -y busybox
       - name: Measure with BusyBox AWK
-        run: |
-          mkdir -p "$RUNNER_TEMP/ysh-busybox"
-          ln -s "$(command -v busybox)" "$RUNNER_TEMP/ysh-busybox/awk"
-          export PATH="$RUNNER_TEMP/ysh-busybox:$PATH"
-          export YAML_TEST_SUITE_DIR="$PWD/.evidence/yaml-test-suite"
-          export YQ_BINARY="$(mise which yq)"
-          make conformance
-          make differential
-          make fuzz
+        run: mise run evidence:busybox
