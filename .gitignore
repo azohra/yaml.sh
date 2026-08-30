@@ -12,7 +12,7 @@ test/.tmp-*
 
 # mise
 /mise.local.toml
-/mise.local.lock
+mise*.lock
 
 # cloudflare
 .wrangler/

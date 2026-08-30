@@ -49,7 +49,7 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/*|Makefile|mise.toml|mise.lock)
+              .github/workflows/*|Makefile|mise.toml)
                 runtime=true
                 docs=true
                 docs_portability=true
