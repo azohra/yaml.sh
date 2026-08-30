@@ -16,6 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
+        with:
+          minimum_release_age: 24h
       # The battery, against the pinned corpora it fetches. Identical to what
       # `mise run evidence` does on a contributor's machine.
       - run: mise run evidence

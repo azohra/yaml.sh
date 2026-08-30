@@ -97,6 +97,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
+        with:
+          minimum_release_age: 24h
       - name: Validate generated pages, links, assets, and docs JavaScript
         run: mise run check:docs
 
@@ -112,9 +114,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
-      # No task-artifact cache on this job: its whole purpose is running the
-      # same battery on a different OS, and a shared result would skip exactly
-      # the run that proves portability.
+        with:
+          minimum_release_age: 24h
       - name: Build, lint, and test
         run: mise run check:runtime
 
@@ -127,4 +128,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
+        with:
+          minimum_release_age: 24h
       - run: mise run check:linux-portability
