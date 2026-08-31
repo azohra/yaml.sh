@@ -98,22 +98,58 @@ mkdir -p "$dir"
 digest() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
 pin_repo() {
-  name=$1 url=$2 ref=$3
-  if [ -f "$dir/$name/.pin" ] && [ "$(cat "$dir/$name/.pin")" = "$ref" ]; then return 0; fi
-  rm -rf "$dir/$name"
-  git init -q "$dir/$name"
-  git -C "$dir/$name" remote add origin "$url"
-  git -C "$dir/$name" fetch -q --depth 1 origin "$ref"
-  git -C "$dir/$name" checkout -q --detach FETCH_HEAD
-  printf '%s' "$ref" > "$dir/$name/.pin"
+  local name=$1 url=$2 ref=$3 target marker legacy_marker current tmp
+  target="$dir/$name"
+  marker="$target.pin"
+  legacy_marker="$target/.pin"
+  if [ -d "$target" ] && [ ! -L "$target" ]; then
+    current=
+    if [ -f "$marker" ] && [ ! -L "$marker" ]; then
+      current=$(cat "$marker")
+    elif [ -f "$legacy_marker" ] && [ ! -L "$legacy_marker" ]; then
+      current=$(cat "$legacy_marker")
+    fi
+    if [ "$current" = "$ref" ]; then
+      rm -f "$marker"
+      printf '%s\n' "$ref" > "$marker"
+      # Git is only transport here; retained metadata makes tools discover the
+      # corpora as unrelated repositories.
+      rm -rf "$target/.git"
+      rm -f "$legacy_marker"
+      return 0
+    fi
+  fi
+
+  tmp=$(mktemp -d "$dir/.$name.XXXXXX")
+  if git init -q "$tmp" &&
+     git -C "$tmp" remote add origin "$url" &&
+     git -C "$tmp" fetch -q --depth 1 origin "$ref" &&
+     git -C "$tmp" checkout -q --detach FETCH_HEAD &&
+     rm -rf "$tmp/.git"; then
+    rm -rf "$target"
+    mv "$tmp" "$target"
+    rm -f "$marker"
+    printf '%s\n' "$ref" > "$marker"
+  else
+    rm -rf "$tmp"
+    return 1
+  fi
 }
 
 pin_file() {
-  name=$1 url=$2 want=$3
-  if [ -f "$dir/$name" ] && [ "$(digest "$dir/$name")" = "$want" ]; then return 0; fi
-  curl -fsSL "$url" -o "$dir/$name"
-  got=$(digest "$dir/$name")
-  [ "$got" = "$want" ] || { echo "evidence:corpora: refusing — $name is $got, pinned at $want" >&2; rm -f "$dir/$name"; exit 1; }
+  local name=$1 url=$2 want=$3 target tmp got
+  target="$dir/$name"
+  if [ -f "$target" ] && [ "$(digest "$target")" = "$want" ]; then return 0; fi
+
+  tmp=$(mktemp "$dir/.$name.XXXXXX")
+  if ! curl -fsSL "$url" -o "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  got=$(digest "$tmp")
+  [ "$got" = "$want" ] || { echo "evidence:corpora: refusing — $name is $got, pinned at $want" >&2; rm -f "$tmp"; return 1; }
+  rm -rf "$target"
+  mv "$tmp" "$target"
 }
 
 pin_repo yaml-test-suite https://github.com/yaml/yaml-test-suite.git data-2022-01-17
