@@ -203,6 +203,32 @@ docker run --rm --network none --volume "$dir:/evidence:ro" "$image" ./test/busy
 description = "The Makefile's full battery: build, lint, tests, docs"
 depends = ["check:runtime", "check:docs"]
 
+[tasks."check:ci-result"]
+description = "Verify classified CI jobs succeeded or were intentionally skipped"
+raw_args = true
+run = "sh build/ci-result.sh"
+
+[tasks.push]
+description = "Push a checked feature branch for review"
+tools = { gh = "2.100.0" }
+depends = ["check"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+branch=$(git branch --show-current)
+[ -n "$branch" ] && [ "$branch" != main ] || { echo 'push: use a feature branch' >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo 'push: commit the complete change first' >&2; exit 1; }
+[ "$(gh api --hostname github.com user --jq .login)" = azohra ] || { echo 'push: expected the azohra account' >&2; exit 1; }
+[ "$(gh api --hostname github.com repos/azohra/yaml.sh --jq '.id == 159573143 and .private == false')" = true ] || { echo 'push: repository identity changed' >&2; exit 1; }
+for url in "$(git remote get-url --all origin)" "$(git remote get-url --push --all origin)"; do
+  case "$url" in
+    https://github.com/azohra/yaml.sh|https://github.com/azohra/yaml.sh.git|git@github.com:azohra/yaml.sh.git) ;;
+    *) echo 'push: unexpected remote destination' >&2; exit 1 ;;
+  esac
+done
+git push --set-upstream origin "refs/heads/$branch:refs/heads/$branch"
+'''
+
 [tasks.deploy]
 description = "Deploy the site at the tip of main"
 confirm = "Deploy yaml.azohra.com to production?"
