@@ -32,6 +32,13 @@ agreement with a pinned yq, and the scale and benchmark budgets. It fetches thos
 corpora itself. `mise run evidence:busybox` repeats the conformance, differential,
 and fuzz measurements with BusyBox AWK in Docker. The weekly job runs both verbs.
 
+CI's `Check` job combines the selected runtime, documentation, and portability
+results. It rejects failed classification and missing or unsuccessful selected
+jobs, while accepting intentional skips. Use this stable result for branch
+protection: the runtime matrix emits different check names when skipped.
+
+`mise run push` checks and publishes a clean feature branch for PR review.
+
 ## Generated files
 
 `make ysh` and `make docs` own these paths; edit their sources instead:

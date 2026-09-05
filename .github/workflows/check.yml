@@ -78,6 +78,8 @@ jobs:
             printf 'docs_portability=%s\n' "$docs_portability"
           } >> "$GITHUB_OUTPUT"
 
+          # The backticks below are Markdown, not shell substitutions.
+          # shellcheck disable=SC2016
           {
             printf '### CI scope\n\n'
             printf -- '- Runtime portability: `%s`\n' "$runtime"
@@ -131,3 +133,29 @@ jobs:
         with:
           minimum_release_age: 24h
       - run: mise run check:linux-portability
+
+  check:
+    name: Check
+    needs: [changes, docs, test, linux-portability]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          minimum_release_age: 24h
+      - name: Verify selected results
+        env:
+          CLASSIFICATION: ${{ needs.changes.result }}
+          RUNTIME_SCOPE: ${{ needs.changes.outputs.runtime }}
+          DOCS_SCOPE: ${{ needs.changes.outputs.docs }}
+          PORTABILITY_SCOPE: ${{ needs.changes.outputs.docs_portability }}
+          DOCS_RESULT: ${{ needs.docs.result }}
+          RUNTIME_RESULT: ${{ needs.test.result }}
+          PORTABILITY_RESULT: ${{ needs.linux-portability.result }}
+        run: |
+          mise run check:ci-result -- "$CLASSIFICATION" "$RUNTIME_SCOPE" "$DOCS_SCOPE" \
+            "$PORTABILITY_SCOPE" "$DOCS_RESULT" "$RUNTIME_RESULT" "$PORTABILITY_RESULT"
