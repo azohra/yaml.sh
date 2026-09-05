@@ -5,15 +5,12 @@ function new_node(kind, source_line, value, value_type, tag,    node) {
     node = ++node_count
     node_kind[node] = kind
     node_line[node] = source_line
-    if (value != "") {
-        node_value[node] = value
-    }
-    if (value_type != "") {
-        node_type[node] = value_type
-    }
-    if (tag != "") {
-        node_tag[node] = tag
-    }
+    node_value[node] = value
+    node_type[node] = value_type
+    node_tag[node] = tag
+    node_anchor[node] = ""
+    node_depth[node] = 0
+    node_style[node] = ""
     if (document_index != file_document_offset) {
         node_document[node] = document_index - file_document_offset
     }

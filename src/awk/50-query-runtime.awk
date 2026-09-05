@@ -802,7 +802,7 @@ function expression_clear_node(node,    i, key) {
         sequence_count[node] = 0
     }
     delete alias_target[node]
-    delete node_anchor[node]
+    node_anchor[node] = ""
 }
 
 function expression_attach_missing(node,    parent, key) {

@@ -40,10 +40,12 @@ and fuzz measurements with BusyBox AWK in Docker. The weekly job runs both verbs
 | --- | --- |
 | `ysh` | `src/ysh.sh`, `src/awk/*.awk`, and `src/diff.awk`, assembled by `build/shbuilder.awk` |
 | `_static/_www/docs/*/index.html`, `_static/_www/docs/index.html`, `_static/_www/docs/search-index.json` | `_static/_www/docs/*.md`, rendered by `build/docs.sh` |
-| Version and checksum spans inside `README.md`, `_static/_www/install`, and `_static/_www/index.html` | Rewritten by `build/docbuilder.awk` during `make docs` |
+| Version spans inside `README.md` and `_static/_www/index.html` | Rewritten by `build/docbuilder.awk` during `make docs` |
+| Release URL and checksum inside `_static/_www/install` | Preserved by ordinary docs builds; rewritten together from the release artifact with `make docs RELEASE_SHA256=...` |
 
-After a `src/` change, `testReleaseArtifactsStayInSync` fails until `make docs`
-refreshes the installer checksum. That is the expected mid-development state.
+Ordinary source changes must not rewrite the checksum for the immutable release
+asset named by the installer. `testReleaseArtifactsStayInSync` pins that released
+version and digest until the next release updates both together.
 
 Release numbers follow [Semantic Versioning](VERSIONING.md). Compatible additions belong in a minor release, compatible fixes in a patch release, and a new major requires an intentional, documented compatibility break.
 

@@ -7,12 +7,12 @@
     }
 }
 
-/https:\/\/raw.githubusercontent.com\/azohra\/yaml.sh\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/ {
+version != "" && /https:\/\/raw.githubusercontent.com\/azohra\/yaml.sh\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/ {
     sub(/https:\/\/raw.githubusercontent.com\/azohra\/yaml.sh\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/, "https://raw.githubusercontent.com/azohra/yaml.sh/v" version "/ysh")
     print
     next
 }
-/https:\/\/github.com\/azohra\/yaml.sh\/releases\/download\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/ {
+version != "" && /https:\/\/github.com\/azohra\/yaml.sh\/releases\/download\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/ {
     sub(/https:\/\/github.com\/azohra\/yaml.sh\/releases\/download\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/, "https://github.com/azohra/yaml.sh/releases/download/v" version "/ysh")
     print
     next

@@ -69,7 +69,7 @@ run = "make ysh docs-check"
 # laptop and a runner. The native CI matrix remains the macOS portability
 # authority; an Ubuntu container cannot prove those implementations.
 [tasks."check:linux-portability"]
-description = "Test the Linux AWK and shell matrix in Ubuntu 24.04 (requires Docker)"
+description = "Test the Linux AWK and shell matrix in Ubuntu 26.04 (requires Docker)"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail

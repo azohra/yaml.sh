@@ -1689,14 +1689,8 @@ testRunsWithPosixShell() {
 }
 
 testReleaseArtifactsStayInSync() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        release_sha256=$(sha256sum ysh)
-    else
-        release_sha256=$(shasum -a 256 ysh)
-    fi
-    release_sha256=${release_sha256%% *}
     assertContains "$(cat _static/_www/install)" "v1.18.0/ysh"
-    assertContains "$(cat _static/_www/install)" "expected_sha256=$release_sha256"
+    assertContains "$(cat _static/_www/install)" "expected_sha256=4ec74b5b1a5b96e5b60b5bcd3f44ad401e420a8b4662f54fc623fa9787f16dd3"
     assertContains "$(cat _static/_www/install)" "checksum verification failed"
     assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.18.0"
     assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
