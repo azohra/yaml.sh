@@ -1,5 +1,6 @@
 AWK_MODULES := $(sort $(wildcard src/awk/*.awk))
 INSTALL_DIR=/usr/local/bin
+RELEASE_SHA256 ?=
 
 .PHONY: lint test docs-check public-contract operator-manifest conformance toml-conformance schema-conformance json-patch-conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
 
@@ -94,10 +95,9 @@ uninstall:
 docs: ysh
 	@echo "📚 Updating docs"
 	$(eval VERSION := $(shell sed -n 's/^YSH_VERSION=//p' ysh | head -n 1))
-	$(eval RELEASE_SHA256 := $(shell if command -v sha256sum >/dev/null 2>&1; then sha256sum ysh | sed 's/ .*//'; else shasum -a 256 ysh | sed 's/ .*//'; fi))
 	@awk -v version=$(VERSION) -f build/docbuilder.awk README.md > .tmp_README.md
 	@mv .tmp_README.md README.md
-	@awk -v version=$(VERSION) -v sha256=$(RELEASE_SHA256) -f build/docbuilder.awk _static/_www/install > .tmp_install
+	@awk $(if $(strip $(RELEASE_SHA256)),-v version=$(VERSION) -v sha256=$(RELEASE_SHA256),) -f build/docbuilder.awk _static/_www/install > .tmp_install
 	@mv .tmp_install _static/_www/install
 	@chmod 755 _static/_www/install
 	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/index.html > .tmp_index.html

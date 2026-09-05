@@ -36,6 +36,15 @@ if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROO
     printf '%s\n' 'Installer checksum is not generated from the release artifact.' >&2
     exit 1
 fi
+expected_sha256=$(sed -n 's/^expected_sha256=//p' "$ROOT/_static/_www/install")
+if ! awk -v version=9.9.9 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq "expected_sha256=$expected_sha256"; then
+    printf '%s\n' 'Ordinary documentation builds rewrite the pinned release checksum.' >&2
+    exit 1
+fi
+if ! awk -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'releases/download/v1.18.0/ysh'; then
+    printf '%s\n' 'Ordinary documentation builds rewrite the pinned release URL.' >&2
+    exit 1
+fi
 if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'releases/download/v9.9.9/ysh'; then
     printf '%s\n' 'Installer download URL is not generated from the release version.' >&2
     exit 1

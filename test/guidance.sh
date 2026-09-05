@@ -87,7 +87,7 @@ if [ -z "$shunit_version" ] || ! grep -qF "$shunit_version" _static/_www/docs/de
     status=1
 fi
 
-# Guidance names this test as the expected mid-development failure.
+# Guidance names this test as the pinned release-artifact contract.
 if ! grep -q 'testReleaseArtifactsStayInSync()' test/test.sh; then
     printf '%s\n' 'Guidance references testReleaseArtifactsStayInSync, which no longer exists' >&2
     status=1

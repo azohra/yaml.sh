@@ -32,7 +32,10 @@ Bumping the version touches an exact set:
 1. `YSH_VERSION` in `src/ysh.sh`.
 2. The three version assertions in `test/test.sh`: `--version`, the installer download URL, and the homepage version marker.
 3. A dated `CHANGELOG.md` entry plus its compare-link definition at the file tail.
-4. `make docs`, which regenerates the installer checksum, homepage version, and documentation pages.
+4. Build the release artifact, calculate its SHA-256 digest, and pass that digest to
+   `make docs RELEASE_SHA256=...`; this updates the installer checksum, homepage
+   version, and documentation pages together. Ordinary `make docs` runs preserve
+   the checksum of the currently published immutable release asset.
 5. `make all` and the focused gates for whatever changed.
 
 Release notes carry the voice, not just the facts: the title ends with a
