@@ -54,7 +54,7 @@ For every supported feature:
 
 The objective is not a vague percentage of YAML. It is an expanding set of behaviors users can rely on.
 
-Run `make operator-manifest` and `make parser-boundaries` before expanding the public contract. `make conformance` uses the pinned YAML Test Suite; `make differential` uses yq v4.53.3 and jq; `make toml-conformance`, `make schema-conformance`, and `make json-patch-conformance` use their pinned upstream suites. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover replayable grammar properties, exact source retention, hostile shapes, and bounded scale.
+Run `make operator-manifest` and `make parser-boundaries` before expanding the public contract. `make conformance` uses the pinned YAML Test Suite; `make differential` uses yq v4.53.6 and jq; `make toml-conformance`, `make schema-conformance`, and `make json-patch-conformance` use their pinned upstream suites. `make fuzz`, `make presentation`, `make adversarial`, and `make scale` cover replayable grammar properties, exact source retention, hostile shapes, and bounded scale.
 
 ## Add expression behavior
 

@@ -8104,9 +8104,6 @@ function expression_evaluate_collections(kind, expression, input,    output, mid
                     matched = mapping_lookup(resolved, node_value[argument]) != 0
                 } else if (node_kind[resolved] == "sequence" && node_type[argument] == "int") {
                     collection = node_value[argument] + 0
-                    if (collection < 0) {
-                        collection = sequence_count[resolved] + collection
-                    }
                     matched = collection >= 0 && collection < sequence_count[resolved]
                 } else {
                     matched = 0
