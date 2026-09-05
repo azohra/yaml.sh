@@ -70,7 +70,7 @@ Run the Linux-only portion on any Docker host:
 mise run check:linux-portability
 ```
 
-The Ubuntu 24.04 container covers BusyBox AWK, POSIX-mode gawk, original AWK,
+The Ubuntu 26.04 container covers BusyBox AWK, POSIX-mode gawk, original AWK,
 dash, bash POSIX mode, and BusyBox sh. The native CI matrix remains the proof
 for macOS on Arm and Intel.
 
