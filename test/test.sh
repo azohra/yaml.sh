@@ -179,6 +179,7 @@ testExpressionCollectionHelpers() {
     assertEquals "true" "$(./ysh '.metadata | has("owner")' test/expressions.yml)"
     assertEquals "false" "$(./ysh '.metadata | has("missing")' test/expressions.yml)"
     assertEquals "true" "$(./ysh '.services | has(2)' test/expressions.yml)"
+    assertEquals "false" "$(./ysh '.services | has(-1)' test/expressions.yml)"
     assertEquals "false" "$(./ysh '.services | has(9)' test/expressions.yml)"
 }
 

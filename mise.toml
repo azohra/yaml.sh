@@ -10,13 +10,13 @@ experimental = true
 YSH_EVIDENCE_DIR = "{{config_root}}/.evidence"
 
 [tools]
-wrangler = "4.126.0"
+wrangler = "4.129.0"
 node = "24"
-make = "4.3"
+make = "4.4.1"
 # make lint runs it; without it `mise run check` fails on a clean machine.
 shellcheck = "0.11.0"
 # The differential oracle for make differential.
-yq = "4.53.3"
+yq = "4.53.6"
 
 # What this repository needs in its environment, and which of those
 # disclosure would compromise. Read it; do not restate it.

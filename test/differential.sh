@@ -12,15 +12,15 @@ YSH_DIFFERENTIAL_WORD=portable
 export YSH_DIFFERENTIAL_CONFIG YSH_DIFFERENTIAL_WORD
 
 if ! command -v "$YQ_BINARY" >/dev/null 2>&1; then
-    printf '%s\n' "The differential harness requires mikefarah/yq v4.53.3." >&2
+    printf '%s\n' "The differential harness requires mikefarah/yq v4.53.6." >&2
     exit 2
 fi
 if ! command -v jq >/dev/null 2>&1; then
     printf '%s\n' "The differential harness requires jq." >&2
     exit 2
 fi
-if ! "$YQ_BINARY" --version 2>&1 | grep -q 'version v4.53.3'; then
-    printf '%s\n' "The differential oracle must be mikefarah/yq v4.53.3." >&2
+if ! "$YQ_BINARY" --version 2>&1 | grep -q 'version v4.53.6'; then
+    printf '%s\n' "The differential oracle must be mikefarah/yq v4.53.6." >&2
     exit 2
 fi
 
@@ -71,7 +71,7 @@ while IFS="$tab" read -r family fixture query; do
     printf '%s\tpass\n' "$family" >> "$RESULTS"
 done < "$CORPUS"
 
-printf 'yq v4.53.3 differential results: %s/%s pass\n' "$passed" "$total"
+printf 'yq v4.53.6 differential results: %s/%s pass\n' "$passed" "$total"
 awk -F '\t' '
     !seen[$1]++ { order[++families] = $1 }
     { total[$1]++; if ($2 == "pass") passed[$1]++ }
@@ -111,7 +111,7 @@ while IFS="$tab" read -r family id fixture query expected; do
     fi
     workflow_passed=$((workflow_passed + 1))
 done < "$SCRIPT_DIR/workflows.tsv"
-printf 'Real-world workflows matching yq v4.53.3: %s/%s\n' "$workflow_passed" "$workflow_total"
+printf 'Real-world workflows matching yq v4.53.6: %s/%s\n' "$workflow_passed" "$workflow_total"
 if [ "$workflow_total" -eq 0 ]; then
     printf 'Workflow differential has no named scenarios\n' >&2
     exit 1
@@ -150,7 +150,7 @@ select(fileIndex == 1) | sort_keys(.)
 select(fileIndex == 1) | path
 . as $document ireduce ({}; . * $document)
 EOF
-printf 'yq v4.53.3 eval-all results: %s/%s pass\n' "$eval_all_passed" "$eval_all_total"
+printf 'yq v4.53.6 eval-all results: %s/%s pass\n' "$eval_all_passed" "$eval_all_total"
 if [ "$total" -eq 0 ]; then
     printf 'Differential corpus has no named cases\n' >&2
     exit 1
