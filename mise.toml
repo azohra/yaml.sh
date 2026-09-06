@@ -242,9 +242,30 @@ set -euo pipefail
 git fetch -q origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)" ] || { echo "deploy: refusing — HEAD is not the tip of origin/main" >&2; exit 1; }
 mise run check
+mise run release:consumer
 if [ "${usage_dry_run:-false}" = "true" ]; then
   wrangler deploy --dry-run
   exit 0
 fi
 wrangler deploy --tag "$(git rev-parse --short HEAD)" --message "$(git log -1 --pretty=%s)"
 """
+
+[tasks."release:source"]
+description = "Resolve a signed release tag to its reviewed main commit"
+usage = 'arg "<tag>"'
+run = 'bash build/release-source.sh "$usage_tag"'
+
+[tasks."build:release"]
+description = "Build ysh and verify the version, installer checksum, and reviewed notes"
+depends = ["check"]
+usage = 'arg "<tag>"'
+run = 'bash build/release-build.sh "$usage_tag"'
+
+[tasks.release]
+description = "Upload, verify, and publish a draft release from built assets"
+usage = 'arg "<tag>"'
+run = 'bash build/release-publish.sh "$usage_tag"'
+
+[tasks."release:consumer"]
+description = "Verify the installer names an available release with matching bytes"
+run = 'bash build/release-consumer.sh'

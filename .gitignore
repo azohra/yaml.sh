@@ -17,3 +17,5 @@ mise*.lock
 # cloudflare
 .wrangler/
 .evidence/
+
+.release/
