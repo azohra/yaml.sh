@@ -43,3 +43,25 @@ short per-release quip (never the site tagline), the body opens by showing
 the change — one runnable example beats a paragraph — with one idea per
 bullet, and evidence, changelog, and artifact SHA-256 close in a compact
 footer.
+
+## Publish and promote
+
+Include reviewed release notes in the releases directory, named for the tag with a .md suffix in the version
+PR. Its first line is `# YAML.sh vMAJOR.MINOR.PATCH — <quip>`; the remaining text
+is the release body described above. The publisher appends the built artifact's
+SHA-256. Keep claims about evidence tied to a real run.
+
+After the PR's Check passes and merges, create the signed tag on that main
+commit. Run the Release workflow on main with the tag. Pushing a tag alone does
+not publish. The workflow verifies main ancestry and GitHub's signature result,
+runs the checks, and verifies that the built version and checksum agree with the
+installer. It uploads `ysh` and `ysh.sha256` to a draft, downloads and compares
+them, then publishes. Re-run with the same tag to resume an incomplete draft;
+published releases are never overwritten.
+
+Site deployment verifies the installer's pinned download and checksum before
+shipping. A version PR can therefore merge before its artifact exists without
+publishing a broken installer: Deploy refuses until publication succeeds. The
+Release workflow then deploys current main through the same guarded task.
+Homebrew's daily YAML.sh updater verifies the published bytes and proposes the
+formula change; its manual workflow provides an immediate update when needed.
