@@ -119,7 +119,7 @@ Unsupported syntax fails clearly rather than returning a plausible result.
 ## Build and contribute
 
 ```sh
-make all
+mise run check
 ```
 
 Development source is modular under `src/awk/`; the build assembles the single `ysh` artifact. Start with [DESIGN.md](DESIGN.md), then read the [internals](https://yaml.azohra.com/docs/internals/) and [development](https://yaml.azohra.com/docs/development/) guides.
