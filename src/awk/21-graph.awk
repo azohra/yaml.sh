@@ -9,7 +9,9 @@ function new_node(kind, source_line, value, value_type, tag,    node) {
     node_type[node] = value_type
     node_tag[node] = tag
     node_anchor[node] = ""
-    node_depth[node] = 0
+    if (kind == "mapping" || kind == "sequence" || kind == "pending") {
+        node_depth[node] = 0
+    }
     node_style[node] = ""
     if (document_index != file_document_offset) {
         node_document[node] = document_index - file_document_offset

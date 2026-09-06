@@ -30,7 +30,7 @@ Releases come from tested `main` commits and use signed `vMAJOR.MINOR.PATCH` tag
 Bumping the version touches an exact set:
 
 1. `YSH_VERSION` in `src/ysh.sh`.
-2. The three version assertions in `test/test.sh`: `--version`, the installer download URL, and the homepage version marker.
+2. The version and installer checksum assertions in `test/test.sh`, plus the pinned installer URL in `test/docs.sh`.
 3. A dated `CHANGELOG.md` entry plus its compare-link definition at the file tail.
 4. Build the release artifact, calculate its SHA-256 digest, and pass that digest to
    `make docs RELEASE_SHA256=...`; this updates the installer checksum, homepage

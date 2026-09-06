@@ -41,7 +41,7 @@ if ! awk -v version=9.9.9 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/in
     printf '%s\n' 'Ordinary documentation builds rewrite the pinned release checksum.' >&2
     exit 1
 fi
-if ! awk -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'releases/download/v1.18.0/ysh'; then
+if ! awk -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'releases/download/v1.18.1/ysh'; then
     printf '%s\n' 'Ordinary documentation builds rewrite the pinned release URL.' >&2
     exit 1
 fi
