@@ -4,6 +4,14 @@ All notable changes to YAML.sh are documented here.
 
 ## Unreleased
 
+## [1.18.1] - 2026-09-05
+
+### Fixed
+
+- `has(-1)` on a sequence returns false instead of treating a negative index as an offset from the end.
+- Depth metadata is allocated only for collections, keeping scalar-heavy documents within the existing memory budget.
+- Node metadata is initialized explicitly, and clearing an anchor retains an empty scalar value for consistent behavior across AWK implementations.
+
 ### Changed
 
 - Documentation headings speak plainly: "Start with the job" became "Pick a task", "Know the boundary" became "What's supported — and what isn't", and the sidebar, page titles, and landing links now name reader tasks instead of internal design vocabulary.
@@ -543,6 +551,7 @@ Version 1 is a ground-up, intentionally breaking rebuild around a real YAML node
 
 - Report missing files and make the help flag exit successfully.
 
+[1.18.1]: https://github.com/azohra/yaml.sh/compare/v1.18.0...v1.18.1
 [1.18.0]: https://github.com/azohra/yaml.sh/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/azohra/yaml.sh/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/azohra/yaml.sh/compare/v1.16.0...v1.17.0

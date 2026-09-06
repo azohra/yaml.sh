@@ -159,6 +159,7 @@ pin_file json-patch-spec-tests.json https://raw.githubusercontent.com/json-patch
 """
 
 [tasks.evidence]
+tools = { go = "1.27.1", jq = "1.8.1" }
 description = "Measure conformance, differential agreement, and the scale and benchmark budgets"
 depends = ["evidence:corpora"]
 run = """
