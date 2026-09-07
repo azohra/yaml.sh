@@ -48,7 +48,7 @@ sources = [
   "mise.toml",
   "cliff.toml",
 ]
-run = "make ysh lint test && bash test/release.sh"
+run = "make ysh lint test"
 
 [tasks."check:docs"]
 outputs = []
@@ -230,19 +230,12 @@ git push --set-upstream origin "refs/heads/$branch:refs/heads/$branch"
 
 [tasks.changelog]
 description = "Render changes from Git and retain the historical changelog"
-usage = 'flag "--release" help="Include the calculated next release"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 archive=$(sed -n 's/^## \[\([0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
-args=(--offline)
-if [ "${usage_release:-false}" = true ]; then
-  base=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
-  next=$(git cliff --offline --unreleased --bumped-version)
-  if [ "$next" != "$base" ]; then args+=(--bump=auto); fi
-fi
 printf '# Changelog\n\n'
-git cliff "${args[@]}" "v$archive..HEAD"
+git cliff --offline "v$archive..HEAD"
 printf '\n'
 awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
@@ -252,6 +245,9 @@ description = "Build and smoke-test the versioned executable, checksum, and note
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
+rm -f .release/commit
+source=$(git rev-parse HEAD)
+[ -z "$(git status --porcelain)" ] || source="$source-dirty"
 if tag=$(git describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null); then
   notes_args=(--current)
 else
@@ -265,31 +261,23 @@ make .release/ysh RELEASE_VERSION="${tag#v}"
 [ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
 (cd .release && shasum -a 256 ysh > ysh.sha256)
 git cliff --offline "${notes_args[@]}" > .release/notes.md
-mise run changelog -- --release > .release/CHANGELOG.md
+printf '%s\n' "$source" > .release/commit
 '''
 
 [tasks.release]
-description = "Calculate, build, and publish a release from main"
+description = "Publish the built release artifacts from current main"
 tools = { gh = "2.100.0" }
-usage = 'flag "--dry-run" help="Build and verify without publishing"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 [ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
-git fetch -q origin main --tags
+git fetch -q origin main
 head=$(git rev-parse HEAD)
 [ "$head" = "$(git rev-parse origin/main)" ] || { echo 'release: check out current main first' >&2; exit 1; }
-base=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
-tag=$(git cliff --offline --unreleased --bumped-version)
-if [ "$tag" = "$base" ] && [ "$(git rev-parse "$base^{commit}")" != "$head" ]; then
-  echo 'No releasable changes'
-  exit 0
-fi
-mise run build:release
-if [ "${usage_dry_run:-false}" = true ]; then
-  printf 'Ready to publish %s at %s\n' "$tag" "$head"
-  exit 0
-fi
+[ "$(cat .release/commit)" = "$head" ] || { echo 'release: run mise run build:release from this clean commit first' >&2; exit 1; }
+(cd .release && shasum -a 256 -c ysh.sha256)
+tag=$(sh .release/ysh --version)
+[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]
 gh release create "$tag" .release/ysh .release/ysh.sha256 \
   --repo azohra/yaml.sh --target "$head" \
   --title "YAML.sh $tag" --notes-file .release/notes.md

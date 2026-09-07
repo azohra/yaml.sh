@@ -26,10 +26,10 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 ## Changes and validation
 
 The reviewed PR title and body become the squash commit. Its Conventional title
-sets aggregate impact: `fix` and `perf` produce patches, `feat` produces a minor,
-and a breaking header or `BREAKING CHANGE:` footer produces a major. Maintenance
-appears in the notes without forcing a release. Nested Conventional headings in
-the body are ordinary prose.
+sets aggregate impact using git-cliff's default bump rules: a breaking header or
+`BREAKING CHANGE:` footer produces a major, `feat` produces a minor, and other
+Conventional changes produce patches. Non-Conventional commits are excluded.
+Nested Conventional headings in the body are ordinary prose.
 
 PR checks build and test the proposed merge. Main requires passing checks against
 the current base before merging. The full suite runs before merge; publication
@@ -50,23 +50,30 @@ Versions and notes are calculated without rewriting source or opening a version 
 From a clean checkout of current main:
 
 ```sh
-mise run release -- --dry-run
+mise run check
+mise run build:release
 mise run release
 ```
 
-Release calculates the version, builds the single-file executable, verifies its
-version and a query, and generates its checksum and notes. GitHub CLI creates the
-tag on that source commit, uploads the artifacts, and publishes the release.
+`build:release` calculates the version once, builds the single-file executable,
+verifies its version and a query, and generates its checksum and notes. It records
+the source commit beside the artifacts. Inspect `.release/notes.md` and the
+executable before publishing.
+
+`release` verifies that the artifacts came from the current clean main commit and
+checks their checksum. GitHub CLI creates the tag on that source commit, uploads
+the existing artifacts, and publishes the release without rebuilding.
 The build outputs are in `.release/`; source files remain unchanged. Development
 builds identify themselves as `vdev`. Published builds embed the calculated
 version. Build the development executable with `make ysh` after cloning.
 
-With maintenance changes only, release reports that no release is needed.
+Publication is explicit. Documentation and build changes can be released as
+patches; merging their PRs does not publish a release.
 An existing release is not overwritten. If an upload is interrupted, inspect
 its draft with `gh release view`, upload missing assets with GitHub CLI, and
 publish the draft after verifying its files. Do not move an existing tag.
 
-Dispatch the Release workflow to run the same command on main. After successful
+Dispatch the Release workflow to build and then publish on main. After successful
 publication it runs the website deployment. Homebrew's daily updater reads the
 published executable and checksum and proposes the formula update; its manual
 workflow can run that update immediately.
