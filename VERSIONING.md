@@ -50,22 +50,18 @@ Versions and notes are calculated without rewriting source or opening a version 
 From a clean checkout of current main:
 
 ```sh
-mise run check
-mise run build:release
 mise run release
 ```
 
-`build:release` calculates the version once, builds the single-file executable,
-verifies its version and a query, and generates its checksum and notes. It records
-the source commit beside the artifacts. Inspect `.release/notes.md` and the
-executable before publishing.
+Release fetches main and its tags, checks the source commit, and calculates the
+version once. It builds the executable with that version, smoke-tests it, and
+writes its checksum and notes. GitHub CLI then creates the tag and publishes
+those artifacts from the same run. The outputs are in `.release/`; source files
+remain unchanged.
 
-`release` verifies that the artifacts came from the current clean main commit and
-checks their checksum. GitHub CLI creates the tag on that source commit, uploads
-the existing artifacts, and publishes the release without rebuilding.
-The build outputs are in `.release/`; source files remain unchanged. Development
-builds identify themselves as `vdev`. Published builds embed the calculated
-version. Build the development executable with `make ysh` after cloning.
+PR checks build and test the development executable without calculating a release
+version from branch commits. Development builds identify themselves as `vdev`;
+published builds embed the calculated version. Use `make ysh` for a local build.
 
 Publication is explicit. Documentation and build changes can be released as
 patches; merging their PRs does not publish a release.
@@ -73,8 +69,8 @@ An existing release is not overwritten. If an upload is interrupted, inspect
 its draft with `gh release view`, upload missing assets with GitHub CLI, and
 publish the draft after verifying its files. Do not move an existing tag.
 
-Dispatch the Release workflow to build and then publish on main. After successful
-publication it runs the website deployment. Homebrew's daily updater reads the
+Dispatch the Release workflow to run the same release command on main. After
+successful publication it runs the website deployment. Homebrew's daily updater reads the
 published executable and checksum and proposes the formula update; its manual
 workflow can run that update immediately.
 

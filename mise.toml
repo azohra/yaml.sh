@@ -240,44 +240,24 @@ printf '\n'
 awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
 
-[tasks."build:release"]
-description = "Build and smoke-test the versioned executable, checksum, and notes"
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-rm -f .release/commit
-source=$(git rev-parse HEAD)
-[ -z "$(git status --porcelain)" ] || source="$source-dirty"
-if tag=$(git describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null); then
-  notes_args=(--current)
-else
-  tag=$(git cliff --offline --unreleased --bumped-version)
-  [ "$tag" != "$(git describe --tags --abbrev=0 --match 'v[0-9]*')" ] || { echo 'No releasable changes' >&2; exit 1; }
-  notes_args=(--unreleased --tag "$tag")
-fi
-[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || { echo 'release: expected a stable version' >&2; exit 1; }
-make .release/ysh RELEASE_VERSION="${tag#v}"
-[ "$(sh .release/ysh --version)" = "$tag" ]
-[ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
-(cd .release && shasum -a 256 ysh > ysh.sha256)
-git cliff --offline "${notes_args[@]}" > .release/notes.md
-printf '%s\n' "$source" > .release/commit
-'''
-
 [tasks.release]
-description = "Publish the built release artifacts from current main"
+description = "Build and publish a release from current main"
 tools = { gh = "2.100.0" }
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 [ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
-git fetch -q origin main
+git fetch -q origin main --tags
 head=$(git rev-parse HEAD)
 [ "$head" = "$(git rev-parse origin/main)" ] || { echo 'release: check out current main first' >&2; exit 1; }
-[ "$(cat .release/commit)" = "$head" ] || { echo 'release: run mise run build:release from this clean commit first' >&2; exit 1; }
-(cd .release && shasum -a 256 -c ysh.sha256)
-tag=$(sh .release/ysh --version)
+tag=$(git cliff --offline --unreleased --bumped-version)
 [[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]
+[ "$tag" != "$(git describe --tags --abbrev=0 --match 'v[0-9]*')" ] || { echo 'No new Conventional changes to release'; exit 0; }
+make .release/ysh RELEASE_VERSION="${tag#v}"
+[ "$(sh .release/ysh --version)" = "$tag" ]
+[ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
+(cd .release && shasum -a 256 ysh > ysh.sha256)
+git cliff --offline --unreleased --tag "$tag" > .release/notes.md
 gh release create "$tag" .release/ysh .release/ysh.sha256 \
   --repo azohra/yaml.sh --target "$head" \
   --title "YAML.sh $tag" --notes-file .release/notes.md
