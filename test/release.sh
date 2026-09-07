@@ -85,7 +85,7 @@ grep -Fq 'releases/download/v1.2.3/ysh' .release/site/install
 grep -Fq 'data-ysh-version>v1.2.3' .release/site/index.html
 grep -Fq -- '--dry-run' "$scratch/deployment"
 [ -z "$(git status --porcelain)" ]
-# A release builds without updating source, and preserves the reviewed body.
+# A release keeps notes concise and links the full reviewed explanation.
 git commit --allow-empty -qm 'fix: retain empty values' -m 'Keep empty values in their original positions.'
 git update-ref refs/heads/main HEAD
 # Used by the release task in a child shell.
@@ -98,7 +98,9 @@ unset -f make
 usage_dry_run=true bash "$scratch/release.sh"
 [ ! -e "$scratch/publication" ]
 [ "$(sh .release/ysh --version)" = v1.2.4 ]
-grep -Fq 'Keep empty values in their original positions.' .release/notes.md
+grep -Fq 'retain empty values' .release/notes.md
+if grep -Fq 'Keep empty values in their original positions.' .release/notes.md; then exit 1; fi
+grep -Fq "https://github.com/azohra/yaml.sh/commit/$(git rev-parse HEAD)" .release/notes.md
 cp .release/ysh "$scratch/first-ysh"
 cp .release/notes.md "$scratch/first-notes"
 usage_dry_run=true bash "$scratch/release.sh"
@@ -133,10 +135,12 @@ git commit --allow-empty -qm 'feat: add a query operator'
 [ "$(git cliff --offline --unreleased --bumped-version)" = v1.3.0 ]
 bash "$scratch/build-release.sh"
 grep -Fq '## [1.2.4]' .release/CHANGELOG.md
-grep -Fq 'Keep empty values in their original positions.' .release/CHANGELOG.md
+grep -Fq 'retain empty values' .release/CHANGELOG.md
 grep -Fq 'Historical notes stay intact.' .release/CHANGELOG.md
 git commit --allow-empty -qm 'refactor: remove the old argument' -m 'BREAKING CHANGE: use --input instead of --file.'
 [ "$(git cliff --offline --unreleased --bumped-version)" = v2.0.0 ]
+bash "$scratch/build-release.sh"
+grep -Fq 'use --input instead of --file.' .release/notes.md
 git tag v2.0.0
 git commit --allow-empty -qm 'chore!: remove a supported host'
 [ "$(git cliff --offline --unreleased --bumped-version)" = v3.0.0 ]

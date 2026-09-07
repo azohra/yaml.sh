@@ -1,6 +1,7 @@
 <!--
 Describe the completed changes, why they are needed, and compatibility impact.
-The title and body become the squash commit and feed the changelog.
+The title and body become the squash commit. The changelog shows the title,
+a link to the full explanation, and any BREAKING CHANGE migration notes.
 
 Use a Conventional title: feat for additions, fix for corrections, or the
 appropriate maintenance type. For an incompatible change, use ! in the title
