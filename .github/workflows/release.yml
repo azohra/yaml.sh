@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing signed release tag on main
+        description: Existing release tag on main
         required: true
         type: string
 
@@ -16,60 +16,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      sha: ${{ steps.source.outputs.sha }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
-        env:
-          MISE_GITHUB_TOKEN: ${{ github.token }}
-      - id: source
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          sha=$(mise run --quiet release:source -- "$RELEASE_TAG")
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          git checkout --detach "$sha"
-      - name: Build release
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: mise run build:release -- "$RELEASE_TAG"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release
-          path: .release
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 1
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ needs.build.outputs.sha }}
+          ref: ${{ inputs.tag }}
           fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
         env:
           MISE_GITHUB_TOKEN: ${{ github.token }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: release
-          path: .release
-      - run: chmod +x .release/ysh
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,7 +38,7 @@ jobs:
         run: mise run release -- "$RELEASE_TAG"
 
   deploy:
-    needs: publish
+    needs: release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:

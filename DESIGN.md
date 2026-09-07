@@ -171,4 +171,4 @@ runtime behavior; compatibility fixtures; migration documentation; and a
 release candidate.
 
 A release is complete only when source, generated artifact, installer, docs,
-checksums, signed tag, GitHub release, and package metadata agree.
+checksums, tag, GitHub release, and package metadata agree.

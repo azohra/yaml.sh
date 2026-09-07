@@ -251,11 +251,6 @@ fi
 wrangler deploy --tag "$(git rev-parse --short HEAD)" --message "$(git log -1 --pretty=%s)"
 """
 
-[tasks."release:source"]
-description = "Resolve a signed release tag to its reviewed main commit"
-usage = 'arg "<tag>"'
-run = 'bash build/release-source.sh "$usage_tag"'
-
 [tasks."build:release"]
 description = "Build ysh and verify the version, installer checksum, and reviewed notes"
 depends = ["check"]
@@ -263,7 +258,8 @@ usage = 'arg "<tag>"'
 run = 'bash build/release-build.sh "$usage_tag"'
 
 [tasks.release]
-description = "Upload, verify, and publish a draft release from built assets"
+description = "Build and publish the checked-out release tag"
+tools = { gh = "2.100.0" }
 usage = 'arg "<tag>"'
 run = 'bash build/release-publish.sh "$usage_tag"'
 
