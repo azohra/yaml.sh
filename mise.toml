@@ -44,9 +44,10 @@ sources = [
   "bench/**",
   "_static/_www/install",
   "Makefile",
+  "mise.toml",
   "ysh",
 ]
-run = "make ysh lint test && git diff --exit-code -- ysh"
+run = "make ysh lint test && bash test/release.sh && git diff --exit-code -- ysh"
 
 [tasks."check:docs"]
 outputs = []
@@ -61,6 +62,7 @@ sources = [
   "_static/**",
   "*.md",
   "Makefile",
+  "mise.toml",
   "ysh",
 ]
 run = "make ysh docs-check"
@@ -204,11 +206,6 @@ docker run --rm --network none --volume "$dir:/evidence:ro" "$image" ./test/busy
 description = "The Makefile's full battery: build, lint, tests, docs"
 depends = ["check:runtime", "check:docs"]
 
-[tasks."check:ci-result"]
-description = "Verify classified CI jobs succeeded or were intentionally skipped"
-raw_args = true
-run = "sh build/ci-result.sh"
-
 [tasks.push]
 description = "Push a checked feature branch for review"
 tools = { gh = "2.100.0" }
@@ -235,7 +232,7 @@ description = "Deploy the site at the tip of main"
 confirm = "Deploy yaml.azohra.com to production?"
 timeout = "5m"
 usage = 'flag "--dry-run" help="Validate without shipping"'
-run = """
+run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || { echo "deploy: refusing — CLOUDFLARE_API_TOKEN is unset" >&2; exit 1; }
@@ -243,26 +240,64 @@ set -euo pipefail
 git fetch -q origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)" ] || { echo "deploy: refusing — HEAD is not the tip of origin/main" >&2; exit 1; }
 mise run check
-mise run release:consumer
+checksum() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
+installer=_static/_www/install
+url=$(sed -n 's/^release_url=//p' "$installer")
+expected=$(sed -n 's/^expected_sha256=//p' "$installer")
+[[ "$url" =~ ^https://github.com/azohra/yaml[.]sh/releases/download/v[0-9]+[.][0-9]+[.][0-9]+/ysh$ ]] || exit 1
+[[ "$expected" =~ ^[0-9a-f]{64}$ ]] || exit 1
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+curl --fail --silent --show-error --location --retry 3 "$url" -o "$scratch/ysh"
+actual=$(checksum "$scratch/ysh" | cut -d' ' -f1)
+[ "$actual" = "$expected" ] || { echo 'release: installer does not match the published asset' >&2; exit 1; }
+echo 'Installer release asset and checksum verified'
 if [ "${usage_dry_run:-false}" = "true" ]; then
   wrangler deploy --dry-run
   exit 0
 fi
 wrangler deploy --tag "$(git rev-parse --short HEAD)" --message "$(git log -1 --pretty=%s)"
-"""
+'''
 
 [tasks."build:release"]
-description = "Build ysh and verify the version, installer checksum, and reviewed notes"
+description = "Build the executable, checksum, and changelog excerpt"
 depends = ["check"]
 usage = 'arg "<tag>"'
-run = 'bash build/release-build.sh "$usage_tag"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+tag=${usage_tag:?}
+make ysh
+[ "$(./ysh --version)" = "$tag" ] || { echo 'release: version differs from tag' >&2; exit 1; }
+sha=$(shasum -a 256 ysh | cut -d' ' -f1)
+grep -Fxq "release_url=https://github.com/azohra/yaml.sh/releases/download/$tag/ysh" _static/_www/install
+grep -Fxq "expected_sha256=$sha" _static/_www/install
+mkdir -p .release
+awk -v version="${tag#v}" '
+  /^## / { if (found) exit; found = ($2 == "[" version "]"); next }
+  found { print }
+' CHANGELOG.md > .release/notes.md
+[ -s .release/notes.md ] || { echo 'release: changelog entry is missing' >&2; exit 1; }
+printf '%s  ysh\n' "$sha" > .release/ysh.sha256
+cp ysh .release/ysh
+'''
 
 [tasks.release]
 description = "Build and publish the checked-out release tag"
 tools = { gh = "2.100.0" }
 usage = 'arg "<tag>"'
-run = 'bash build/release-publish.sh "$usage_tag"'
-
-[tasks."release:consumer"]
-description = "Verify the installer names an available release with matching bytes"
-run = 'bash build/release-consumer.sh'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+tag=${usage_tag:?}
+[[ "$tag" =~ ^v(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$ ]] || exit 1
+[ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
+git fetch -q origin main
+git fetch -q origin "refs/tags/$tag"
+[ "$(git rev-parse 'FETCH_HEAD^{commit}')" = "$(git rev-parse HEAD)" ] || { echo 'release: check out the release tag first' >&2; exit 1; }
+git merge-base --is-ancestor HEAD origin/main
+mise run build:release -- "$tag"
+gh release create "$tag" .release/ysh .release/ysh.sha256 \
+  --repo azohra/yaml.sh --verify-tag \
+  --title "YAML.sh $tag" --notes-file .release/notes.md
+'''

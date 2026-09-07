@@ -27,29 +27,19 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 
 Releases come from tested `main` commits and use `vMAJOR.MINOR.PATCH` tags. The executable, installer, and generated release text must agree.
 
-Bumping the version touches an exact set:
+Change `YSH_VERSION` in `src/ysh.sh` and add the dated `CHANGELOG.md` entry
+with its compare link. Build `ysh`, calculate its SHA-256, and run
+`make docs RELEASE_SHA256=...` to update the installer pin and homepage version.
+The generated executable, installer, and homepage are committed with the source
+change. Documentation pages do not carry release-version stamps, and tests read
+the version from source instead of keeping their own copy.
 
-1. `YSH_VERSION` in `src/ysh.sh`.
-2. The version and installer checksum assertions in `test/test.sh`, plus the pinned installer URL in `test/docs.sh`.
-3. A dated `CHANGELOG.md` entry plus its compare-link definition at the file tail.
-4. Build the release artifact, calculate its SHA-256 digest, and pass that digest to
-   `make docs RELEASE_SHA256=...`; this updates the installer checksum, homepage
-   version, and documentation pages together. Ordinary `make docs` runs preserve
-   the checksum of the currently published release asset.
-5. `make all` and the focused gates for whatever changed.
-
-Release notes carry the voice, not just the facts: the title ends with a
-short per-release quip (never the site tagline), the body opens by showing
-the change — one runnable example beats a paragraph — with one idea per
-bullet, and evidence, changelog, and artifact SHA-256 close in a compact
-footer.
+Run `mise run check` before submitting the version change.
 
 ## Publish and promote
 
-Include reviewed release notes in the releases directory, named for the tag with a .md suffix in the version
-PR. Its first line is `# YAML.sh vMAJOR.MINOR.PATCH — <quip>`; the remaining text
-is the release body described above. The publisher appends the built artifact's
-SHA-256. Keep claims about evidence tied to a real run.
+`CHANGELOG.md` owns the release notes. The build task extracts the matching
+version section for GitHub; there is no separate release-notes file to maintain.
 
 After the version PR passes Check and merges, tag that commit and push the tag.
 Tags do not need to be signed. Check out the tag and run:

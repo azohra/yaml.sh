@@ -61,11 +61,6 @@ if [ -z "$VERSION" ]; then
     printf '%s\n' 'src/ysh.sh no longer defines YSH_VERSION' >&2
     status=1
 else
-    assertions=$(grep -cF "v$VERSION" test/test.sh || :)
-    if [ "$assertions" -lt 1 ]; then
-        printf 'test/test.sh no longer asserts the release version v%s\n' "$VERSION" >&2
-        status=1
-    fi
     if ! grep -qF "## [$VERSION]" CHANGELOG.md; then
         printf 'CHANGELOG.md has no entry for the current version %s\n' "$VERSION" >&2
         status=1
