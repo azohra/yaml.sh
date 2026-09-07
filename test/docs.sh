@@ -23,7 +23,7 @@ for page in $PAGES; do
 done
 
 if ! awk -v version=9.9.9 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/index.html" | grep -Fq 'data-ysh-version>v9.9.9'; then
-    printf '%s\n' 'Homepage release text is not generated from the executable version.' >&2
+    printf '%s\n' 'Homepage release text is not generated from the published version.' >&2
     exit 1
 fi
 if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'expected_sha256=abc123'; then

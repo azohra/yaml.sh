@@ -1,0 +1,50 @@
+[changelog]
+header = ""
+body = """
+{% if version %}## [{{ version | trim_start_matches(pat="v") }}]
+{% else %}## Unreleased
+{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}
+- {% if commit.breaking %}**Breaking:** {% endif %}{% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message }}
+{% if commit.body %}
+{{ commit.body | indent(prefix="  ", first=true) }}
+{% endif %}{% if commit.breaking_description %}
+  **Breaking change:** {{ commit.breaking_description }}
+{% endif %}{% endfor %}{% endfor %}
+{% if version %}
+[{{ version | trim_start_matches(pat="v") }}]: https://github.com/azohra/yaml.sh/compare/{{ previous.version }}...{{ version }}
+{% endif %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
+use_branch_tags = true
+sort_commits = "oldest"
+commit_preprocessors = [
+  # git-cliff's no-increment rule takes precedence over breaking maintenance
+  # types. Normalize their type for calculation while retaining the description.
+  { pattern = '^(build|chore|ci|docs|refactor|style|test)(\([^)]*\))?!:', replace = 'feat${2}!:' },
+  { pattern = '(?s)^(build|chore|ci|docs|refactor|style|test)(\([^)]*\))?: (.*\n\nBREAKING[ -]CHANGE:.*)$', replace = 'feat${2}!: ${3}' },
+  # This documentation commit predates the Conventional PR check.
+  { pattern = '^Use mise check in contribution instructions', replace = 'docs: use mise check in contribution instructions' },
+]
+commit_parsers = [
+  { message = '^chore\(release\):', skip = true },
+  { message = '^feat', group = "Added" },
+  { message = '^fix', group = "Fixed" },
+  { message = '^perf', group = "Performance" },
+  { message = '^docs', group = "Documentation" },
+  { message = '.*', group = "Maintenance" },
+]
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
+no_increment_regex = '^(build|chore|ci|docs|refactor|style|test)$'

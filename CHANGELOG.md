@@ -1,8 +1,10 @@
 # Changelog
 
-All notable changes to YAML.sh are documented here.
+Run `mise run changelog` for the complete history, including pending changes.
+New release notes are generated from reviewed squash commits and published in
+[GitHub Releases](https://github.com/azohra/yaml.sh/releases).
 
-## Unreleased
+The historical entries below are preserved as written.
 
 ## [1.18.1] - 2026-09-05
 

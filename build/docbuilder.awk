@@ -1,23 +1,14 @@
 #!/usr/bin/awk -f
 
-/^expected_sha256=/ {
-    if (sha256 != "") {
-        print "expected_sha256=" sha256
-        next
-    }
-}
-
-version != "" && /https:\/\/raw.githubusercontent.com\/azohra\/yaml.sh\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/ {
-    sub(/https:\/\/raw.githubusercontent.com\/azohra\/yaml.sh\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/, "https://raw.githubusercontent.com/azohra/yaml.sh/v" version "/ysh")
-    print
+/^release_url=/ && version != "" {
+    print "release_url=https://github.com/azohra/yaml.sh/releases/download/v" version "/ysh"
     next
 }
-version != "" && /https:\/\/github.com\/azohra\/yaml.sh\/releases\/download\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/ {
-    sub(/https:\/\/github.com\/azohra\/yaml.sh\/releases\/download\/v[0-9]+\.[0-9]+\.[0-9]+\/ysh/, "https://github.com/azohra/yaml.sh/releases/download/v" version "/ysh")
-    print
+/^expected_sha256=/ && sha256 != "" {
+    print "expected_sha256=" sha256
     next
 }
-/data-ysh-version/ {
-    sub(/>v[0-9]+\.[0-9]+\.[0-9]+</, ">v" version "<")
+/data-ysh-version/ && version != "" {
+    sub(/data-ysh-version>[^<]*</, "data-ysh-version>v" version "<")
 }
-{print}
+{ print }

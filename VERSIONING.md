@@ -23,47 +23,69 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 | Compatible capability | Minor | `1.3.0` → `1.4.0` |
 | Intentional contract break | Major | `1.x` → `2.0.0` |
 
-## Release mechanics
+## Changes and validation
 
-Releases come from tested `main` commits and use `vMAJOR.MINOR.PATCH` tags. The executable, installer, and generated release text must agree.
+The reviewed PR title and body become the squash commit. Its Conventional title
+sets aggregate impact: `fix` and `perf` produce patches, `feat` produces a minor,
+and a breaking header or `BREAKING CHANGE:` footer produces a major. Maintenance
+appears in the notes without forcing a release. Nested Conventional headings in
+the body are ordinary prose.
 
-Change `YSH_VERSION` in `src/ysh.sh` and add the dated `CHANGELOG.md` entry
-with its compare link. Build `ysh`, calculate its SHA-256, and run
-`make docs RELEASE_SHA256=...` to update the installer pin and homepage version.
-The generated executable, installer, and homepage are committed with the source
-change. Documentation pages do not carry release-version stamps, and tests read
-the version from source instead of keeping their own copy.
-
-Run `mise run check` before submitting the version change.
-
-## Publish and promote
-
-`CHANGELOG.md` owns the release notes. The build task extracts the matching
-version section for GitHub; there is no separate release-notes file to maintain.
-
-After the version PR passes Check and merges, tag that commit and push the tag.
-Tags do not need to be signed. Check out the tag and run:
+PR checks build and test the proposed merge. Main requires passing checks against
+the current base before merging. The full suite runs before merge; publication
+smoke-tests the versioned artifact.
 
 ```sh
-mise run release -- vMAJOR.MINOR.PATCH
+mise run changelog
 ```
 
-The task checks the source, runs the repository checks, builds `ysh` and
-`ysh.sha256`, and publishes them with `gh release create`. The existing tag,
-executable version, installer checksum, and release notes must agree. GitHub CLI
-handles uploading the assets before publication. An existing release is not
-overwritten; inspect an interrupted publication with `gh release view` and
-finish its draft with GitHub CLI if needed.
+This renders recorded changes and releases from Git, followed by the historical
+entries in `CHANGELOG.md`. Commit bodies supply the descriptions. Versions and
+notes are calculated without rewriting source or opening a version PR.
 
-The Release workflow runs the same task on the supplied tag with the repository
-token, then deploys the site from current main. Pushing a tag alone does not
-publish a release.
+## Publish the executable
 
-For local publication, run `mise run deploy` from current main afterward.
-Ordinary site changes also deploy through that task or the manual Deploy
-workflow. Merging alone does not deploy: a version PR can reference an asset
-that has not been published yet. Deployment checks that the installer's pinned
-download exists and matches its checksum before shipping.
+From a clean checkout of current main:
 
-Homebrew's daily YAML.sh updater reads `ysh` and `ysh.sha256` and proposes the
-formula change. Its manual workflow provides an immediate update when needed.
+```sh
+mise run release -- --dry-run
+mise run release
+```
+
+Release calculates the version, builds the single-file executable, verifies its
+version and a query, and generates its checksum and notes. GitHub CLI creates the
+tag on that source commit, uploads the artifacts, and publishes the release.
+The build outputs are in `.release/`; source files remain unchanged. Development
+builds identify themselves as `vdev`. Published builds embed the calculated
+version. Build the development executable with `make ysh` after cloning.
+
+With maintenance changes only, release reports that no release is needed.
+An existing release is not overwritten. If an upload is interrupted, inspect
+its draft with `gh release view`, upload missing assets with GitHub CLI, and
+publish the draft after verifying its files. Do not move an existing tag.
+
+Dispatch the Release workflow to run the same command on main. After successful
+publication it runs the website deployment. Homebrew's daily updater reads the
+published executable and checksum and proposes the formula update; its manual
+workflow can run that update immediately.
+
+## Deploy the website
+
+The website deploys on merges to main, independently of executable releases.
+Its documentation follows main. Its installer and displayed release version
+always refer to the latest published GitHub release.
+
+```sh
+mise run deploy -- --dry-run
+mise run deploy
+```
+
+Deployment resolves one published tag, downloads its executable and checksum,
+and verifies them. It builds the site into `.release/site`, filling the installer
+URL, checksum and homepage version from that release. Wrangler deploys that
+output. Source templates contain no release pins to update.
+
+A missing or corrupt release asset stops deployment. An unsuccessful executable
+release leaves the installer on the previous published version. After a release,
+redeploying promotes its installer without a source commit. Local publication
+and deployment are separate commands; the Release workflow performs both in order.

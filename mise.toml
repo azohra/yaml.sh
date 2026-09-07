@@ -13,6 +13,7 @@ YSH_EVIDENCE_DIR = "{{config_root}}/.evidence"
 wrangler = "4.129.0"
 node = "24"
 make = "4.4.1"
+"aqua:orhun/git-cliff" = "2.14.1"
 # make lint runs it; without it `mise run check` fails on a clean machine.
 shellcheck = "0.11.0"
 # The differential oracle for make differential.
@@ -36,7 +37,7 @@ CONTRACT
 [tasks."check:runtime"]
 outputs = []
 cache = { enabled = true }
-description = "Build ysh, verify the generated artifact, lint every script, run the suites"
+description = "Build ysh, lint scripts, and run the suites"
 sources = [
   "src/**",
   "build/**",
@@ -45,9 +46,9 @@ sources = [
   "_static/_www/install",
   "Makefile",
   "mise.toml",
-  "ysh",
+  "cliff.toml",
 ]
-run = "make ysh lint test && bash test/release.sh && git diff --exit-code -- ysh"
+run = "make ysh lint test && bash test/release.sh"
 
 [tasks."check:docs"]
 outputs = []
@@ -63,7 +64,7 @@ sources = [
   "*.md",
   "Makefile",
   "mise.toml",
-  "ysh",
+  "cliff.toml",
 ]
 run = "make ysh docs-check"
 
@@ -227,77 +228,109 @@ done
 git push --set-upstream origin "refs/heads/$branch:refs/heads/$branch"
 '''
 
-[tasks.deploy]
-description = "Deploy the site at the tip of main"
-confirm = "Deploy yaml.azohra.com to production?"
-timeout = "5m"
-usage = 'flag "--dry-run" help="Validate without shipping"'
+[tasks.changelog]
+description = "Render changes from Git and retain the historical changelog"
+usage = 'flag "--release" help="Include the calculated next release"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-[ -n "${CLOUDFLARE_API_TOKEN:-}" ] || { echo "deploy: refusing — CLOUDFLARE_API_TOKEN is unset" >&2; exit 1; }
-[ -z "$(git status --porcelain)" ] || { echo "deploy: refusing — tree is dirty" >&2; exit 1; }
-git fetch -q origin main
-[ "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)" ] || { echo "deploy: refusing — HEAD is not the tip of origin/main" >&2; exit 1; }
-mise run check
-checksum() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
-installer=_static/_www/install
-url=$(sed -n 's/^release_url=//p' "$installer")
-expected=$(sed -n 's/^expected_sha256=//p' "$installer")
-[[ "$url" =~ ^https://github.com/azohra/yaml[.]sh/releases/download/v[0-9]+[.][0-9]+[.][0-9]+/ysh$ ]] || exit 1
-[[ "$expected" =~ ^[0-9a-f]{64}$ ]] || exit 1
-scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
-curl --fail --silent --show-error --location --retry 3 "$url" -o "$scratch/ysh"
-actual=$(checksum "$scratch/ysh" | cut -d' ' -f1)
-[ "$actual" = "$expected" ] || { echo 'release: installer does not match the published asset' >&2; exit 1; }
-echo 'Installer release asset and checksum verified'
-if [ "${usage_dry_run:-false}" = "true" ]; then
-  wrangler deploy --dry-run
-  exit 0
+archive=$(sed -n 's/^## \[\([0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
+args=(--offline)
+if [ "${usage_release:-false}" = true ]; then
+  base=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
+  next=$(git cliff --offline --unreleased --bumped-version)
+  if [ "$next" != "$base" ]; then args+=(--bump=auto); fi
 fi
-wrangler deploy --tag "$(git rev-parse --short HEAD)" --message "$(git log -1 --pretty=%s)"
+printf '# Changelog\n\n'
+git cliff "${args[@]}" "v$archive..HEAD"
+printf '\n'
+awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
 
 [tasks."build:release"]
-description = "Build the executable, checksum, and changelog excerpt"
-depends = ["check"]
-usage = 'arg "<tag>"'
+description = "Build and smoke-test the versioned executable, checksum, and notes"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-tag=${usage_tag:?}
-make ysh
-[ "$(./ysh --version)" = "$tag" ] || { echo 'release: version differs from tag' >&2; exit 1; }
-sha=$(shasum -a 256 ysh | cut -d' ' -f1)
-grep -Fxq "release_url=https://github.com/azohra/yaml.sh/releases/download/$tag/ysh" _static/_www/install
-grep -Fxq "expected_sha256=$sha" _static/_www/install
-mkdir -p .release
-awk -v version="${tag#v}" '
-  /^## / { if (found) exit; found = ($2 == "[" version "]"); next }
-  found { print }
-' CHANGELOG.md > .release/notes.md
-[ -s .release/notes.md ] || { echo 'release: changelog entry is missing' >&2; exit 1; }
-printf '%s  ysh\n' "$sha" > .release/ysh.sha256
-cp ysh .release/ysh
+if tag=$(git describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null); then
+  notes_args=(--current)
+else
+  tag=$(git cliff --offline --unreleased --bumped-version)
+  [ "$tag" != "$(git describe --tags --abbrev=0 --match 'v[0-9]*')" ] || { echo 'No releasable changes' >&2; exit 1; }
+  notes_args=(--unreleased --tag "$tag")
+fi
+[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || { echo 'release: expected a stable version' >&2; exit 1; }
+make .release/ysh RELEASE_VERSION="${tag#v}"
+[ "$(sh .release/ysh --version)" = "$tag" ]
+[ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
+(cd .release && shasum -a 256 ysh > ysh.sha256)
+git cliff --offline "${notes_args[@]}" > .release/notes.md
+mise run changelog -- --release > .release/CHANGELOG.md
 '''
 
 [tasks.release]
-description = "Build and publish the checked-out release tag"
+description = "Calculate, build, and publish a release from main"
 tools = { gh = "2.100.0" }
-usage = 'arg "<tag>"'
+usage = 'flag "--dry-run" help="Build and verify without publishing"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+[ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
+git fetch -q origin main --tags
+head=$(git rev-parse HEAD)
+[ "$head" = "$(git rev-parse origin/main)" ] || { echo 'release: check out current main first' >&2; exit 1; }
+base=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
+tag=$(git cliff --offline --unreleased --bumped-version)
+if [ "$tag" = "$base" ] && [ "$(git rev-parse "$base^{commit}")" != "$head" ]; then
+  echo 'No releasable changes'
+  exit 0
+fi
+mise run build:release
+if [ "${usage_dry_run:-false}" = true ]; then
+  printf 'Ready to publish %s at %s\n' "$tag" "$head"
+  exit 0
+fi
+gh release create "$tag" .release/ysh .release/ysh.sha256 \
+  --repo azohra/yaml.sh --target "$head" \
+  --title "YAML.sh $tag" --notes-file .release/notes.md
+'''
+
+[tasks."build:site"]
+description = "Build the website with an installer pinned to downloaded release assets"
+usage = 'arg "<tag>"; arg "<assets>"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 tag=${usage_tag:?}
-[[ "$tag" =~ ^v(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$ ]] || exit 1
-[ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
+assets=${usage_assets:?}
+[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || exit 1
+(cd "$assets" && shasum -a 256 -c ysh.sha256)
+[ "$(sh "$assets/ysh" --version)" = "$tag" ]
+sha=$(shasum -a 256 "$assets/ysh" | cut -d' ' -f1)
+rm -rf .release/site
+mkdir -p .release/site
+cp -R _static/_www/. .release/site/
+YSH_DOCS_OUTPUT="$PWD/.release/site/docs" ./build/docs.sh
+awk -v version="${tag#v}" -v sha256="$sha" -f build/docbuilder.awk _static/_www/install > .release/site/install
+awk -v version="${tag#v}" -f build/docbuilder.awk _static/_www/index.html > .release/site/index.html
+'''
+
+[tasks.deploy]
+description = "Deploy the site from main using the latest published release for its installer"
+tools = { gh = "2.100.0" }
+usage = 'flag "--dry-run" help="Build and validate without deploying"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+[ -z "$(git status --porcelain)" ] || { echo 'deploy: commit changes first' >&2; exit 1; }
 git fetch -q origin main
-git fetch -q origin "refs/tags/$tag"
-[ "$(git rev-parse 'FETCH_HEAD^{commit}')" = "$(git rev-parse HEAD)" ] || { echo 'release: check out the release tag first' >&2; exit 1; }
-git merge-base --is-ancestor HEAD origin/main
-mise run build:release -- "$tag"
-gh release create "$tag" .release/ysh .release/ysh.sha256 \
-  --repo azohra/yaml.sh --verify-tag \
-  --title "YAML.sh $tag" --notes-file .release/notes.md
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo 'deploy: check out current main first' >&2; exit 1; }
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+tag=$(gh release view --repo azohra/yaml.sh --json tagName --jq .tagName)
+gh release download "$tag" --repo azohra/yaml.sh --pattern ysh --pattern ysh.sha256 --dir "$scratch"
+mise run build:site -- "$tag" "$scratch"
+args=(--assets .release/site)
+if [ "${usage_dry_run:-false}" = true ]; then args+=(--dry-run); fi
+wrangler deploy "${args[@]}"
 '''

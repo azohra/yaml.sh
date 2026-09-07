@@ -1,5 +1,10 @@
 #!/usr/bin/awk -f
 
+/^YSH_VERSION=/ && release_version != "" {
+    print "YSH_VERSION=" release_version
+    next
+}
+
 /^# YSH_AWK_PROGRAM$/ {
     print "ysh_awk_program() {"
     print "    LC_ALL=C awk -f - \"$@\" <<'YSH_AWK_EOF'"

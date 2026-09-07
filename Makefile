@@ -1,15 +1,17 @@
 AWK_MODULES := $(sort $(wildcard src/awk/*.awk))
 INSTALL_DIR=/usr/local/bin
-RELEASE_SHA256 ?=
+RELEASE_VERSION ?=
 
 .PHONY: lint test docs-check public-contract operator-manifest conformance toml-conformance schema-conformance json-patch-conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
 
 all: ysh lint test docs-check
 
-ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile build/shbuilder.awk
+.PHONY: .release/ysh
+ysh .release/ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile build/shbuilder.awk
 	@echo "👷 Building"
-	@awk -v awk_modules="$(AWK_MODULES)" -v diff_module=src/diff.awk -f build/shbuilder.awk src/ysh.sh > ysh
-	@chmod 755 ysh
+	@mkdir -p $(@D)
+	@awk -v release_version="$(RELEASE_VERSION)" -v awk_modules="$(AWK_MODULES)" -v diff_module=src/diff.awk -f build/shbuilder.awk src/ysh.sh > $@
+	@chmod 755 $@
 
 lint: ysh
 	@echo "👖 Linting"
@@ -93,16 +95,7 @@ uninstall:
 	@echo "🗑️  Uninstalling ysh"
 	@rm -f $(INSTALL_DIR)/ysh
 
-docs: ysh
-	@echo "📚 Updating docs"
-	$(eval VERSION := $(shell sed -n 's/^YSH_VERSION=//p' ysh | head -n 1))
-	@awk -v version=$(VERSION) -f build/docbuilder.awk README.md > .tmp_README.md
-	@mv .tmp_README.md README.md
-	@awk $(if $(strip $(RELEASE_SHA256)),-v version=$(VERSION) -v sha256=$(RELEASE_SHA256),) -f build/docbuilder.awk _static/_www/install > .tmp_install
-	@mv .tmp_install _static/_www/install
-	@chmod 755 _static/_www/install
-	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/index.html > .tmp_index.html
-	@mv .tmp_index.html _static/_www/index.html
+docs:
 	@./build/docs.sh
 
 clean:

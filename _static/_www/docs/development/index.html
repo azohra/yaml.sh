@@ -112,7 +112,8 @@
             <pre><code class="language-sh">make all
 </code></pre>
           </div>
-          <p>The default workflow rebuilds <code>ysh</code>, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and verifies that the committed static documentation is generated and internally linked correctly.</p>
+          <p>The development executable is generated locally and reports <code>vdev</code>. Release builds embed their calculated version without changing source.</p>
+          <p>The default workflow builds <code>ysh</code>, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and verifies that the committed static documentation is generated and internally linked correctly.</p>
           <h2 id="source-layout"><a href="#source-layout">Source layout<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <div class="code-block">
             <div class="code-head"><span>text</span><button type="button" data-copy>Copy</button></div>
@@ -129,8 +130,8 @@ test/          test.sh behavioral suite on a vendored shunit2 (2.1.8pre
                workflows/; fault-injection PATH shims under fault-bin/;
                toml-test adapters
 bench/         benchmark.sh throughput sample; scale.sh resource contract
-_static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
-               documentation sources, and install is the installer
+_static/_www/  Cloudflare Workers static site; docs/*.md are the editable
+               documentation sources, and install is the installer template
 </code></pre>
           </div>
           <p>Each gate script reads its sibling TSV corpus: tab-separated columns, blank lines and <code>#</code> comments skipped, rows grouped under a leading family or capability label. Add a row beside its family, rerun the owning gate, and update <code>test/public-contract.tsv</code> when the supported surface changes; the gates assert their own corpus floors and status vocabularies.</p>
@@ -140,7 +141,7 @@ _static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
             <pre><code class="language-sh">make docs
 </code></pre>
           </div>
-          <p>Markdown remains the readable source under <code>_static/_www/docs</code>. Portable shell and AWK generate committed HTML at real paths such as <code>/docs/queries/</code>; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run <code>make docs-check</code> to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs <code>test/guidance.sh</code>, which verifies that the build targets, repository paths, local links, version literals, and provenance claims named in the guidance documents still match the repository.</p>
+          <p>Markdown remains the readable source under <code>_static/_www/docs</code>. Portable shell and AWK generate committed HTML at real paths such as <code>/docs/queries/</code>; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run <code>make docs-check</code> to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs <code>test/guidance.sh</code>, which verifies that the build targets, repository paths, local links, changelog links, and provenance claims named in the guidance documents still match the repository.</p>
           <h2 id="add-parser-behavior"><a href="#add-parser-behavior">Add parser behavior<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>For every supported feature:</p>
           <ol>
@@ -155,7 +156,7 @@ _static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
           <h2 id="add-expression-behavior"><a href="#add-expression-behavior">Add expression behavior<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
           <p>Expression operators must preserve node references unless they intentionally compute a new value. Add tests for precedence, empty streams, null traversal, scalar and collection inputs, multi-result output, and parity with the equivalent yq expression where one exists.</p>
           <h2 id="portability"><a href="#portability">Portability<span class="anchor-mark" aria-hidden="true">#</span></a></h2>
-          <p>Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform <code>/bin/sh</code>. That portability matrix runs on pull requests and main updates that touch the runtime; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.</p>
+          <p>Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform <code>/bin/sh</code>. That portability matrix runs on pull requests; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.</p>
           <p>Run the Linux-only portion on any Docker host:</p>
           <div class="code-block">
             <div class="code-head"><span>sh</span><button type="button" data-copy>Copy</button></div>

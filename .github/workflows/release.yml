@@ -2,11 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing release tag on main
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -25,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ inputs.tag }}
+          ref: main
           fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
@@ -34,8 +29,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: mise run release -- "$RELEASE_TAG"
+        run: mise run release
 
   deploy:
     needs: release
@@ -53,4 +47,5 @@ jobs:
           MISE_GITHUB_TOKEN: ${{ github.token }}
       - run: mise run deploy
         env:
+          GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
