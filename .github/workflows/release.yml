@@ -54,7 +54,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: bosun-release
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -69,17 +70,9 @@ jobs:
           name: release
           path: .release
       - run: chmod +x .release/ysh
-      - id: bosun
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-        with:
-          client-id: ${{ vars.BOSUN_CLIENT_ID }}
-          private-key: ${{ secrets.BOSUN_PRIVATE_KEY }}
-          owner: azohra
-          repositories: yaml.sh
-          permission-contents: write
       - name: Publish release
         env:
-          GH_TOKEN: ${{ steps.bosun.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: mise run release -- "$RELEASE_TAG"
 
