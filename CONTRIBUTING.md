@@ -15,7 +15,7 @@ Read [the design](DESIGN.md) first. It defines the product premise, invariants, 
    supplies the Linux AWK and shell matrix that CI runs. Then run the focused
    gates for the subsystem you touched. Update `test/public-contract.tsv` when
    the supported surface or its product role changes.
-4. Update the documentation and changelog for user-visible changes.
+4. Update documentation and record the completed changes in the PR title and body.
 
 | You changed | Also run |
 | --- | --- |
@@ -32,28 +32,24 @@ agreement with a pinned yq, and the scale and benchmark budgets. It fetches thos
 corpora itself. `mise run evidence:busybox` repeats the conformance, differential,
 and fuzz measurements with BusyBox AWK in Docker. The weekly job runs both verbs.
 
-CI's `Check` job combines the selected runtime, documentation, and portability
-results. It rejects failed classification and missing or unsuccessful selected
-jobs, while accepting intentional skips. Use this stable result for branch
-protection: the runtime matrix emits different check names when skipped.
+CI's `Check` job requires successful runtime, documentation, and portability
+results. Use this stable result for branch protection.
 
 `mise run push` checks and publishes a clean feature branch for PR review.
 
 ## Generated files
 
-`make ysh` and `make docs` own these paths; edit their sources instead:
+Edit the sources and run their build command:
 
-| Generated | Source |
+| Output | Source and command |
 | --- | --- |
-| `ysh` | `src/ysh.sh`, `src/awk/*.awk`, and `src/diff.awk`, assembled by `build/shbuilder.awk` |
-| `_static/_www/docs/*/index.html`, `_static/_www/docs/index.html`, `_static/_www/docs/search-index.json` | `_static/_www/docs/*.md`, rendered by `build/docs.sh` |
-| Version spans inside `README.md` and `_static/_www/index.html` | Rewritten by `build/docbuilder.awk` during `make docs` |
-| Release URL and checksum inside `_static/_www/install` | Preserved by ordinary docs builds; rewritten together from the release artifact with `make docs RELEASE_SHA256=...` |
+| `ysh` (ignored) | `src/ysh.sh`, `src/awk/*.awk`, and `src/diff.awk`; `make ysh` builds the development executable |
+| `_static/_www/docs/*/index.html`, `_static/_www/docs/index.html`, `_static/_www/docs/search-index.json` | `make docs` renders the documentation Markdown; these outputs remain committed |
+| `.release/` (ignored) | `mise run build:release` builds the versioned executable, checksum and release notes |
+| `.release/site/` (ignored) | `mise run deploy` builds the website, filling the installer and homepage from downloaded published assets |
 
-Ordinary source changes must not rewrite the checksum for the immutable release
-asset named by the installer. `testReleaseArtifactsStayInSync` pins that released
-version and digest until the next release updates both together.
-
-Release numbers follow [Semantic Versioning](VERSIONING.md). Compatible additions belong in a minor release, compatible fixes in a patch release, and a new major requires an intentional, documented compatibility break.
+The PR title and body become the squash commit and supply the changelog.
+`mise run changelog` renders pending changes and release history.
+[Versioning](VERSIONING.md) describes release and website deployment.
 
 Bug reports should include a minimal YAML document, the exact command, YAML.sh version, shell, AWK implementation, and operating system.

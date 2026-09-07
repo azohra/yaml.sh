@@ -7,7 +7,7 @@
   "preview_urls": false,
   "routes": [{ "pattern": "yaml.azohra.com", "custom_domain": true }],
   "assets": {
-    "directory": "_static/_www",
+    "directory": ".release/site",
     "not_found_handling": "404-page"
   }
 }

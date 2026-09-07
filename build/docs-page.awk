@@ -210,7 +210,7 @@ function print_header() {
     print "      <button class=\"header-search\" type=\"button\" data-search-open aria-label=\"Search documentation\">Search</button>"
     print "      <a" (page_slug == "index" ? " aria-current=\"page\"" : "") " href=\"/docs/\">Docs</a>"
     print "      <a href=\"https://github.com/azohra/yaml.sh\">GitHub</a>"
-    print "      <a class=\"install\" href=\"/docs/getting-started/\">Install <span>v" esc(version) "</span></a>"
+    print "      <a class=\"install\" href=\"/docs/getting-started/\">Install</a>"
     print "    </nav>"
     print "  </header>"
     print "  <details class=\"mobile-docs\"><summary>Browse documentation</summary><nav>"
@@ -225,7 +225,7 @@ function print_header() {
     print "      <p class=\"nav-foot\">One file. <code>/bin/sh</code> + AWK.</p>"
     print "    </aside>"
     print "    <main id=\"content\" class=\"doc-content\">"
-    print "      <div class=\"breadcrumb\"><span>Documentation</span><span>v" esc(version) "</span></div>"
+    print "      <div class=\"breadcrumb\"><span>Documentation</span></div>"
     print "      <article>"
 }
 

@@ -2,11 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing signed release tag on main
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -16,75 +11,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      sha: ${{ steps.source.outputs.sha }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: main
           fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
         env:
           MISE_GITHUB_TOKEN: ${{ github.token }}
-      - id: source
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          sha=$(mise run --quiet release:source -- "$RELEASE_TAG")
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          git checkout --detach "$sha"
-      - name: Build release
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: mise run build:release -- "$RELEASE_TAG"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release
-          path: .release
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 1
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: bosun-release
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ needs.build.outputs.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
-        env:
-          MISE_GITHUB_TOKEN: ${{ github.token }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: release
-          path: .release
-      - run: chmod +x .release/ysh
-      - id: bosun
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-        with:
-          client-id: ${{ vars.BOSUN_CLIENT_ID }}
-          private-key: ${{ secrets.BOSUN_PRIVATE_KEY }}
-          owner: azohra
-          repositories: yaml.sh
-          permission-contents: write
       - name: Publish release
         env:
-          GH_TOKEN: ${{ steps.bosun.outputs.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: mise run release -- "$RELEASE_TAG"
+          GH_TOKEN: ${{ github.token }}
+        run: mise run release
 
   deploy:
-    needs: publish
+    needs: release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -99,4 +47,5 @@ jobs:
           MISE_GITHUB_TOKEN: ${{ github.token }}
       - run: mise run deploy
         env:
+          GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

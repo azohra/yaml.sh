@@ -1,8 +1,6 @@
 name: Check
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -14,86 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changes:
-    name: Classify changes
-    runs-on: ubuntu-latest
-    outputs:
-      runtime: ${{ steps.scope.outputs.runtime }}
-      docs: ${{ steps.scope.outputs.docs }}
-      docs_portability: ${{ steps.scope.outputs.docs_portability }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-      - name: Select required checks
-        id: scope
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          runtime=false
-          docs=false
-          docs_portability=false
-
-          if [ "$EVENT_NAME" = workflow_dispatch ]; then
-            runtime=true
-            docs=true
-            docs_portability=true
-            printf '%s\n' '(manual run: all checks)' > "$RUNNER_TEMP/changed-files"
-          elif [ -n "$BASE_SHA" ] && git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files"
-          else
-            git diff-tree --no-commit-id --name-only -r "$HEAD_SHA" > "$RUNNER_TEMP/changed-files"
-          fi
-
-          while IFS= read -r file; do
-            case "$file" in
-              .github/workflows/*|Makefile|mise.toml)
-                runtime=true
-                docs=true
-                docs_portability=true
-                ;;
-              ysh|_static/_www/install)
-                runtime=true
-                docs=true
-                ;;
-              build/docs.sh|build/docs-*.awk|test/docs.sh)
-                runtime=true
-                docs=true
-                docs_portability=true
-                ;;
-              CONTRIBUTING.md|DESIGN.md|README.md|SECURITY.md|VERSIONING.md|CHANGELOG.md|_static/*|build/docbuilder.awk)
-                docs=true
-                ;;
-              src/*|build/*|test/*|bench/*)
-                runtime=true
-                ;;
-            esac
-          done < "$RUNNER_TEMP/changed-files"
-
-          {
-            printf 'runtime=%s\n' "$runtime"
-            printf 'docs=%s\n' "$docs"
-            printf 'docs_portability=%s\n' "$docs_portability"
-          } >> "$GITHUB_OUTPUT"
-
-          # The backticks below are Markdown, not shell substitutions.
-          # shellcheck disable=SC2016
-          {
-            printf '### CI scope\n\n'
-            printf -- '- Runtime portability: `%s`\n' "$runtime"
-            printf -- '- Site and docs: `%s`\n' "$docs"
-            printf -- '- Docs generator portability: `%s`\n\n' "$docs_portability"
-            printf 'Changed paths:\n```text\n'
-            sed -n '1,100p' "$RUNNER_TEMP/changed-files"
-            printf '```\n'
-          } >> "$GITHUB_STEP_SUMMARY"
-
   docs:
     name: Site and docs
-    needs: changes
-    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -107,8 +27,6 @@ jobs:
         run: mise run check:docs
 
   test:
-    needs: changes
-    if: needs.changes.outputs.runtime == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -127,8 +45,6 @@ jobs:
 
   linux-portability:
     name: Linux AWK and shell portability
-    needs: changes
-    if: needs.changes.outputs.runtime == 'true' || needs.changes.outputs.docs_portability == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -142,28 +58,11 @@ jobs:
 
   check:
     name: Check
-    needs: [changes, docs, test, linux-portability]
+    needs: [docs, test, linux-portability]
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - name: Verify results
         env:
-          MISE_GITHUB_TOKEN: ${{ github.token }}
-        with:
-          minimum_release_age: 24h
-      - name: Verify selected results
-        env:
-          CLASSIFICATION: ${{ needs.changes.result }}
-          RUNTIME_SCOPE: ${{ needs.changes.outputs.runtime }}
-          DOCS_SCOPE: ${{ needs.changes.outputs.docs }}
-          PORTABILITY_SCOPE: ${{ needs.changes.outputs.docs_portability }}
-          DOCS_RESULT: ${{ needs.docs.result }}
-          RUNTIME_RESULT: ${{ needs.test.result }}
-          PORTABILITY_RESULT: ${{ needs.linux-portability.result }}
-        run: |
-          mise run check:ci-result -- "$CLASSIFICATION" "$RUNTIME_SCOPE" "$DOCS_SCOPE" \
-            "$PORTABILITY_SCOPE" "$DOCS_RESULT" "$RUNTIME_RESULT" "$PORTABILITY_RESULT"
+          RESULTS: ${{ join(needs.*.result, ',') }}
+        run: test "$RESULTS" = 'success,success,success'

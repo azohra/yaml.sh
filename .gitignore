@@ -19,3 +19,6 @@ mise*.lock
 .evidence/
 
 .release/
+
+# Generated development executable
+/ysh

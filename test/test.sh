@@ -19,7 +19,7 @@ assertYshFails() {
 }
 
 testVersion() {
-    assertEquals "v1.18.1" "$(./ysh --version)"
+    assertEquals "v$(sed -n 's/^YSH_VERSION=//p' src/ysh.sh)" "$(./ysh --version)"
 }
 
 testHelp() {
@@ -1689,12 +1689,12 @@ testRunsWithPosixShell() {
     assertEquals "value" "$(/bin/sh ./ysh ".key_value.key" test/test.yml)"
 }
 
-testReleaseArtifactsStayInSync() {
-    assertContains "$(cat _static/_www/install)" "v1.18.1/ysh"
-    assertContains "$(cat _static/_www/install)" "expected_sha256=2c486cc7ba37f94cd91694774ff88abd2fc21cafea7fd0ad962a5bd3941e8bcb"
-    assertContains "$(cat _static/_www/install)" "checksum verification failed"
-    assertContains "$(cat _static/_www/index.html)" "data-ysh-version>v1.18.1"
-    assertTrue "evergreen social preview image must exist" "[ -s _static/_www/og.png ]"
+testStandaloneExecutable() {
+    standalone_dir=$(mktemp -d)
+    cp ./ysh "$standalone_dir/ysh"
+    result=$(cd "$standalone_dir" && printf 'key: value\n' | /bin/sh ./ysh '.key')
+    assertEquals "value" "$result"
+    rm -rf "$standalone_dir"
 }
 
 # shellcheck source=/dev/null

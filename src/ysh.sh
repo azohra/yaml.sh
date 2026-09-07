@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YSH_VERSION=1.18.1
+YSH_VERSION=dev
 
 # Replaced by the build with the embedded AWK engine.
 # YSH_AWK_PROGRAM

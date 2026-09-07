@@ -6,7 +6,9 @@
 make all
 ```
 
-The default workflow rebuilds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and verifies that the committed static documentation is generated and internally linked correctly.
+The development executable is generated locally and reports `vdev`. Release builds embed their calculated version without changing source.
+
+The default workflow builds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and verifies that the committed static documentation is generated and internally linked correctly.
 
 ## Source layout
 
@@ -24,8 +26,8 @@ test/          test.sh behavioral suite on a vendored shunit2 (2.1.8pre
                workflows/; fault-injection PATH shims under fault-bin/;
                toml-test adapters
 bench/         benchmark.sh throughput sample; scale.sh resource contract
-_static/_www/  unified Cloudflare Pages site; docs/*.md are the editable
-               documentation sources, and install is the installer
+_static/_www/  Cloudflare Workers static site; docs/*.md are the editable
+               documentation sources, and install is the installer template
 ```
 
 Each gate script reads its sibling TSV corpus: tab-separated columns, blank
@@ -40,7 +42,7 @@ gates assert their own corpus floors and status vocabularies.
 make docs
 ```
 
-Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs `test/guidance.sh`, which verifies that the build targets, repository paths, local links, version literals, and provenance claims named in the guidance documents still match the repository.
+Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs `test/guidance.sh`, which verifies that the build targets, repository paths, local links, changelog links, and provenance claims named in the guidance documents still match the repository.
 
 ## Add parser behavior
 
@@ -62,7 +64,7 @@ Expression operators must preserve node references unless they intentionally com
 
 ## Portability
 
-Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on pull requests and main updates that touch the runtime; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
+Hosted CI covers macOS AWK on Arm and Intel, mawk on two Ubuntu releases, original AWK, POSIX-mode gawk, and BusyBox AWK. Shell smoke tests use dash, BusyBox sh, bash POSIX mode, and the platform `/bin/sh`. That portability matrix runs on pull requests; the longer evidence workflow runs on demand before a release and weekly to catch upstream changes.
 
 Run the Linux-only portion on any Docker host:
 

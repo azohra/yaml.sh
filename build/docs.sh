@@ -6,11 +6,6 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 SOURCE=$ROOT/_static/_www/docs
 DOCS=${YSH_DOCS_OUTPUT:-$SOURCE}
 RENDERER=$ROOT/build/docs-page.awk
-VERSION=${YSH_DOCS_VERSION:-$(sed -n 's/^YSH_VERSION=//p' "$ROOT/ysh" | head -n 1)}
-if [ -z "$VERSION" ]; then
-    printf '%s\n' 'docs.sh: unable to determine the release version; set YSH_DOCS_VERSION or restore YSH_VERSION in ysh.' >&2
-    exit 1
-fi
 PAGES='README getting-started recipes queries contracts operators documents output yq-compatibility yaml-support security migration internals development'
 
 mkdir -p "$DOCS"
@@ -47,7 +42,6 @@ for page in $PAGES; do
     title=$(sed -n 's/^# //p' "$source_file" | head -n 1)
     description=$(description_for "$page")
     awk \
-        -v version="$VERSION" \
         -v page_slug="$slug" \
         -v page_title="$title" \
         -v page_description="$description" \
@@ -60,4 +54,4 @@ for page in $PAGES; do
 done
 awk -f "$ROOT/build/docs-search.awk" "$@" > "$DOCS/search-index.json"
 
-printf 'Generated %s static documentation pages for v%s.\n' "$(printf '%s\n' "$PAGES" | wc -w | tr -d ' ')" "$VERSION"
+printf 'Generated %s static documentation pages.\n' "$(printf '%s\n' "$PAGES" | wc -w | tr -d ' ')"

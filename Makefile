@@ -1,30 +1,30 @@
 AWK_MODULES := $(sort $(wildcard src/awk/*.awk))
 INSTALL_DIR=/usr/local/bin
-RELEASE_SHA256 ?=
+RELEASE_VERSION ?=
 
 .PHONY: lint test docs-check public-contract operator-manifest conformance toml-conformance schema-conformance json-patch-conformance differential fuzz presentation parser-boundaries adversarial benchmark scale all install uninstall docs clean
 
 all: ysh lint test docs-check
 
-ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile build/shbuilder.awk
+.PHONY: .release/ysh
+ysh .release/ysh: src/ysh.sh $(AWK_MODULES) src/diff.awk Makefile build/shbuilder.awk
 	@echo "👷 Building"
-	@awk -v awk_modules="$(AWK_MODULES)" -v diff_module=src/diff.awk -f build/shbuilder.awk src/ysh.sh > ysh
-	@chmod 755 ysh
+	@mkdir -p $(@D)
+	@awk -v release_version="$(RELEASE_VERSION)" -v awk_modules="$(AWK_MODULES)" -v diff_module=src/diff.awk -f build/shbuilder.awk src/ysh.sh > $@
+	@chmod 755 $@
 
 lint: ysh
 	@echo "👖 Linting"
 	@sh -n ysh
-	@shellcheck build/ci-result.sh test/ci-result.sh build/release-*.sh test/release.sh
+	@shellcheck test/release.sh
 	@shellcheck -e SC2016 ysh build/docs.sh test/docs.sh test/guidance.sh test/test.sh test/workflows.sh test/public-contract.sh test/operator-manifest.sh test/conformance.sh test/toml-conformance.sh test/schema-conformance.sh test/json-patch-conformance.sh test/toml-test-decoder test/toml-test-encoder test/differential.sh test/generate-yq-corpus.sh test/fuzz.sh test/presentation-matrix.sh test/parser-boundaries.sh test/adversarial.sh test/linux-portability-container.sh test/busybox-evidence-container.sh test/fault-bin/mv test/fault-bin/awk bench/benchmark.sh bench/scale.sh _static/_www/install
 
 test: ysh
-	@bash test/release.sh
 	@echo "🔬 Testing"
 	@./test/test.sh
 	@./test/workflows.sh
 	@./test/parser-boundaries.sh
 	@./test/public-contract.sh
-	@sh test/ci-result.sh
 
 docs-check: ysh
 	@echo "📚 Checking static documentation"
@@ -95,16 +95,7 @@ uninstall:
 	@echo "🗑️  Uninstalling ysh"
 	@rm -f $(INSTALL_DIR)/ysh
 
-docs: ysh
-	@echo "📚 Updating docs"
-	$(eval VERSION := $(shell sed -n 's/^YSH_VERSION=//p' ysh | head -n 1))
-	@awk -v version=$(VERSION) -f build/docbuilder.awk README.md > .tmp_README.md
-	@mv .tmp_README.md README.md
-	@awk $(if $(strip $(RELEASE_SHA256)),-v version=$(VERSION) -v sha256=$(RELEASE_SHA256),) -f build/docbuilder.awk _static/_www/install > .tmp_install
-	@mv .tmp_install _static/_www/install
-	@chmod 755 _static/_www/install
-	@awk -v version=$(VERSION) -f build/docbuilder.awk _static/_www/index.html > .tmp_index.html
-	@mv .tmp_index.html _static/_www/index.html
+docs:
 	@./build/docs.sh
 
 clean:

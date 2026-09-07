@@ -22,14 +22,8 @@ for page in $PAGES; do
     cmp "$GENERATED/$page/index.html" "$PUBLISHED/$page/index.html"
 done
 
-VERSION_TEST=$GENERATED/version-test
-YSH_DOCS_VERSION=9.9.9 YSH_DOCS_OUTPUT=$VERSION_TEST "$ROOT/build/docs.sh" >/dev/null
-if ! grep -Fq 'Install <span>v9.9.9</span>' "$VERSION_TEST/index.html"; then
-    printf '%s\n' 'Documentation release text is not generated from the executable version.' >&2
-    exit 1
-fi
 if ! awk -v version=9.9.9 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/index.html" | grep -Fq 'data-ysh-version>v9.9.9'; then
-    printf '%s\n' 'Homepage release text is not generated from the executable version.' >&2
+    printf '%s\n' 'Homepage release text is not generated from the published version.' >&2
     exit 1
 fi
 if ! awk -v version=9.9.9 -v sha256=abc123 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'expected_sha256=abc123'; then
@@ -41,7 +35,8 @@ if ! awk -v version=9.9.9 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/in
     printf '%s\n' 'Ordinary documentation builds rewrite the pinned release checksum.' >&2
     exit 1
 fi
-if ! awk -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fq 'releases/download/v1.18.1/ysh'; then
+release_url=$(sed -n 's/^release_url=//p' "$ROOT/_static/_www/install")
+if ! awk -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/install" | grep -Fxq "release_url=$release_url"; then
     printf '%s\n' 'Ordinary documentation builds rewrite the pinned release URL.' >&2
     exit 1
 fi
