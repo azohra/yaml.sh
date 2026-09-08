@@ -235,7 +235,7 @@ run = '''
 set -euo pipefail
 archive=$(sed -n 's/^## \[\([0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
 printf '# Changelog\n\n'
-git cliff --offline "v$archive..HEAD"
+git cliff "v$archive..HEAD"
 printf '\n'
 awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
@@ -257,7 +257,7 @@ make .release/ysh RELEASE_VERSION="${tag#v}"
 [ "$(sh .release/ysh --version)" = "$tag" ]
 [ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
 (cd .release && shasum -a 256 ysh > ysh.sha256)
-git cliff --offline --unreleased --tag "$tag" > .release/notes.md
+git cliff --unreleased --tag "$tag" > .release/notes.md
 gh release create "$tag" .release/ysh .release/ysh.sha256 \
   --repo azohra/yaml.sh --target "$head" \
   --title "YAML.sh $tag" --notes-file .release/notes.md
