@@ -43,6 +43,10 @@ This renders recorded changes and releases from Git, followed by the historical
 entries in `CHANGELOG.md`. New entries use the reviewed title and link to the
 full commit. Breaking-change notes retain migration instructions. Published
 release notes are available in [GitHub Releases](https://github.com/azohra/yaml.sh/releases).
+Changelog rendering uses GitHub PR metadata for links, with commit links when no
+associated PR is available. Set `GITHUB_TOKEN` for authenticated GitHub access;
+version calculation remains offline.
+
 Versions and notes are calculated without rewriting source or opening a version PR.
 
 ## Publish the executable
