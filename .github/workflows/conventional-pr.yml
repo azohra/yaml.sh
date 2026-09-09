@@ -3,8 +3,6 @@ name: Conventional PR
 on:
   pull_request_target:
     types: [opened, reopened, edited, synchronize]
-  push:
-    branches: [main]
 
 permissions:
   pull-requests: read
@@ -15,8 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - if: github.event_name == 'pull_request_target'
-        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -33,5 +30,3 @@ jobs:
             style
             test
           requireScope: false
-      - if: github.event_name == 'push'
-        run: ":"
