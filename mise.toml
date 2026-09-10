@@ -6,7 +6,8 @@
 experimental = true
 
 [vars]
-changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/8236e353f4b175a81020b61ae7d237746dd7dd64/cliff.toml"
+release_base = "44cd3444b1a0377342295936215cb7359f34fcb1"
+changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/3b38025ec8de687c82bdadd36ddb56c4060eefda/cliff.toml"
 
 [env]
 # Where the pinned corpora live. Gitignored: fetched, never committed.
@@ -246,7 +247,7 @@ awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
 
 [tasks.release]
-description = "Build and publish a release from current main"
+description = "Publish the checked-out main revision; print its release tag"
 tools = { gh = "2.100.0" }
 run = '''
 #!/usr/bin/env bash
@@ -254,18 +255,51 @@ set -euo pipefail
 [ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
 git fetch -q origin main --tags
 head=$(git rev-parse HEAD)
-[ "$head" = "$(git rev-parse origin/main)" ] || { echo 'release: check out current main first' >&2; exit 1; }
-tag=$(git cliff --config-url "{{vars.changelog_config}}" --offline --unreleased --bumped-version)
+git merge-base --is-ancestor "$head" origin/main || { echo 'release: use a merged revision' >&2; exit 1; }
+tag=$(git tag --points-at "$head" --list 'v[0-9]*')
+if [ -z "$tag" ]; then
+  parent=$(git rev-parse "$head^")
+  if [ "$parent" != "{{vars.release_base}}" ] && [ -z "$(git tag --points-at "$parent" --list 'v[0-9]*')" ]; then
+    echo 'release: publish the preceding merge before this revision' >&2
+    exit 1
+  fi
+  latest=$(git tag --sort=-version:refname --list 'v[0-9]*' | head -n 1)
+  [ "$(gh release view "$latest" --repo azohra/yaml.sh --json isDraft --jq .isDraft)" = false ] || { echo "release: finish $latest before starting another release" >&2; exit 1; }
+  git merge-base --is-ancestor "$latest" "$head" || { echo 'release: a newer revision is already released' >&2; exit 1; }
+  tag=$(git cliff --config-url "{{vars.changelog_config}}" --offline --unreleased --bumped-version)
+fi
 [[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]
-[ "$tag" != "$(git describe --tags --abbrev=0 --match 'v[0-9]*')" ] || { echo 'No new Conventional changes to release'; exit 0; }
-make .release/ysh RELEASE_VERSION="${tag#v}"
-[ "$(sh .release/ysh --version)" = "$tag" ]
-[ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
-(cd .release && shasum -a 256 ysh > ysh.sha256)
-git cliff --config-url "{{vars.changelog_config}}" --unreleased --tag "$tag" > .release/notes.md
-gh release create "$tag" .release/ysh .release/ysh.sha256 \
-  --repo azohra/yaml.sh --target "$head" \
-  --title "YAML.sh $tag" --notes-file .release/notes.md
+status=$(gh api --paginate repos/azohra/yaml.sh/releases --jq ".[] | select(.tag_name == \"$tag\") | if .draft then \"draft\" else \"published\" end")
+if [ "$status" != published ]; then
+  make .release/ysh RELEASE_VERSION="${tag#v}" >&2
+  [ "$(sh .release/ysh --version)" = "$tag" ]
+  [ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
+  (cd .release && shasum -a 256 ysh > ysh.sha256)
+  if git rev-parse --verify "refs/tags/$tag" >/dev/null 2>&1; then
+    git cliff --config-url "{{vars.changelog_config}}" --current > .release/notes.md
+  else
+    git cliff --config-url "{{vars.changelog_config}}" --unreleased --tag "$tag" > .release/notes.md
+    gh api repos/azohra/yaml.sh/git/refs --method POST -f "ref=refs/tags/$tag" -f "sha=$head" >/dev/null
+    git fetch -q origin "refs/tags/$tag:refs/tags/$tag"
+  fi
+  if [ -z "$status" ]; then
+    gh release create "$tag" --repo azohra/yaml.sh --verify-tag --draft \
+      --title "YAML.sh $tag" --notes-file .release/notes.md >&2
+  fi
+  scratch=$(mktemp -d)
+  trap 'rm -rf "$scratch"' EXIT
+  assets=$(gh release view "$tag" --repo azohra/yaml.sh --json assets --jq '.assets[].name')
+  for asset in ysh ysh.sha256; do
+    if printf '%s\n' "$assets" | grep -Fxq "$asset"; then
+      gh release download "$tag" --repo azohra/yaml.sh --pattern "$asset" --dir "$scratch"
+      cmp ".release/$asset" "$scratch/$asset" || { echo "release: conflicting $asset" >&2; exit 1; }
+    else
+      gh release upload "$tag" ".release/$asset" --repo azohra/yaml.sh >&2
+    fi
+  done
+  gh release edit "$tag" --repo azohra/yaml.sh --draft=false --latest >&2
+fi
+printf '%s\n' "$tag"
 '''
 
 [tasks."build:site"]
@@ -289,21 +323,29 @@ awk -v version="${tag#v}" -f build/docbuilder.awk _static/_www/index.html > .rel
 '''
 
 [tasks.deploy]
-description = "Deploy the site from main using the latest published release for its installer"
+description = "Deploy the checked-out release tag and its matching installer"
 tools = { gh = "2.100.0" }
-usage = 'flag "--dry-run" help="Build and validate without deploying"'
+usage = '''arg "<tag>"
+flag "--dry-run" help="Build and validate without deploying"'''
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
+tag=${usage_tag:?}
+[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]
 [ -z "$(git status --porcelain)" ] || { echo 'deploy: commit changes first' >&2; exit 1; }
-git fetch -q origin main
-[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo 'deploy: check out current main first' >&2; exit 1; }
+git fetch -q origin "refs/tags/$tag:refs/tags/$tag"
+[ "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$tag^{commit}")" ] || { echo "deploy: check out $tag first" >&2; exit 1; }
+[ "$(gh release view "$tag" --repo azohra/yaml.sh --json isDraft,isPrerelease --jq '(.isDraft or .isPrerelease) | not')" = true ] || { echo 'deploy: select a published stable release' >&2; exit 1; }
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
-tag=$(gh release view --repo azohra/yaml.sh --json tagName --jq .tagName)
 gh release download "$tag" --repo azohra/yaml.sh --pattern ysh --pattern ysh.sha256 --dir "$scratch"
 mise run build:site -- "$tag" "$scratch"
-args=(--assets .release/site)
-if [ "${usage_dry_run:-false}" = true ]; then args+=(--dry-run); fi
-wrangler deploy "${args[@]}"
+if [ "${usage_dry_run:-false}" = true ]; then
+  wrangler deploy --assets .release/site --dry-run
+  exit 0
+fi
+[ "$tag" = "$(gh release view --repo azohra/yaml.sh --json tagName --jq .tagName)" ] || { echo 'deploy: a newer release supersedes this deployment' >&2; exit 1; }
+wrangler deploy --assets .release/site --tag "$tag" --message "$(git rev-parse HEAD)"
+curl -fsSL https://yaml.azohra.com/install -o "$scratch/install"
+cmp .release/site/install "$scratch/install"
 '''

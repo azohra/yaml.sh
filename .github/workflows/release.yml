@@ -1,6 +1,8 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -9,28 +11,33 @@ permissions:
 concurrency:
   group: release
   cancel-in-progress: false
+  queue: max
 
 jobs:
   release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     permissions:
       contents: write
       pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: main
           fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
         env:
           MISE_GITHUB_TOKEN: ${{ github.token }}
       - name: Publish release
+        id: release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: mise run release
+        run: |
+          tag=$(mise run --quiet release)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: release
@@ -42,11 +49,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: main
+          ref: ${{ needs.release.outputs.tag }}
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
         env:
           MISE_GITHUB_TOKEN: ${{ github.token }}
-      - run: mise run deploy
+      - run: mise run deploy "$RELEASE_TAG"
         env:
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

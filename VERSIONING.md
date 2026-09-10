@@ -58,52 +58,45 @@ Release notes use the same template for the unreleased changes.
 
 Versions and notes are calculated without rewriting source or opening a version PR.
 
-## Publish the executable
+## Releases and deployment
 
-From a clean checkout of current main:
+Merging a PR automatically releases its main revision. `release_base` in
+`mise.toml` records the last revision before automatic releases; older changes
+are collected in the first release rather than backfilled as separate versions. Git-cliff calculates the
+version and notes; the release task builds and smoke-tests the executable,
+writes its checksum, and publishes both assets in GitHub Releases. No version
+file or generated changelog commit is required.
+
+The Release workflow then checks out that published tag and deploys its website.
+Pages, documentation and installer use the same release revision and executable.
+A deployment failure leaves the published release available; retry the failed
+job to deploy that same tag. A superseded release cannot replace the latest site.
+
+The same operations are available through mise. Release requires a clean,
+merged checkout and prints the tag it published or resumed:
 
 ```sh
 mise run release
 ```
 
-Release fetches main and its tags, checks the source commit, and calculates the
-version once. It builds the executable with that version, smoke-tests it, and
-writes its checksum and notes. GitHub CLI then creates the tag and publishes
-those artifacts from the same run. The outputs are in `.release/`; source files
-remain unchanged.
+An interrupted publication resumes the tag at that commit, verifies existing
+assets and uploads missing ones before publishing. Existing tags and published
+assets are never replaced. If merges arrive out of order, finish the preceding
+release and retry the waiting revision. Main may advance without changing the selected source.
 
-PR checks build and test the development executable without calculating a release
-version from branch commits. Development builds identify themselves as `vdev`;
-published builds embed the calculated version. Use `make ysh` for a local build.
-
-Publication is explicit. Documentation and build changes can be released as
-patches; merging their PRs does not publish a release.
-An existing release is not overwritten. If an upload is interrupted, inspect
-its draft with `gh release view`, upload missing assets with GitHub CLI, and
-publish the draft after verifying its files. Do not move an existing tag.
-
-Dispatch the Release workflow to run the same release command on main. After
-successful publication it runs the website deployment. Homebrew's daily updater reads the
-published executable and checksum and proposes the formula update; its manual
-workflow can run that update immediately.
-
-## Deploy the website
-
-The website deploys on merges to main, independently of executable releases.
-Its documentation follows main. Its installer and displayed release version
-always refer to the latest published GitHub release.
+To validate or deploy a release, check out its tag first:
 
 ```sh
-mise run deploy -- --dry-run
-mise run deploy
+git checkout --detach v1.18.2
+mise run deploy v1.18.2 --dry-run
+mise run deploy v1.18.2
 ```
 
-Deployment resolves one published tag, downloads its executable and checksum,
-and verifies them. It builds the site into `.release/site`, filling the installer
-URL, checksum and homepage version from that release. Wrangler deploys that
-output. Source templates contain no release pins to update.
+Use the desired published tag in place of the example. Deployment downloads that
+release's executable and checksum, builds `.release/site` from the checkout,
+and publishes it with Wrangler. It verifies the live installer against the built
+file. Deployment does not calculate a version or create a release.
 
-A missing or corrupt release asset stops deployment. An unsuccessful executable
-release leaves the installer on the previous published version. After a release,
-redeploying promotes its installer without a source commit. Local publication
-and deployment are separate commands; the Release workflow performs both in order.
+PR checks use development builds identified as `vdev`; release builds embed the
+calculated version. Homebrew's updater follows the published executable and
+checksum independently of website deployment.
