@@ -60,42 +60,42 @@ Versions and notes are calculated without rewriting source or opening a version 
 
 ## Releases and deployment
 
-Merging a PR automatically releases its main revision. `release_base` in
-`mise.toml` records the last revision before automatic releases; older changes
-are collected in the first release rather than backfilled as separate versions. Git-cliff calculates the
-version and notes; the release task builds and smoke-tests the executable,
-writes its checksum, and publishes both assets in GitHub Releases. No version
-file or generated changelog commit is required.
+Changes on main trigger a release, followed by website deployment. The workflow
+selects current main when it starts; pending runs may combine several merges.
+Git-cliff calculates the version once and renders the notes using that version.
+The existing Make recipe builds the executable, which is smoke-tested before
+publication. The website is generated from the same source and executable.
 
-The Release workflow then checks out that published tag and deploys its website.
-Pages, documentation and installer use the same release revision and executable.
-A deployment failure leaves the published release available; retry the failed
-job to deploy that same tag. A superseded release cannot replace the latest site.
+Each release contains `ysh`, `ysh.sha256` and `site.tar.gz`. The website archive
+contains the generated pages, documentation and installer. GitHub CLI uploads
+these files to a draft, then publishes it. No source version file or generated
+changelog commit is required.
 
-The same operations are available through mise. Release requires a clean,
-merged checkout and prints the tag it published or resumed:
+The same operations are available locally:
 
 ```sh
 mise run release
 ```
 
-An interrupted publication resumes the tag at that commit, verifies existing
-assets and uploads missing ones before publishing. Existing tags and published
-assets are never replaced. If merges arrive out of order, finish the preceding
-release and retry the waiting revision. Main may advance without changing the selected source.
+Release requires a clean checkout of current main and prints its published tag.
+Repeating it for already-published source returns that tag without rebuilding.
+If publication is interrupted, inspect the draft and its assets before retrying;
+use GitHub CLI to finish an incomplete draft. Existing tags and published assets
+must not be replaced. Local publication should not run alongside the workflow.
 
-To validate or deploy a release, check out its tag first:
+Deployment consumes a published website archive. It neither rebuilds the site
+nor calculates a version. A failed deployment leaves the release available.
+To retry it, select the release tag and run the deployment task:
 
 ```sh
-git checkout --detach v1.18.2
-mise run deploy v1.18.2 --dry-run
-mise run deploy v1.18.2
+git checkout --detach <release-tag>
+mise run deploy <release-tag> --dry-run
+mise run deploy <release-tag>
 ```
 
-Use the desired published tag in place of the example. Deployment downloads that
-release's executable and checksum, builds `.release/site` from the checkout,
-and publishes it with Wrangler. It verifies the live installer against the built
-file. Deployment does not calculate a version or create a release.
+Replace `<release-tag>` with the desired published tag. The checkout supplies
+its Wrangler configuration; the archive supplies its website files. Releases
+created before website archives were introduced cannot use this deployment task.
 
 PR checks use development builds identified as `vdev`; release builds embed the
 calculated version. Homebrew's updater follows the published executable and
