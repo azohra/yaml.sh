@@ -4,7 +4,7 @@ set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 SOURCE=$ROOT/_static/_www/docs
-DOCS=${YSH_DOCS_OUTPUT:-$SOURCE}
+DOCS=${YSH_DOCS_OUTPUT:-$ROOT/.release/site/docs}
 RENDERER=$ROOT/build/docs-page.awk
 PAGES='README getting-started recipes queries contracts operators documents output yq-compatibility yaml-support security migration internals development'
 

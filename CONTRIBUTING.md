@@ -24,9 +24,10 @@ Read [the design](DESIGN.md) first. It defines the product premise, invariants, 
 | Source-edit compiler or diff renderer | `make presentation`, `make fuzz` |
 | Codecs, schema, pointer, or patches | `make toml-conformance`, `make schema-conformance`, `make json-patch-conformance` |
 | Resource limits or transactions | `make adversarial`, `make scale` |
-| Docs sources or generators | `make docs`, `make docs-check` |
+| Docs sources or generators | `mise run build`, `make docs-check` |
 
-Before a release, `mise run evidence` runs the full measured battery: conformance
+Before merging runtime changes, use `mise run evidence` for the full measured
+battery: conformance
 against the pinned YAML, TOML, JSON Schema and JSON Patch corpora, differential
 agreement with a pinned yq, and the scale and benchmark budgets. It fetches those
 corpora itself. `mise run evidence:busybox` repeats the conformance, differential,
@@ -44,9 +45,9 @@ Edit the sources and run their build command:
 | Output | Source and command |
 | --- | --- |
 | `ysh` (ignored) | `src/ysh.sh`, `src/awk/*.awk`, and `src/diff.awk`; `make ysh` builds the development executable |
-| `_static/_www/docs/*/index.html`, `_static/_www/docs/index.html`, `_static/_www/docs/search-index.json` | `make docs` renders the documentation Markdown; these outputs remain committed |
+| `.release/site/docs/` | `mise run build` renders the documentation Markdown; these outputs are not committed |
 | `.release/` (ignored) | `mise run release` builds and publishes the versioned executable, checksum, website archive and release notes |
-| `.release/site/` (ignored) | `mise run build:site <tag> <assets>` generates the website from the selected executable; release packages this output |
+| `.release/site/` (ignored) | `mise run build [tag]` builds the executable and website together, including the deployable archive |
 
 The PR title and body become the squash commit and supply the changelog.
 `mise run changelog` renders pending changes and release history.

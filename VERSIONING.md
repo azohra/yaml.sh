@@ -58,45 +58,41 @@ Release notes use the same template for the unreleased changes.
 
 Versions and notes are calculated without rewriting source or opening a version PR.
 
-## Releases and deployment
+## Build, release and deploy
 
-Changes on main trigger a release, followed by website deployment. The workflow
-selects current main when it starts; pending runs may combine several merges.
-Git-cliff calculates the version once and renders the notes using that version.
-The existing Make recipe builds the executable, which is smoke-tested before
-publication. The website is generated from the same source and executable.
+`mise run build [tag]` produces the executable, its checksum and the deployable
+website archive in `.release/`. Without a tag, it builds `vdev` for local checks.
+The executable is smoke-tested, documentation is generated from Markdown, and
+the installer and homepage use that executable's version. Generated pages are
+build output and are not committed.
 
-Each release contains `ysh`, `ysh.sha256` and `site.tar.gz`. The website archive
-contains the generated pages, documentation and installer. GitHub CLI uploads
-these files to a draft, then publishes it. No source version file or generated
-changelog commit is required.
+Each merge to main queues a release of that commit, followed by website
+deployment. Git-cliff calculates the version once; the build receives it and
+the release notes use it. PR checks exercise the same build with a development
+version, including the generated site's links and deployment configuration.
 
-The same operations are available locally:
+`mise run release` publishes the checked-out main commit and prints its tag.
+The release contains `ysh`, `ysh.sha256` and `site.tar.gz`. The archive contains
+the generated website and its Wrangler configuration. No source version file
+or generated changelog commit is required.
 
-```sh
-mise run release
-```
-
-Release requires a clean checkout of current main and prints its published tag.
-Repeating it for already-published source returns that tag without rebuilding.
-If publication is interrupted, inspect the draft and its assets before retrying;
-use GitHub CLI to finish an incomplete draft. Existing tags and published assets
-must not be replaced. Local publication should not run alongside the workflow.
-
-Deployment consumes a published website archive. It neither rebuilds the site
-nor calculates a version. A failed deployment leaves the release available.
-To retry it, select the release tag and run the deployment task:
+An interrupted draft upload can be retried with `mise run release` from the
+same source: it rebuilds that version and replaces only draft assets before
+publishing. A draft belonging to different source is refused. Once published,
+repeating release returns its tag without rebuilding or replacing assets.
+Local publication should not run alongside the workflow. New releases from
+source older than an existing descendant release are refused.
 
 ```sh
-git checkout --detach <release-tag>
 mise run deploy <release-tag> --dry-run
 mise run deploy <release-tag>
 ```
 
-Replace `<release-tag>` with the desired published tag. The checkout supplies
-its Wrangler configuration; the archive supplies its website files. Releases
-created before website archives were introduced cannot use this deployment task.
+Deployment downloads and extracts the published archive and uses its Wrangler
+configuration. It does not use the checkout's website files or rebuild the
+product. The same command retries deployment or restores an earlier release,
+without switching branches. Releases created before the website archive was
+introduced do not contain this deployable bundle.
 
-PR checks use development builds identified as `vdev`; release builds embed the
-calculated version. Homebrew's updater follows the published executable and
-checksum independently of website deployment.
+A failed deployment leaves the published release available. Homebrew's updater
+follows the published executable and checksum independently of website deployment.

@@ -8,7 +8,7 @@ make all
 
 The development executable is generated locally and reports `vdev`. Release builds embed their calculated version without changing source.
 
-The default workflow builds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and verifies that the committed static documentation is generated and internally linked correctly.
+The default workflow builds `ysh`, validates shell scripts with ShellCheck, runs the shUnit2 suite, audits the workflow, parser-boundary, and public-contract gates, and builds the website and validates its generated documentation and local links.
 
 ## Source layout
 
@@ -39,10 +39,10 @@ gates assert their own corpus floors and status vocabularies.
 ## Build documentation
 
 ```sh
-make docs
+mise run build
 ```
 
-Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate committed HTML at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to detect stale output, broken local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs `test/guidance.sh`, which verifies that the build targets, repository paths, local links, changelog links, and provenance claims named in the guidance documents still match the repository.
+Markdown remains the readable source under `_static/_www/docs`. Portable shell and AWK generate HTML under `.release/site/`, served at real paths such as `/docs/queries/`; no client-side framework renders the pages. The small optional script provides local search, copy buttons, and keyboard shortcuts. Run `make docs-check` to validate generated pages, local links, anchor regressions, remote framework assets, or release-specific artwork. The same target runs `test/guidance.sh`, which verifies that the build targets, repository paths, local links, changelog links, and provenance claims named in the guidance documents still match the repository.
 
 ## Add parser behavior
 
