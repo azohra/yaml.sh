@@ -29,7 +29,9 @@ The reviewed PR title and body become the squash commit. Its Conventional title
 sets aggregate impact using git-cliff's default bump rules: a breaking header or
 `BREAKING CHANGE:` footer produces a major, `feat` produces a minor, and other
 Conventional changes produce patches. Non-Conventional commits are excluded.
-Nested Conventional headings in the body are ordinary prose.
+Nested Conventional headings in the body are ordinary prose. The
+[Conventional PR format](https://github.com/azohra/conventional-pr#bodies-and-annotations)
+defines the validated message and optional annotations.
 
 PR checks build and test the proposed merge. Main requires passing checks against
 the current base before merging. The full suite runs before merge; publication
@@ -40,12 +42,19 @@ mise run changelog
 ```
 
 This renders recorded changes and releases from Git, followed by the historical
-entries in `CHANGELOG.md`. New entries use the reviewed title and link to the
-full commit. Breaking-change notes retain migration instructions. Published
+entries in `CHANGELOG.md`. Each entry shows the reviewed title and PR link, with
+migration instructions and footers visible. Expand **Details** for the full
+explanation, including Markdown lists and code examples. Published
 release notes are available in [GitHub Releases](https://github.com/azohra/yaml.sh/releases).
 Changelog rendering uses GitHub PR metadata for links, with commit links when no
 associated PR is available. Set `GITHUB_TOKEN` for authenticated GitHub access;
-version calculation remains offline.
+the preset itself is downloaded for every invocation, including version calculation.
+Its URL in `mise.toml` pins the shared configuration to a reviewed commit.
+
+`mise run changelog -- --json` exports git-cliff's structured context, including
+bodies, footers and available GitHub metadata. It covers Git history only; it
+does not convert the Markdown archive. Redirect either output to a file when needed.
+Release notes use the same template for the unreleased changes.
 
 Versions and notes are calculated without rewriting source or opening a version PR.
 
