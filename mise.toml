@@ -6,7 +6,7 @@
 experimental = true
 
 [vars]
-changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/00ed923287317e0726db1d0b1f6edf8420caa6c2/cliff.toml"
+changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/main/cliff.toml"
 
 [env]
 # Where the pinned corpora live. Gitignored: fetched, never committed.
