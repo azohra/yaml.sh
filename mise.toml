@@ -229,10 +229,14 @@ git push --set-upstream origin "refs/heads/$branch:refs/heads/$branch"
 '''
 
 [tasks.changelog]
-description = "Render changes from Git and retain the historical changelog"
+description = "Render the changelog or export structured Git history"
+usage = 'flag "--json" help="Export git-cliff context without the Markdown archive"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
+if [ "${usage_json:-false}" = true ]; then
+  exec git cliff --context
+fi
 archive=$(sed -n 's/^## \[\([0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
 printf '# Changelog\n\n'
 git cliff "v$archive..HEAD"
