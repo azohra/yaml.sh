@@ -3,24 +3,24 @@
 set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-PUBLISHED=$ROOT/_static/_www/docs
-STORY=$ROOT/_static/_www/story
-GENERATED=$(mktemp -d "${TMPDIR:-/tmp}/ysh-docs.XXXXXX")
-trap 'rm -rf "$GENERATED"' 0 1 2 3 15
+SOURCE=$ROOT/_static/_www/docs
+GENERATED=$ROOT/.release/site
+PUBLISHED=$GENERATED/docs
+STORY=$GENERATED/story
+LINKS=$(mktemp "${TMPDIR:-/tmp}/ysh-links.XXXXXX")
+trap 'rm -f "$LINKS"' 0 1 2 3 15
 
+make -C "$ROOT" build >/dev/null
 PAGES=
-for page_source in "$PUBLISHED"/*.md; do
+for page_source in "$SOURCE"/*.md; do
     page=$(basename "$page_source" .md)
-    [ "$page" = README ] || PAGES="$PAGES $page"
+    if [ "$page" != README ]; then
+        PAGES="$PAGES $page"
+        [ -s "$PUBLISHED/$page/index.html" ] || { printf 'Missing generated page: %s\n' "$page" >&2; exit 1; }
+    fi
 done
 
-YSH_DOCS_OUTPUT=$GENERATED "$ROOT/build/docs.sh" >/dev/null
-
-cmp "$GENERATED/index.html" "$PUBLISHED/index.html"
-cmp "$GENERATED/search-index.json" "$PUBLISHED/search-index.json"
-for page in $PAGES; do
-    cmp "$GENERATED/$page/index.html" "$PUBLISHED/$page/index.html"
-done
+node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$PUBLISHED/search-index.json"
 
 if ! awk -v version=9.9.9 -f "$ROOT/build/docbuilder.awk" "$ROOT/_static/_www/index.html" | grep -Fq 'data-ysh-version>v9.9.9'; then
     printf '%s\n' 'Homepage release text is not generated from the published version.' >&2
@@ -108,25 +108,25 @@ if ! grep -Fq 'og.png' "$ROOT/_static/_www/index.html"; then
     printf '%s\n' 'Homepage no longer references the social preview image.' >&2
     exit 1
 fi
-if ! grep -Fq '# Operator reference' "$PUBLISHED/operators.md" ||
-    ! grep -Fq 'array_to_map' "$PUBLISHED/operators.md" ||
-    ! grep -Fq 'split_doc' "$PUBLISHED/operators.md"; then
+if ! grep -Fq '# Operator reference' "$SOURCE/operators.md" ||
+    ! grep -Fq 'array_to_map' "$SOURCE/operators.md" ||
+    ! grep -Fq 'split_doc' "$SOURCE/operators.md"; then
     printf '%s\n' 'Operator reference lost its heading or a portable operator entry.' >&2
     exit 1
 fi
-if grep -Fq 'testExpression' "$PUBLISHED/operators.md"; then
+if grep -Fq 'testExpression' "$SOURCE/operators.md"; then
     printf '%s\n' 'Operator reference leaks internal test function names.' >&2
     exit 1
 fi
-if ! grep -Fq '# Validate, patch & convert' "$PUBLISHED/contracts.md"; then
+if ! grep -Fq '# Validate, patch & convert' "$SOURCE/contracts.md"; then
     printf '%s\n' 'Contracts page lost its heading.' >&2
     exit 1
 fi
-if ! grep -Fq '# YAML support' "$PUBLISHED/yaml-support.md"; then
+if ! grep -Fq '# YAML support' "$SOURCE/yaml-support.md"; then
     printf '%s\n' 'YAML support page lost its heading.' >&2
     exit 1
 fi
-if grep -Fq 'Date/time, XML' "$PUBLISHED/yaml-support.md"; then
+if grep -Fq 'Date/time, XML' "$SOURCE/yaml-support.md"; then
     printf '%s\n' 'YAML support page reintroduced retired capability copy.' >&2
     exit 1
 fi
@@ -141,8 +141,8 @@ if grep -Fq '35/35' "$ROOT/_static/_www/index.html" || grep -Fq '35/35' "$ROOT/R
     exit 1
 fi
 
-if ! grep -Fq '<code>|=</code>' "$GENERATED/operators/index.html" ||
-    grep -Fq '<td>=<code>' "$GENERATED/operators/index.html"; then
+if ! grep -Fq '<code>|=</code>' "$PUBLISHED/operators/index.html" ||
+    grep -Fq '<td>=<code>' "$PUBLISHED/operators/index.html"; then
     printf '%s\n' 'A pipe inside inline code broke a generated documentation table.' >&2
     exit 1
 fi
@@ -171,8 +171,7 @@ for brand_source in "$ROOT/_static/_www/brand/hero.svg" "$ROOT/_static/_www/bran
     fi
 done
 
-LINKS=$GENERATED/.links
-for source in "$ROOT/_static/_www/index.html" "$STORY/index.html" "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html; do
+for source in "$GENERATED/index.html" "$STORY/index.html" "$PUBLISHED"/*.html "$PUBLISHED"/*/index.html; do
     awk -v source="$source" '
     {
         line = $0
@@ -200,9 +199,9 @@ while IFS="	" read -r source link; do
         target=$source
     else
         case "$link" in
-        /) target=$ROOT/_static/_www/index.html ;;
-        /*/) target=$ROOT/_static/_www${link}index.html ;;
-        /*) target=$ROOT/_static/_www$link ;;
+        /) target=$GENERATED/index.html ;;
+        /*/) target=$GENERATED${link}index.html ;;
+        /*) target=$GENERATED$link ;;
         *) target=$(dirname "$source")/$link ;;
         esac
     fi

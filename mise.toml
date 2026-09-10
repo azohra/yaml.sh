@@ -6,7 +6,7 @@
 experimental = true
 
 [vars]
-changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/8236e353f4b175a81020b61ae7d237746dd7dd64/cliff.toml"
+changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/00ed923287317e0726db1d0b1f6edf8420caa6c2/cliff.toml"
 
 [env]
 # Where the pinned corpora live. Gitignored: fetched, never committed.
@@ -66,8 +66,9 @@ sources = [
   "*.md",
   "Makefile",
   "mise.toml",
+  "wrangler.jsonc",
 ]
-run = "make ysh docs-check"
+run = ["make ysh docs-check", "wrangler deploy --dry-run"]
 
 # Linux-only portability runs in Docker so the same proof is available on a
 # laptop and a runner. The native CI matrix remains the macOS portability
@@ -246,64 +247,65 @@ awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
 
 [tasks.release]
-description = "Build and publish a release from current main"
+description = "Build and publish the checked-out main commit; print its tag"
 tools = { gh = "2.100.0" }
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-[ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo 'Commit changes first' >&2; exit 1; }
 git fetch -q origin main --tags
 head=$(git rev-parse HEAD)
-[ "$head" = "$(git rev-parse origin/main)" ] || { echo 'release: check out current main first' >&2; exit 1; }
+git merge-base --is-ancestor "$head" origin/main || { echo 'Check out a merged main commit' >&2; exit 1; }
+tag=$(git tag --points-at HEAD --list 'v[0-9]*')
+if [ -n "$tag" ]; then
+  [ "$(gh release view "$tag" --json isDraft --jq .isDraft)" = false ] || exit 1
+  printf '%s\n' "$tag"
+  exit 0
+fi
+[ -z "$(git tag --contains HEAD --list 'v[0-9]*')" ] || { echo 'A newer release exists; deploy a published tag explicitly' >&2; exit 1; }
 tag=$(git cliff --config-url "{{vars.changelog_config}}" --offline --unreleased --bumped-version)
-[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]
-[ "$tag" != "$(git describe --tags --abbrev=0 --match 'v[0-9]*')" ] || { echo 'No new Conventional changes to release'; exit 0; }
-make .release/ysh RELEASE_VERSION="${tag#v}"
-[ "$(sh .release/ysh --version)" = "$tag" ]
-[ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
-(cd .release && shasum -a 256 ysh > ysh.sha256)
+if git show-ref --verify --quiet "refs/tags/$tag"; then
+  echo "Tag $tag already exists; inspect its release" >&2
+  exit 1
+fi
+mise run build -- "$tag" >&2
 git cliff --config-url "{{vars.changelog_config}}" --unreleased --tag "$tag" > .release/notes.md
-gh release create "$tag" .release/ysh .release/ysh.sha256 \
-  --repo azohra/yaml.sh --target "$head" \
-  --title "YAML.sh $tag" --notes-file .release/notes.md
+if ! gh release view "$tag" >/dev/null 2>&1; then
+  gh release create "$tag" --draft --target "$head" --title "YAML.sh $tag" --notes-file .release/notes.md >&2
+fi
+[ "$(gh release view "$tag" --json isDraft,targetCommitish --jq ".isDraft and .targetCommitish == \"$head\"")" = true ] || { echo 'Release belongs to different source or is already published' >&2; exit 1; }
+gh release upload "$tag" .release/ysh .release/ysh.sha256 .release/site.tar.gz --clobber >&2
+gh release edit "$tag" --draft=false >&2
+printf '%s\n' "$tag"
 '''
 
-[tasks."build:site"]
-description = "Build the website with an installer pinned to downloaded release assets"
-usage = 'arg "<tag>"; arg "<assets>"'
+[tasks.build]
+description = "Build the executable and deployable website"
+usage = 'arg "[tag]" default="vdev"'
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+tag=${usage_tag:-vdev}
+[[ "$tag" = vdev || "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || exit 1
+make build RELEASE_VERSION="${tag#v}"
+[ "$(sh .release/ysh --version)" = "$tag" ]
+'''
+
+[tasks.deploy]
+description = "Deploy a published website archive"
+tools = { gh = "2.100.0" }
+usage = '''arg "<tag>"
+flag "--dry-run" help="Validate without deploying"'''
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 tag=${usage_tag:?}
-assets=${usage_assets:?}
-[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || exit 1
-(cd "$assets" && shasum -a 256 -c ysh.sha256)
-[ "$(sh "$assets/ysh" --version)" = "$tag" ]
-sha=$(shasum -a 256 "$assets/ysh" | cut -d' ' -f1)
-rm -rf .release/site
-mkdir -p .release/site
-cp -R _static/_www/. .release/site/
-YSH_DOCS_OUTPUT="$PWD/.release/site/docs" ./build/docs.sh
-awk -v version="${tag#v}" -v sha256="$sha" -f build/docbuilder.awk _static/_www/install > .release/site/install
-awk -v version="${tag#v}" -f build/docbuilder.awk _static/_www/index.html > .release/site/index.html
-'''
-
-[tasks.deploy]
-description = "Deploy the site from main using the latest published release for its installer"
-tools = { gh = "2.100.0" }
-usage = 'flag "--dry-run" help="Build and validate without deploying"'
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-[ -z "$(git status --porcelain)" ] || { echo 'deploy: commit changes first' >&2; exit 1; }
-git fetch -q origin main
-[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo 'deploy: check out current main first' >&2; exit 1; }
+[ "$(gh release view "$tag" --json isDraft,isPrerelease --jq '(.isDraft or .isPrerelease) | not')" = true ] || exit 1
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
-tag=$(gh release view --repo azohra/yaml.sh --json tagName --jq .tagName)
-gh release download "$tag" --repo azohra/yaml.sh --pattern ysh --pattern ysh.sha256 --dir "$scratch"
-mise run build:site -- "$tag" "$scratch"
-args=(--assets .release/site)
+gh release download "$tag" --pattern site.tar.gz --dir "$scratch"
+tar -xzf "$scratch/site.tar.gz" -C "$scratch"
+args=()
 if [ "${usage_dry_run:-false}" = true ]; then args+=(--dry-run); fi
-wrangler deploy "${args[@]}"
+wrangler deploy --config "$scratch/wrangler.jsonc" --tag "$tag" "${args[@]}"
 '''
