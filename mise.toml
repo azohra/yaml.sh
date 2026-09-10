@@ -5,6 +5,9 @@
 # Task artifact caching, which check:runtime and check:docs are built on.
 experimental = true
 
+[vars]
+changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/8236e353f4b175a81020b61ae7d237746dd7dd64/cliff.toml"
+
 [env]
 # Where the pinned corpora live. Gitignored: fetched, never committed.
 YSH_EVIDENCE_DIR = "{{config_root}}/.evidence"
@@ -46,7 +49,6 @@ sources = [
   "_static/_www/install",
   "Makefile",
   "mise.toml",
-  "cliff.toml",
 ]
 run = "make ysh lint test"
 
@@ -64,7 +66,6 @@ sources = [
   "*.md",
   "Makefile",
   "mise.toml",
-  "cliff.toml",
 ]
 run = "make ysh docs-check"
 
@@ -235,11 +236,11 @@ run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "${usage_json:-false}" = true ]; then
-  exec git cliff --context
+  exec git cliff --config-url "{{vars.changelog_config}}" --context
 fi
 archive=$(sed -n 's/^## \[\([0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
 printf '# Changelog\n\n'
-git cliff "v$archive..HEAD"
+git cliff --config-url "{{vars.changelog_config}}" "v$archive..HEAD"
 printf '\n'
 awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
@@ -254,14 +255,14 @@ set -euo pipefail
 git fetch -q origin main --tags
 head=$(git rev-parse HEAD)
 [ "$head" = "$(git rev-parse origin/main)" ] || { echo 'release: check out current main first' >&2; exit 1; }
-tag=$(git cliff --offline --unreleased --bumped-version)
+tag=$(git cliff --config-url "{{vars.changelog_config}}" --offline --unreleased --bumped-version)
 [[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]
 [ "$tag" != "$(git describe --tags --abbrev=0 --match 'v[0-9]*')" ] || { echo 'No new Conventional changes to release'; exit 0; }
 make .release/ysh RELEASE_VERSION="${tag#v}"
 [ "$(sh .release/ysh --version)" = "$tag" ]
 [ "$(printf 'answer: 42\n' | sh .release/ysh '.answer')" = 42 ]
 (cd .release && shasum -a 256 ysh > ysh.sha256)
-git cliff --unreleased --tag "$tag" > .release/notes.md
+git cliff --config-url "{{vars.changelog_config}}" --unreleased --tag "$tag" > .release/notes.md
 gh release create "$tag" .release/ysh .release/ysh.sha256 \
   --repo azohra/yaml.sh --target "$head" \
   --title "YAML.sh $tag" --notes-file .release/notes.md

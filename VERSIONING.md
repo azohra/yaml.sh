@@ -29,11 +29,9 @@ The reviewed PR title and body become the squash commit. Its Conventional title
 sets aggregate impact using git-cliff's default bump rules: a breaking header or
 `BREAKING CHANGE:` footer produces a major, `feat` produces a minor, and other
 Conventional changes produce patches. Non-Conventional commits are excluded.
-Nested Conventional headings in the body are ordinary prose. The Conventional PR
-check validates the assembled title and body. Breaking changes require both the
-`!` header marker and a `BREAKING CHANGE:` footer explaining the migration.
-Optional `Security:` and `Deprecated:` footers record supported consequences;
-they do not change version calculation.
+Nested Conventional headings in the body are ordinary prose. The
+[Conventional PR format](https://github.com/azohra/conventional-pr#bodies-and-annotations)
+defines the validated message and optional annotations.
 
 PR checks build and test the proposed merge. Main requires passing checks against
 the current base before merging. The full suite runs before merge; publication
@@ -50,7 +48,8 @@ explanation, including Markdown lists and code examples. Published
 release notes are available in [GitHub Releases](https://github.com/azohra/yaml.sh/releases).
 Changelog rendering uses GitHub PR metadata for links, with commit links when no
 associated PR is available. Set `GITHUB_TOKEN` for authenticated GitHub access;
-version calculation remains offline.
+the preset itself is downloaded for every invocation, including version calculation.
+Its URL in `mise.toml` pins the shared configuration to a reviewed commit.
 
 `mise run changelog -- --json` exports git-cliff's structured context, including
 bodies, footers and available GitHub metadata. It covers Git history only; it
