@@ -49,7 +49,7 @@ release notes are available in [GitHub Releases](https://github.com/azohra/yaml.
 Changelog rendering uses GitHub PR metadata for links, with commit links when no
 associated PR is available. Set `GITHUB_TOKEN` for authenticated GitHub access;
 the preset itself is downloaded for every invocation, including version calculation.
-Its URL in `mise.toml` pins the shared configuration to a reviewed commit.
+Its URL in `mise.toml` follows the shared configuration on main.
 
 `mise run changelog -- --json` exports git-cliff's structured context, including
 bodies, footers and available GitHub metadata. It covers Git history only; it
