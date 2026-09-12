@@ -4,7 +4,8 @@ on:
   pull_request_target:
     types: [opened, reopened, edited, synchronize]
 
-permissions: {}
+permissions:
+  pull-requests: read
 
 jobs:
   title:
@@ -12,4 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: azohra/conventional-pr@c86109511263ca80e66a2fb8500182c2890dc121
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            build
+            chore
+            ci
+            docs
+            feat
+            fix
+            perf
+            refactor
+            revert
+            style
+            test
+          requireScope: false
