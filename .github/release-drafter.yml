@@ -18,14 +18,13 @@ autolabeler:
       - '/^fix(\(.+\))?!?:/'
   - label: skip-changelog
     title:
-      - '/^(build|chore|ci|docs|style|test)(\(.+\))?:/'
+      - '/^(build|chore|ci|docs|style|test)(\(.+\))?!?:/'
 
 categories:
+  # Explicit exclusions apply to both notes and versioning, even with a !.
   - type: pre-exclude
     when:
-      conventional:
-        types: [build, chore, ci, docs, style, test]
-        breaking: false
+      label: skip-changelog
   - type: version-resolver
     semver-increment: major
     when:
