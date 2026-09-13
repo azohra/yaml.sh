@@ -1,21 +1,14 @@
-name: Release and deploy
+name: Release
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags: ["v*"]
 
 permissions:
   contents: write
-  pull-requests: read
-
-concurrency:
-  group: release
-  queue: max
 
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -27,16 +20,26 @@ jobs:
           MISE_GITHUB_TOKEN: ${{ github.token }}
         with:
           minimum_release_age: 24h
-      - name: Release when ysh changed
-        id: release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          tag=$(mise run --quiet release)
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - name: Deploy the website
-        env:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        id: bosun
+        with:
+          client-id: ${{ vars.BOSUN_CLIENT_ID }}
+          private-key: ${{ secrets.BOSUN_PRIVATE_KEY }}
+          owner: azohra
+          repositories: homebrew-tools
+          permission-contents: write
+          permission-pull-requests: write
+      - env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: mise run deploy "$RELEASE_TAG"
+          HOMEBREW_TOOLS_TOKEN: ${{ steps.bosun.outputs.token }}
+        run: mise run release
+      # A published release with no ysh would be "latest" for the installer and
+      # Homebrew. Return it to draft and drop the tag, so the previous release is
+      # latest again and publishing the draft later recreates the tag on main.
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$GITHUB_REF_NAME" --draft=true
+          git push --delete origin "refs/tags/$GITHUB_REF_NAME" || true

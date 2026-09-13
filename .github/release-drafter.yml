@@ -1,0 +1,48 @@
+# The draft release is the list of what is unreleased. Merging a pull request
+# refreshes it; publishing it creates the tag that runs the Release workflow.
+name-template: 'YAML.sh v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+change-template: '- $TITLE (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+# Labels come from the Conventional title, so nothing new to remember.
+autolabeler:
+  - label: breaking
+    title:
+      - '/^\w+(\(.+\))?!:/'
+  - label: feature
+    title:
+      - '/^feat(\(.+\))?!?:/'
+  - label: fix
+    title:
+      - '/^fix(\(.+\))?!?:/'
+  - label: skip-changelog
+    title:
+      - '/^(build|chore|ci|docs|style|test)(\(.+\))?:/'
+
+categories:
+  - type: pre-exclude
+    when:
+      conventional:
+        types: [build, chore, ci, docs, style, test]
+        breaking: false
+  - type: version-resolver
+    semver-increment: major
+    when:
+      conventional:
+        breaking: true
+  - title: Added
+    semver-increment: minor
+    when:
+      label: feature
+  - title: Fixed
+    semver-increment: patch
+    when:
+      label: fix
+  - type: version-resolver
+    semver-increment: patch
+
+template: |
+  $CHANGES
+
+  https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

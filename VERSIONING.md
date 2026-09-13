@@ -25,18 +25,21 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 
 ## Changes and validation
 
-The reviewed PR title and body become the squash commit. A version is cut only
-when the assembled `ysh` differs from the published release; documentation,
-website and tooling merges deploy the website and do not release. When it does
-differ, the Conventional titles since the last release choose the number with
-git-cliff's rules: a breaking header or `BREAKING CHANGE:` footer produces a
-major, `feat` a minor, `fix` a patch. `build`, `chore`, `ci`, `docs`, `style`
-and `test` never move the version, so a change to the program needs a `feat`
-or `fix` title.
+The reviewed PR title and body become the squash commit. release-drafter keeps
+one draft release: every merge to main adds the pull request's title under
+Added or Fixed, from labels the Conventional title sets on its own, and
+resolves the next version with git-cliff's rules: a breaking title is a major,
+`feat` a minor, `fix` a patch. `build`, `chore`, `ci`, `docs`, `style` and
+`test` titles stay out of the draft. The draft is the answer to "what is
+unreleased", and editing it is where release notes get written.
+
+A version names a change to the program. Publishing a draft whose `ysh` is
+byte-identical to the previous release fails and returns to draft; a change to
+the program needs a `feat` or `fix` title, and a site or documentation change
+deploys on merge without a version.
 
 PR checks build and test the proposed merge. Main requires passing checks against
-the current base before merging. The full suite runs before merge; publication
-smoke-tests the versioned artifact.
+the current base before merging.
 
 ```sh
 mise run changelog
@@ -44,18 +47,17 @@ mise run changelog
 
 This renders recorded changes and releases from Git, followed by the historical
 entries in `CHANGELOG.md`. Each entry shows the reviewed title and PR link, with
-the body, migration instructions and footers visible. Published release notes are available in [GitHub Releases](https://github.com/azohra/yaml.sh/releases).
-Changelog rendering uses GitHub PR metadata for links, with commit links when no
+the body, migration instructions and footers visible. Published release notes
+are the drafts as they were published, in
+[GitHub Releases](https://github.com/azohra/yaml.sh/releases). Changelog
+rendering uses GitHub PR metadata for links, with commit links when no
 associated PR is available. Set `GITHUB_TOKEN` for authenticated GitHub access;
 the shared git-cliff config named in `mise.toml` is downloaded for every
-invocation, including version calculation.
+invocation.
 
 `mise run changelog -- --json` exports git-cliff's structured context, including
 bodies, footers and available GitHub metadata. It covers Git history only; it
 does not convert the Markdown archive. Redirect either output to a file when needed.
-Release notes use the same template for the unreleased changes.
-
-Versions and notes are calculated without rewriting source or opening a version PR.
 
 ## Build, release and deploy
 
@@ -65,19 +67,15 @@ checks. The executable is smoke-tested, documentation is generated from
 Markdown, and the installer and homepage use that executable's version.
 Generated output is not committed.
 
-Every merge to main runs the Release and deploy workflow. `mise run release`
-builds `ysh` as the published version and compares checksums. Unchanged: it
-prints the current tag and stops. Changed: it computes the next version, builds
-it, publishes the release with `ysh`, `ysh.sha256` and generated notes, and
-prints the new tag. An interrupted draft upload can be retried from the same
-source; a draft belonging to different source is refused.
+Every merge to main deploys the website, built for the latest published
+release, so documentation changes go live on merge and the installer always
+points at the current `ysh`.
 
-`mise run deploy <tag>` builds the website from the checkout for that published
-release and deploys it to Cloudflare, tagged with the version and commit. The
-installer on the site therefore always points at the latest published `ysh`,
-and documentation changes go live on merge. Cloudflare keeps every deployed
-version; to restore an earlier one, use `wrangler rollback` or check out the
-commit and deploy again.
-
-Homebrew's updater follows the published executable and checksum independently
-of website deployment.
+Publishing the draft creates the tag. That runs the Release workflow, which is
+`mise run release`: build `ysh` for the tag, refuse if it is byte-identical to
+the previous release, attach `ysh` and `ysh.sha256` to the release, deploy the
+website stamped with the new version, and open a pull request in
+homebrew-tools that moves the formula to the release, verified against the
+release's own checksum, using a token minted from the Bosun app. Assets appear
+a minute or two after publishing; if the build fails, the release returns to
+draft and its tag is removed, so the previous release stays latest.
