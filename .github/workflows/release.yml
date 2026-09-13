@@ -34,12 +34,3 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           HOMEBREW_TOOLS_TOKEN: ${{ steps.bosun.outputs.token }}
         run: mise run release
-      # A published release with no ysh would be "latest" for the installer and
-      # Homebrew. Return it to draft and drop the tag, so the previous release is
-      # latest again and publishing the draft later recreates the tag on main.
-      - if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release edit "$GITHUB_REF_NAME" --draft=true
-          git push --delete origin "refs/tags/$GITHUB_REF_NAME" || true
