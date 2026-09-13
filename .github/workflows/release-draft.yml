@@ -14,24 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Labels from the Conventional title; the draft groups and versions by them.
-  label:
-    if: github.event_name == 'pull_request_target'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: release-drafter/release-drafter/autolabeler@34d80673e067bdc0c24568d3af899c216adcfaa9 # v7.7.0
-
-  draft:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  release:
+    uses: azohra/.github/.github/workflows/release-draft.yml@main
     permissions:
       contents: write
-      pull-requests: read
-    steps:
-      - uses: release-drafter/release-drafter@34d80673e067bdc0c24568d3af899c216adcfaa9 # v7.7.0
-        with:
-          config-name: release-drafter.yml
+      pull-requests: write
