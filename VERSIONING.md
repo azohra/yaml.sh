@@ -26,12 +26,15 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 ## Changes and validation
 
 The reviewed PR title and body become the squash commit. release-drafter keeps
-one draft release: every merge to main adds the pull request's title under
-Added or Fixed, from labels the Conventional title sets on its own, and
-resolves the next version with git-cliff's rules: a breaking title is a major,
-`feat` a minor, `fix` a patch. `build`, `chore`, `ci`, `docs`, `style` and
-`test` titles stay out of the draft. The draft is the answer to "what is
-unreleased", and editing it is where release notes get written.
+one draft release. `skip-changelog` excludes a pull request from both notes and
+version calculation, including titles with a `!` marker. Tooling types
+(`build`, `chore`, `ci`, `docs`, `style`, `test`) receive that label
+automatically; other changes can be explicitly excluded too.
+
+For included changes, labels group features under Added and fixes under Fixed.
+Release Drafter resolves a breaking title to a major, `feat` to a minor, and
+`fix` to a patch. Exclusion is decided first. The draft records what is
+unreleased and is where release notes are edited.
 
 A version names a change to the program. Publishing a draft whose `ysh` is
 byte-identical to the previous release fails and returns to draft; a change to
