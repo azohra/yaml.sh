@@ -33,5 +33,12 @@ jobs:
       pull-requests: read
     steps:
       - uses: release-drafter/release-drafter@34d80673e067bdc0c24568d3af899c216adcfaa9 # v7.7.0
+        id: draft
         with:
           config-name: release-drafter.yml
+      # A draft with nothing in it would say there is something to release.
+      # Delete it; the next merge that adds a change recreates it.
+      - if: contains(steps.draft.outputs.body, '* No changes')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/${{ steps.draft.outputs.id }}"
