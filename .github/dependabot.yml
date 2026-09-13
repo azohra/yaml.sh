@@ -1,6 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
+    labels: ["dependencies"]
     directory: "/"
     schedule:
       interval: "weekly"
@@ -18,6 +19,7 @@ updates:
       prefix: ci
       include: scope
   - package-ecosystem: "docker"
+    labels: ["dependencies"]
     directory: "/test"
     schedule:
       interval: "weekly"
