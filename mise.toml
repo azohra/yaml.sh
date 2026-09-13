@@ -6,7 +6,7 @@
 experimental = true
 
 [vars]
-changelog_config = "https://raw.githubusercontent.com/azohra/conventional-pr/main/cliff.toml"
+changelog_config = "https://gist.githubusercontent.com/azohra/2bf7f60736469fa8a81ffcb67214e572/raw/cliff.toml"
 
 [env]
 # Where the pinned corpora live. Gitignored: fetched, never committed.
@@ -247,25 +247,35 @@ awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
 
 [tasks.release]
-description = "Build and publish the checked-out main commit; print its tag"
+description = "Publish ysh when the assembled program changed; print the current tag either way"
 tools = { gh = "2.100.0" }
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-[ -z "$(git status --porcelain)" ] || { echo 'Commit changes first' >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
 git fetch -q origin main --tags
 head=$(git rev-parse HEAD)
-git merge-base --is-ancestor "$head" origin/main || { echo 'Check out a merged main commit' >&2; exit 1; }
-tag=$(git tag --points-at HEAD --list 'v[0-9]*')
-if [ -n "$tag" ]; then
-  [ "$(gh release view "$tag" --json isDraft --jq .isDraft)" = false ] || exit 1
-  printf '%s\n' "$tag"
+git merge-base --is-ancestor "$head" origin/main || { echo 'release: check out a merged main commit' >&2; exit 1; }
+digest() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
+
+# A version names a change to the program. Build ysh as the published version
+# and compare bytes; docs, site and tooling merges leave it identical.
+current=$(gh release view --json tagName --jq .tagName)
+[[ "$current" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || { echo "release: no published release to compare against" >&2; exit 1; }
+make .release/ysh RELEASE_VERSION="${current#v}" >/dev/null
+published=$(gh release download "$current" --pattern ysh.sha256 --output - | cut -d' ' -f1)
+if [ "$(digest .release/ysh)" = "$published" ]; then
+  echo "ysh is unchanged since $current; nothing to release" >&2
+  printf '%s
+' "$current"
   exit 0
 fi
-[ -z "$(git tag --contains HEAD --list 'v[0-9]*')" ] || { echo 'A newer release exists; deploy a published tag explicitly' >&2; exit 1; }
+
 tag=$(git cliff --config-url "{{vars.changelog_config}}" --offline --unreleased --bumped-version)
+[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || { echo "release: could not compute a version" >&2; exit 1; }
+[ "$tag" != "$current" ] || { echo "release: ysh changed since $current but no feat or fix commit moves the version" >&2; exit 1; }
 if git show-ref --verify --quiet "refs/tags/$tag"; then
-  echo "Tag $tag already exists; inspect its release" >&2
+  echo "release: tag $tag already exists; inspect its release" >&2
   exit 1
 fi
 mise run build -- "$tag" >&2
@@ -273,14 +283,15 @@ git cliff --config-url "{{vars.changelog_config}}" --unreleased --tag "$tag" > .
 if ! gh release view "$tag" >/dev/null 2>&1; then
   gh release create "$tag" --draft --target "$head" --title "YAML.sh $tag" --notes-file .release/notes.md >&2
 fi
-[ "$(gh release view "$tag" --json isDraft,targetCommitish --jq ".isDraft and .targetCommitish == \"$head\"")" = true ] || { echo 'Release belongs to different source or is already published' >&2; exit 1; }
-gh release upload "$tag" .release/ysh .release/ysh.sha256 .release/site.tar.gz --clobber >&2
+[ "$(gh release view "$tag" --json isDraft,targetCommitish --jq ".isDraft and .targetCommitish == \"$head\"")" = true ] || { echo 'release: the draft belongs to different source or is already published' >&2; exit 1; }
+gh release upload "$tag" .release/ysh .release/ysh.sha256 --clobber >&2
 gh release edit "$tag" --draft=false >&2
-printf '%s\n' "$tag"
+printf '%s
+' "$tag"
 '''
 
 [tasks.build]
-description = "Build the executable and deployable website"
+description = "Build the executable and the website"
 usage = 'arg "[tag]" default="vdev"'
 run = '''
 #!/usr/bin/env bash
@@ -292,20 +303,14 @@ make build RELEASE_VERSION="${tag#v}"
 '''
 
 [tasks.deploy]
-description = "Deploy a published website archive"
+description = "Build the website for a published release and deploy it"
 tools = { gh = "2.100.0" }
-usage = '''arg "<tag>"
-flag "--dry-run" help="Validate without deploying"'''
+usage = 'arg "<tag>"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 tag=${usage_tag:?}
-[ "$(gh release view "$tag" --json isDraft,isPrerelease --jq '(.isDraft or .isPrerelease) | not')" = true ] || exit 1
-scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
-gh release download "$tag" --pattern site.tar.gz --dir "$scratch"
-tar -xzf "$scratch/site.tar.gz" -C "$scratch"
-args=()
-if [ "${usage_dry_run:-false}" = true ]; then args+=(--dry-run); fi
-wrangler deploy --config "$scratch/wrangler.jsonc" --tag "$tag" "${args[@]}"
+[ "$(gh release view "$tag" --json isDraft,isPrerelease --jq '(.isDraft or .isPrerelease) | not')" = true ] || { echo "deploy: $tag is not a published release" >&2; exit 1; }
+mise run build -- "$tag" >&2
+wrangler deploy --tag "$tag-$(git rev-parse --short HEAD)"
 '''

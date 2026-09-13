@@ -25,13 +25,14 @@ Undocumented internals and rejected malformed or unsupported input are outside t
 
 ## Changes and validation
 
-The reviewed PR title and body become the squash commit. Its Conventional title
-sets aggregate impact using git-cliff's default bump rules: a breaking header or
-`BREAKING CHANGE:` footer produces a major, `feat` produces a minor, and other
-Conventional changes produce patches. Non-Conventional commits are excluded.
-Nested Conventional headings in the body are ordinary prose. The
-[Conventional PR format](https://github.com/azohra/conventional-pr#bodies-and-annotations)
-defines the validated message and optional annotations.
+The reviewed PR title and body become the squash commit. A version is cut only
+when the assembled `ysh` differs from the published release; documentation,
+website and tooling merges deploy the website and do not release. When it does
+differ, the Conventional titles since the last release choose the number with
+git-cliff's rules: a breaking header or `BREAKING CHANGE:` footer produces a
+major, `feat` a minor, `fix` a patch. `build`, `chore`, `ci`, `docs`, `style`
+and `test` never move the version, so a change to the program needs a `feat`
+or `fix` title.
 
 PR checks build and test the proposed merge. Main requires passing checks against
 the current base before merging. The full suite runs before merge; publication
@@ -43,13 +44,11 @@ mise run changelog
 
 This renders recorded changes and releases from Git, followed by the historical
 entries in `CHANGELOG.md`. Each entry shows the reviewed title and PR link, with
-migration instructions and footers visible. Expand **Details** for the full
-explanation, including Markdown lists and code examples. Published
-release notes are available in [GitHub Releases](https://github.com/azohra/yaml.sh/releases).
+the body, migration instructions and footers visible. Published release notes are available in [GitHub Releases](https://github.com/azohra/yaml.sh/releases).
 Changelog rendering uses GitHub PR metadata for links, with commit links when no
 associated PR is available. Set `GITHUB_TOKEN` for authenticated GitHub access;
-the preset itself is downloaded for every invocation, including version calculation.
-Its URL in `mise.toml` follows the shared configuration on main.
+the shared git-cliff config named in `mise.toml` is downloaded for every
+invocation, including version calculation.
 
 `mise run changelog -- --json` exports git-cliff's structured context, including
 bodies, footers and available GitHub metadata. It covers Git history only; it
@@ -60,39 +59,25 @@ Versions and notes are calculated without rewriting source or opening a version 
 
 ## Build, release and deploy
 
-`mise run build [tag]` produces the executable, its checksum and the deployable
-website archive in `.release/`. Without a tag, it builds `vdev` for local checks.
-The executable is smoke-tested, documentation is generated from Markdown, and
-the installer and homepage use that executable's version. Generated pages are
-build output and are not committed.
+`mise run build [tag]` produces the executable and its checksum in `.release/`
+and the website in `.release/site`. Without a tag it builds `vdev` for local
+checks. The executable is smoke-tested, documentation is generated from
+Markdown, and the installer and homepage use that executable's version.
+Generated output is not committed.
 
-Each merge to main queues a release of that commit, followed by website
-deployment. Git-cliff calculates the version once; the build receives it and
-the release notes use it. PR checks exercise the same build with a development
-version, including the generated site's links and deployment configuration.
+Every merge to main runs the Release and deploy workflow. `mise run release`
+builds `ysh` as the published version and compares checksums. Unchanged: it
+prints the current tag and stops. Changed: it computes the next version, builds
+it, publishes the release with `ysh`, `ysh.sha256` and generated notes, and
+prints the new tag. An interrupted draft upload can be retried from the same
+source; a draft belonging to different source is refused.
 
-`mise run release` publishes the checked-out main commit and prints its tag.
-The release contains `ysh`, `ysh.sha256` and `site.tar.gz`. The archive contains
-the generated website and its Wrangler configuration. No source version file
-or generated changelog commit is required.
+`mise run deploy <tag>` builds the website from the checkout for that published
+release and deploys it to Cloudflare, tagged with the version and commit. The
+installer on the site therefore always points at the latest published `ysh`,
+and documentation changes go live on merge. Cloudflare keeps every deployed
+version; to restore an earlier one, use `wrangler rollback` or check out the
+commit and deploy again.
 
-An interrupted draft upload can be retried with `mise run release` from the
-same source: it rebuilds that version and replaces only draft assets before
-publishing. A draft belonging to different source is refused. Once published,
-repeating release returns its tag without rebuilding or replacing assets.
-Local publication should not run alongside the workflow. New releases from
-source older than an existing descendant release are refused.
-
-```sh
-mise run deploy <release-tag> --dry-run
-mise run deploy <release-tag>
-```
-
-Deployment downloads and extracts the published archive and uses its Wrangler
-configuration. It does not use the checkout's website files or rebuild the
-product. The same command retries deployment or restores an earlier release,
-without switching branches. Releases created before the website archive was
-introduced do not contain this deployable bundle.
-
-A failed deployment leaves the published release available. Homebrew's updater
-follows the published executable and checksum independently of website deployment.
+Homebrew's updater follows the published executable and checksum independently
+of website deployment.
