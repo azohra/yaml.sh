@@ -33,16 +33,16 @@ jobs:
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ steps.task-cache.outputs.dir }}
-          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: mise-tasks-docs-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: |
-            mise-tasks-${{ runner.os }}-${{ runner.arch }}-
+            mise-tasks-docs-${{ runner.os }}-${{ runner.arch }}-
       - name: Validate generated pages, links, assets, and docs JavaScript
         run: mise run check:docs
       - if: github.event_name == 'push'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ steps.task-cache.outputs.dir }}
-          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: mise-tasks-docs-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
 
   test:
     strategy:
@@ -96,15 +96,15 @@ jobs:
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ steps.task-cache.outputs.dir }}
-          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: mise-tasks-portability-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: |
-            mise-tasks-${{ runner.os }}-${{ runner.arch }}-
+            mise-tasks-portability-${{ runner.os }}-${{ runner.arch }}-
       - run: mise run check:linux-portability
       - if: github.event_name == 'push'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ steps.task-cache.outputs.dir }}
-          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: mise-tasks-portability-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
 
   check:
     name: Check
