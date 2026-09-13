@@ -46,7 +46,7 @@ Edit the sources and run their build command:
 | --- | --- |
 | `ysh` (ignored) | `src/ysh.sh`, `src/awk/*.awk`, and `src/diff.awk`; `make ysh` builds the development executable |
 | `.release/site/docs/` | `mise run build` renders the documentation Markdown; these outputs are not committed |
-| `.release/` (ignored) | `mise run release` builds and publishes the versioned executable, checksum, website archive and release notes |
+| `.release/` (ignored) | Build output: the versioned executable, its checksum and the generated website |
 | `.release/site/` (ignored) | `mise run build [tag]` builds the executable and website together, including the deployable archive |
 
 The PR title and body become the squash commit and supply the changelog.

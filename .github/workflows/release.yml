@@ -1,4 +1,4 @@
-name: Release
+name: Release and deploy
 
 on:
   push:
@@ -27,14 +27,14 @@ jobs:
           MISE_GITHUB_TOKEN: ${{ github.token }}
         with:
           minimum_release_age: 24h
-      - name: Release
+      - name: Release when ysh changed
         id: release
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           tag=$(mise run --quiet release)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - name: Deploy
+      - name: Deploy the website
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
