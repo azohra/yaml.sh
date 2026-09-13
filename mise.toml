@@ -29,7 +29,10 @@ hide = true
 description = "Every variable this repository needs, and whether it is a secret"
 run = """
 cat <<'CONTRACT'
+secret  BOSUN_PRIVATE_KEY
 secret  CLOUDFLARE_API_TOKEN
+secret  GITHUB_TOKEN
+value   BOSUN_CLIENT_ID
 CONTRACT
 """
 
@@ -247,47 +250,73 @@ awk '/^## \[/{history=1} history' CHANGELOG.md
 '''
 
 [tasks.release]
-description = "Publish ysh when the assembled program changed; print the current tag either way"
+description = "Attach ysh to the release for the checked-out tag, deploy the website, and propose the formula"
 tools = { gh = "2.100.0" }
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-[ -z "$(git status --porcelain)" ] || { echo 'release: commit changes first' >&2; exit 1; }
-git fetch -q origin main --tags
-head=$(git rev-parse HEAD)
-git merge-base --is-ancestor "$head" origin/main || { echo 'release: check out a merged main commit' >&2; exit 1; }
 digest() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
+tag=$(git describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null || true)
+[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || { echo 'release: check out a v* tag; publishing the draft creates it' >&2; exit 1; }
+[ "$(gh release view "$tag" --json isDraft --jq .isDraft)" = false ] || { echo "release: $tag is still a draft" >&2; exit 1; }
 
-# A version names a change to the program. Build ysh as the published version
-# and compare bytes; docs, site and tooling merges leave it identical.
-current=$(gh release view --json tagName --jq .tagName)
-[[ "$current" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || { echo "release: no published release to compare against" >&2; exit 1; }
-make .release/ysh RELEASE_VERSION="${current#v}" >/dev/null
-published=$(gh release download "$current" --pattern ysh.sha256 --output - | cut -d' ' -f1)
-if [ "$(digest .release/ysh)" = "$published" ]; then
-  echo "ysh is unchanged since $current; nothing to release" >&2
-  printf '%s
-' "$current"
-  exit 0
+# A version names a change to the program. Build ysh as the previous version
+# and compare bytes; a release whose ysh is identical is refused, and the
+# workflow returns it to draft.
+previous=$(gh release list --exclude-drafts --exclude-pre-releases --json tagName --jq "[.[].tagName | select(. != \"$tag\")] | first")
+if [[ "$previous" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+  make .release/ysh RELEASE_VERSION="${previous#v}" >/dev/null
+  if [ "$(digest .release/ysh)" = "$(gh release download "$previous" --pattern ysh.sha256 --output - | cut -d' ' -f1)" ]; then
+    echo "release: ysh is byte-identical to $previous; a new version needs a change to the program" >&2
+    exit 1
+  fi
 fi
 
-tag=$(git cliff --config-url "{{vars.changelog_config}}" --offline --unreleased --bumped-version)
-[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || { echo "release: could not compute a version" >&2; exit 1; }
-[ "$tag" != "$current" ] || { echo "release: ysh changed since $current but no feat or fix commit moves the version" >&2; exit 1; }
-if git show-ref --verify --quiet "refs/tags/$tag"; then
-  echo "release: tag $tag already exists; inspect its release" >&2
-  exit 1
-fi
 mise run build -- "$tag" >&2
-git cliff --config-url "{{vars.changelog_config}}" --unreleased --tag "$tag" > .release/notes.md
-if ! gh release view "$tag" >/dev/null 2>&1; then
-  gh release create "$tag" --draft --target "$head" --title "YAML.sh $tag" --notes-file .release/notes.md >&2
-fi
-[ "$(gh release view "$tag" --json isDraft,targetCommitish --jq ".isDraft and .targetCommitish == \"$head\"")" = true ] || { echo 'release: the draft belongs to different source or is already published' >&2; exit 1; }
 gh release upload "$tag" .release/ysh .release/ysh.sha256 --clobber >&2
-gh release edit "$tag" --draft=false >&2
-printf '%s
-' "$tag"
+wrangler deploy --tag "$tag-$(git rev-parse --short HEAD)" >&2
+mise run homebrew:propose -- "$tag"
+'''
+
+[tasks."homebrew:propose"]
+description = "Open the pull request in homebrew-tools that moves the ysh formula to a published release"
+tools = { gh = "2.100.0" }
+usage = '''arg "<tag>"
+flag "--dry-run" help="Print the formula change without writing to homebrew-tools"'''
+run = '''
+#!/usr/bin/env bash
+# Needs HOMEBREW_TOOLS_TOKEN: a token that may write contents and pull requests
+# in azohra/homebrew-tools. In CI it is minted per run from the Bosun app.
+set -euo pipefail
+tag=${usage_tag:?}
+tap=azohra/homebrew-tools
+[[ "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || exit 1
+[ "$(gh release view "$tag" --json isDraft,isPrerelease --jq '(.isDraft or .isPrerelease) | not')" = true ] || { echo "homebrew:propose: $tag is not a published release" >&2; exit 1; }
+scratch=$(mktemp -d); trap 'rm -rf "$scratch"' EXIT
+gh release download "$tag" --pattern ysh --pattern ysh.sha256 --dir "$scratch"
+expected=$(sed -nE 's/^([0-9a-f]{64})  ysh$/\1/p' "$scratch/ysh.sha256")
+actual=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$scratch/ysh"; else shasum -a 256 "$scratch/ysh"; fi | cut -d' ' -f1)
+[[ "$expected" =~ ^[0-9a-f]{64}$ ]] && [ "$actual" = "$expected" ] || { echo 'homebrew:propose: release bytes do not match the checksum' >&2; exit 1; }
+
+export GH_TOKEN="${HOMEBREW_TOOLS_TOKEN:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
+current=$(gh api "repos/$tap/contents/ysh.rb" --jq .content | base64 -d)
+blob=$(gh api "repos/$tap/contents/ysh.rb" --jq .sha)
+updated=$(printf '%s\n' "$current" | sed -E \
+  -e "s@/releases/download/v[0-9]+[.][0-9]+[.][0-9]+/ysh@/releases/download/$tag/ysh@" \
+  -e "s@^  sha256 \"[0-9a-f]+\"@  sha256 \"$actual\"@")
+if [ "$updated" = "$current" ]; then echo "homebrew:propose: the formula already points at $tag"; exit 0; fi
+if [ "${usage_dry_run:-false}" = true ]; then diff <(printf '%s\n' "$current") <(printf '%s\n' "$updated") || true; exit 0; fi
+
+branch="ysh-${tag#v}"
+main=$(gh api "repos/$tap/git/ref/heads/main" --jq .object.sha)
+gh api "repos/$tap/git/refs" -f ref="refs/heads/$branch" -f sha="$main" >/dev/null 2>&1 || true
+gh api -X PUT "repos/$tap/contents/ysh.rb" \
+  -f message="chore(deps): update ysh to $tag" -f branch="$branch" -f sha="$blob" \
+  -f content="$(printf '%s\n' "$updated" | base64)" \
+  -f 'committer[name]=azohra-bosun[bot]' -f 'committer[email]=325107280+azohra-bosun[bot]@users.noreply.github.com' >/dev/null
+gh pr create --repo "$tap" --head "$branch" --base main \
+  --title "chore(deps): update ysh to $tag" \
+  --body "YAML.sh $tag is published. The formula moves to its executable and checksum, verified against the release's own \`ysh.sha256\`."
 '''
 
 [tasks.build]
@@ -303,13 +332,13 @@ make build RELEASE_VERSION="${tag#v}"
 '''
 
 [tasks.deploy]
-description = "Build the website for a published release and deploy it"
+description = "Build the website for the latest published release and deploy it"
 tools = { gh = "2.100.0" }
-usage = 'arg "<tag>"'
+usage = 'arg "[tag]" help="Published release to stamp the site with; defaults to the latest"'
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-tag=${usage_tag:?}
+tag=${usage_tag:-$(gh release view --json tagName --jq .tagName)}
 [ "$(gh release view "$tag" --json isDraft,isPrerelease --jq '(.isDraft or .isPrerelease) | not')" = true ] || { echo "deploy: $tag is not a published release" >&2; exit 1; }
 mise run build -- "$tag" >&2
 wrangler deploy --tag "$tag-$(git rev-parse --short HEAD)"
