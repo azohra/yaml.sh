@@ -77,7 +77,22 @@ run = ["make ysh docs-check", "wrangler deploy --dry-run"]
 # laptop and a runner. The native CI matrix remains the macOS portability
 # authority; an Ubuntu container cannot prove those implementations.
 [tasks."check:linux-portability"]
+outputs = []
+cache = { enabled = true }
 description = "Test the Linux AWK and shell matrix in Ubuntu 26.04 (requires Docker)"
+# The container copies the tree and runs the suites and docs-check, so its
+# inputs are both halves of the battery plus what shapes the image.
+sources = [
+  "src/**",
+  "build/**",
+  "test/**",
+  "bench/**",
+  "_static/**",
+  "*.md",
+  "Makefile",
+  "mise.toml",
+  ".dockerignore",
+]
 run = """
 #!/usr/bin/env bash
 set -euo pipefail

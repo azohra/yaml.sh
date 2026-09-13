@@ -2,6 +2,8 @@ name: Check
 
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -9,7 +11,7 @@ permissions:
 
 concurrency:
   group: check-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   docs:
@@ -23,8 +25,24 @@ jobs:
           MISE_GITHUB_TOKEN: ${{ github.token }}
         with:
           minimum_release_age: 24h
+      # mise's task artifact cache: a task whose inputs match an entry replays
+      # instead of running. Pull requests read what main has proven; only main
+      # writes, so a pull request can never seed an entry main relies on.
+      - id: task-cache
+        run: echo "dir=$(mise cache path)/task-artifacts" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.task-cache.outputs.dir }}
+          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            mise-tasks-${{ runner.os }}-${{ runner.arch }}-
       - name: Validate generated pages, links, assets, and docs JavaScript
         run: mise run check:docs
+      - if: github.event_name == 'push'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.task-cache.outputs.dir }}
+          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
 
   test:
     strategy:
@@ -40,8 +58,24 @@ jobs:
           MISE_GITHUB_TOKEN: ${{ github.token }}
         with:
           minimum_release_age: 24h
+      # mise's task artifact cache: a task whose inputs match an entry replays
+      # instead of running. Pull requests read what main has proven; only main
+      # writes, so a pull request can never seed an entry main relies on.
+      - id: task-cache
+        run: echo "dir=$(mise cache path)/task-artifacts" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.task-cache.outputs.dir }}
+          key: mise-tasks-${{ matrix.os }}-${{ github.sha }}
+          restore-keys: |
+            mise-tasks-${{ matrix.os }}-
       - name: Build, lint, and test
         run: mise run check:runtime
+      - if: github.event_name == 'push'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.task-cache.outputs.dir }}
+          key: mise-tasks-${{ matrix.os }}-${{ github.sha }}
 
   linux-portability:
     name: Linux AWK and shell portability
@@ -54,7 +88,23 @@ jobs:
           MISE_GITHUB_TOKEN: ${{ github.token }}
         with:
           minimum_release_age: 24h
+      # mise's task artifact cache: a task whose inputs match an entry replays
+      # instead of running. Pull requests read what main has proven; only main
+      # writes, so a pull request can never seed an entry main relies on.
+      - id: task-cache
+        run: echo "dir=$(mise cache path)/task-artifacts" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.task-cache.outputs.dir }}
+          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            mise-tasks-${{ runner.os }}-${{ runner.arch }}-
       - run: mise run check:linux-portability
+      - if: github.event_name == 'push'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.task-cache.outputs.dir }}
+          key: mise-tasks-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
 
   check:
     name: Check
