@@ -16,4 +16,3 @@ YSH_DOCS_OUTPUT="$PWD/.release/site/docs" ./build/docs.sh
 find .release/site -name '*.md' -delete
 awk -v version="${tag#v}" -v sha256="$sha" -f build/docbuilder.awk _static/_www/install > .release/site/install
 awk -v version="${tag#v}" -f build/docbuilder.awk _static/_www/index.html > .release/site/index.html
-tar -czf .release/site.tar.gz wrangler.jsonc .release/site
