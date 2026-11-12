@@ -223,9 +223,13 @@ image=$(docker build --quiet --build-arg "YQ_VERSION=$(mise current yq)" --file 
 docker run --rm --network none --volume "$dir:/evidence:ro" "$image" ./test/busybox-evidence-container.sh
 """
 
+[tasks."check:tasks"]
+description = "Every task definition is valid"
+run = "mise tasks validate"
+
 [tasks.check]
 description = "The Makefile's full battery: build, lint, tests, docs"
-depends = ["check:runtime", "check:docs"]
+depends = ["check:tasks", "check:runtime", "check:docs"]
 
 [tasks.push]
 description = "Push a checked feature branch for review"
