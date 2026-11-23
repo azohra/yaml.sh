@@ -1,0 +1,18 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  merge:
+    uses: azohra/.github/.github/workflows/dependabot-merge.yml@main
+    secrets:
+      BOSUN_PRIVATE_KEY: ${{ secrets.BOSUN_PRIVATE_KEY }}
