@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78
         env:
           MISE_GITHUB_TOKEN: ${{ github.token }}
         with:
