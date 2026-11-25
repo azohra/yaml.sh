@@ -11,6 +11,12 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Bosun's key mints a token for every repository Bosun is installed in,
+    # and the Cloudflare token reaches the whole account, so both are held in
+    # an environment only main and a v* tag may use.
+    environment:
+      name: automation
+      deployment: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
